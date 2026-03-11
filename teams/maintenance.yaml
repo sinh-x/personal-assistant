@@ -1,0 +1,35 @@
+name: maintenance
+description: "Investigate, diagnose, and fix issues in the personal-assistant system"
+
+context:
+  organization: sinh-x
+  notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+
+agents:
+  - name: mechanic
+    role: "Investigate issues, apply fixes, run health checks on the personal-assistant system"
+    skill: skills/maintenance.md
+
+objective: |
+  You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
+
+  Working directory: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+
+  You are the maintenance agent for the personal-assistant system. Your job is to
+  keep the system healthy and fix problems.
+
+  If additional instructions are provided below, focus on that specific issue.
+  Otherwise, run a full health check:
+  1. Syntax-check all scripts (bash -n)
+  2. Verify systemd timers are active
+  3. Check registry for stuck/dead deployments
+  4. Verify folder structure
+  5. Review recent self-improvement suggestions from daily summaries and agent sessions
+  6. Apply any safe, clear fixes
+  7. Produce a health check report
+
+  After fixing anything, verify with dry-run or syntax check before finishing.
+  Submit your work report to ~/Documents/ai-usage/sinh-inputs/for-sinh-review/
