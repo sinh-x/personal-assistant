@@ -73,7 +73,7 @@ Output: ${output_dir}/${today}-plan-draft.md
 
 IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
 - Save as *-plan-draft.md (not -plan.md)
-- Add a header: "## DRAFT — Review & adjust when ready"
+- Add a header: ## DRAFT — Review and adjust when ready
 - Include a checklist at the top for quick review:
   - [ ] Goals look right
   - [ ] Time budget is realistic
