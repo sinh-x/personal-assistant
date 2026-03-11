@@ -3,16 +3,17 @@ set -euo pipefail
 
 # Deploy an agent team by generating a primer and running claude
 #
-# Usage: ./deploy.sh <team-name-or-file> [--dry-run | --foreground | --interactive]
+# Usage: ./deploy.sh <team-name-or-file> [options]
 #
 # First arg can be:
 #   - A file path (absolute or relative) to a YAML team file
 #   - A team name, resolved as $TEAMS_DIR/<name>.yaml
 #
-# Default: runs in background, tracks status in deployment registry
-# --foreground: runs in foreground with auto-permissions (for debugging)
-# --interactive: runs in foreground WITHOUT auto-permissions (user approves each tool call)
-# --dry-run: generates primer and prints it, no execution
+# Options:
+#   --dry-run          Generate primer and print it, no execution
+#   --foreground       Run in foreground with auto-permissions (for debugging)
+#   --interactive      Run in foreground, user approves each tool call
+#   --objective "..."  Append extra instructions to the team's objective
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
@@ -25,19 +26,35 @@ DEPLOYMENTS_DIR="${HOME}/Documents/ai-usage/deployments"
 REGISTRY_FILE="$DEPLOYMENTS_DIR/registry.jsonl"
 REGISTRY_LOCK="$DEPLOYMENTS_DIR/.registry.lock"
 
-spec="${1:?Usage: ./deploy.sh <team-name-or-file> [--dry-run | --foreground]}"
+spec="${1:?Usage: ./deploy.sh <team-name-or-file> [--dry-run | --foreground | --objective \"...\"]}"
 
 if [[ "$spec" == "--help" || "$spec" == "-h" ]]; then
-    echo "Usage: deploy.sh <team-name-or-file> [--dry-run | --foreground | --interactive]"
+    echo "Usage: deploy.sh <team-name-or-file> [options]"
     echo ""
-    echo "  team-name-or-file  File path to YAML or team name (resolved in \$PA_HOME/teams/)"
-    echo "  --dry-run          Generate primer and print it, no execution"
-    echo "  --foreground       Run in foreground with auto-permissions"
-    echo "  --interactive      Run in foreground, user approves each tool call"
+    echo "  team-name-or-file     File path to YAML or team name (resolved in \$PA_HOME/teams/)"
+    echo "  --dry-run             Generate primer and print it, no execution"
+    echo "  --foreground          Run in foreground with auto-permissions"
+    echo "  --interactive         Run in foreground, user approves each tool call"
+    echo "  --objective \"...\"     Append extra instructions to the team's objective"
     exit 0
 fi
+shift
 
-mode="${2:-background}"
+# Parse remaining args
+mode="background"
+extra_objective=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run|--foreground|--interactive)
+            mode="$1" ;;
+        --objective)
+            extra_objective="${2:?--objective requires a value}"
+            shift ;;
+        *)
+            echo "Warning: Unknown option '$1'" >&2 ;;
+    esac
+    shift
+done
 
 # --- Helper: resolve file from PA_CONFIG then PA_HOME ---
 
@@ -208,6 +225,18 @@ cat >> "$primer_file" << OBJECTIVE_EOF
 ## Objective
 
 ${objective}
+OBJECTIVE_EOF
+
+if [[ -n "$extra_objective" ]]; then
+    cat >> "$primer_file" << EXTRA_EOF
+
+## Additional Instructions
+
+${extra_objective}
+EXTRA_EOF
+fi
+
+cat >> "$primer_file" << DEPLOY_EOF
 
 ## Deployment Instructions
 
@@ -217,7 +246,7 @@ ${objective}
 4. **Create tasks** from the objective and assign to agents
 5. **Coordinate** — monitor via TaskList, unblock as needed
 6. **Shutdown sequence** — follow standards §6: sub-agents log → agents log → you log → write completion marker → exit
-OBJECTIVE_EOF
+DEPLOY_EOF
 
 echo "Primer generated: $primer_file"
 
