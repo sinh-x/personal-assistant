@@ -27,6 +27,17 @@ REGISTRY_FILE="$DEPLOYMENTS_DIR/registry.jsonl"
 REGISTRY_LOCK="$DEPLOYMENTS_DIR/.registry.lock"
 
 spec="${1:?Usage: ./deploy.sh <team-name-or-file> [--dry-run | --foreground]}"
+
+if [[ "$spec" == "--help" || "$spec" == "-h" ]]; then
+    echo "Usage: deploy.sh <team-name-or-file> [--dry-run | --foreground | --interactive]"
+    echo ""
+    echo "  team-name-or-file  File path to YAML or team name (resolved in \$PA_HOME/teams/)"
+    echo "  --dry-run          Generate primer and print it, no execution"
+    echo "  --foreground       Run in foreground with auto-permissions"
+    echo "  --interactive      Run in foreground, user approves each tool call"
+    exit 0
+fi
+
 mode="${2:-background}"
 
 # --- Resolve team file: file path or name ---

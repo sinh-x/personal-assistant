@@ -88,6 +88,7 @@ usage() {
   echo "Commands:"
   echo "  deploy        Deploy an agent team"
   echo "  daily         Daily lifecycle (plan|progress|end)"
+  echo "  teams         List available teams"
   echo "  schedule      Schedule a team with systemd timers"
   echo "  status        Show deployment status"
   echo "  timers        List scheduled timers"
@@ -106,6 +107,20 @@ shift
 case "$cmd" in
   deploy)       exec "$self_dir/pa-deploy" "$@" ;;
   daily)        exec "$self_dir/pa-daily" "$@" ;;
+  teams)
+    pa_home="''${PA_HOME:-}"
+    teams_dir="''${pa_home:+$pa_home/teams}"
+    teams_dir="''${teams_dir:-$(dirname "$(readlink -f "$0")")/../share/personal-assistant/teams}"
+    if [[ ! -d "$teams_dir" ]]; then
+      echo "No teams directory found" >&2; exit 1
+    fi
+    for f in "$teams_dir"/*.yaml; do
+      [[ -f "$f" ]] || continue
+      name="$(basename "$f" .yaml)"
+      desc="$(grep '^description:' "$f" | sed 's/^description:[[:space:]]*//' | head -1)"
+      printf "  %-20s %s\n" "$name" "$desc"
+    done
+    ;;
   schedule)     exec "$self_dir/pa-schedule" "$@" ;;
   status)       exec "$self_dir/pa-status" "$@" ;;
   timers)       exec "$self_dir/pa-timers" "$@" ;;
