@@ -1,0 +1,7 @@
+primers/
+logs/
+result
+result-*
+.env
+.env.*
+.direnv/
