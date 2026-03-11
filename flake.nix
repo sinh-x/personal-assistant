@@ -50,7 +50,7 @@
             # --- Install scripts to libexec ---
             libexec=$out/libexec/personal-assistant
             mkdir -p $libexec
-            for script in deploy.sh daily.sh schedule.sh status.sh list-timers.sh remove-timer.sh pa-config.sh; do
+            for script in deploy.sh daily.sh schedule.sh status.sh list-timers.sh remove-timer.sh idea.sh pa-config.sh; do
               install -Dm755 "$script" "$libexec/$script"
             done
             # Also install pa-config.sh to share/ so scripts can find it via PA_HOME
@@ -66,6 +66,7 @@
               "status.sh:pa-status" \
               "list-timers.sh:pa-timers" \
               "remove-timer.sh:pa-remove-timer" \
+              "idea.sh:pa-idea" \
             ; do
               src_script="''${pair%%:*}"
               bin_name="''${pair##*:}"
@@ -95,6 +96,7 @@ usage() {
   echo "  status        Show deployment status"
   echo "  timers        List scheduled timers"
   echo "  remove-timer  Remove a scheduled timer"
+  echo "  idea          Log an idea interactively"
   echo ""
   echo "Run 'pa <command> --help' for command-specific help."
 }
@@ -139,6 +141,7 @@ case "$cmd" in
   status)       exec "$self_dir/pa-status" "$@" ;;
   timers)       exec "$self_dir/pa-timers" "$@" ;;
   remove-timer) exec "$self_dir/pa-remove-timer" "$@" ;;
+  idea)         exec "$self_dir/pa-idea" "$@" ;;
   help|--help|-h) usage ;;
   *)
     echo "Error: Unknown command '$cmd'" >&2
