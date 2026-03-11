@@ -1,0 +1,22 @@
+name: requirements
+description: "Requirements gathering and analysis — structured planning before implementation"
+
+context:
+  organization: sinh-x
+  notes: "Solo agent (team manager does the work directly). Always run with --interactive."
+
+agents:
+  - name: analyst
+    role: "Gather requirements through structured conversation, explore codebase, produce a plan covering the standard checklist"
+    skill: skills/requirements/analyze.md
+
+# Objective is passed at deploy time, e.g.:
+#   ./deploy.sh requirements --interactive
+# Then tell it what you want to plan.
+objective: |
+  You are running as a solo requirements analyst — do NOT spawn sub-agents.
+
+  Wait for the user to describe what they want to build or change.
+  Then follow the analyze.md skill phases (1-6) to gather requirements interactively.
+
+  Save the final requirements document to your workspace.

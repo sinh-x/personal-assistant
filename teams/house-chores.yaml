@@ -1,0 +1,33 @@
+name: house-chores
+description: Solo agent that surveys, groups, and commits uncommitted changes with journal entries
+
+context:
+  organization: sinh-x
+  notes: "Run interactively for first use; can be scheduled after trust is established"
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+
+agents:
+  - name: house-keeper
+    role: "Survey uncommitted changes, group logically, commit with conventional prefixes, update journal"
+    skill: skills/house-chores.md
+
+objective: |
+  You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
+
+  Working directory: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+
+  Follow the house-chores skill workflow exactly:
+  1. Survey all uncommitted changes (git status + git diff)
+  2. Read and understand each changed/new file
+  3. Group changes into logical commit units by type (feat/fix/docs/chore/infra/refactor)
+  4. Commit each group with conventional commit messages
+  5. Append a journal entry to JOURNAL.md
+  6. Commit the journal entry
+
+  Important:
+  - This repo may have ZERO prior commits — if so, create an initial commit structure
+  - Respect .gitignore — never commit ignored files
+  - Never commit secrets or credentials
+  - Prefer smaller, focused commits over large ones

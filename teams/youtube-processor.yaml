@@ -1,0 +1,29 @@
+name: youtube-processor
+description: Process YouTube videos from queue and save structured notes to Anytype
+
+context:
+  organization: sinh-x
+  notes: "Autonomous video processing — no user interaction required"
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+  anytype_space_id: bafyreifs6whb7td4qfzyqx5nh6krdmxosvbzxwnpn5eqeepivm3tc7ps6i.2eaoxbxt3otui
+  queue_file: ~/Documents/ai-usage/queue/youtube-video-queue.txt
+
+agents:
+  - name: video-processor
+    role: "Download, transcribe, analyze, and save YouTube videos to Anytype"
+    skill: skills/youtube-to-anytype.md
+
+objective: |
+  1. Read the queue file at ~/Documents/ai-usage/queue/youtube-video-queue.txt
+  2. Each non-empty, non-comment line is a YouTube URL to process
+  3. For each URL, run the full pipeline:
+     download → transcribe → analyze → extract frames → evaluate → summarize → save to Anytype
+  4. After successfully processing a URL, remove it from the queue file
+  5. If the queue is empty, report "No videos to process" and exit
+  6. Save each video as a "Ghi chú" object in the Sinh Anytype space with:
+     - Title prefixed with [Video]
+     - Frame images uploaded and embedded
+     - Auto-generated tags + "Video Notes" tag
+     - Full enriched summary as the body
