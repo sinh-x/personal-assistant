@@ -55,6 +55,7 @@ Append an entry to `JOURNAL.md` in the project root:
 - <summary of what was committed, grouped by type>
 - Files: N files across M commits
 - Notes: <anything notable — skipped files, decisions made, oddities found>
+- Suggestions: <proposed gitignore additions or follow-up actions for skipped files>
 ```
 
 ### Step 6 — Commit Journal
