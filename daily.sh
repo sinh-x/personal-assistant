@@ -11,10 +11,16 @@ set -euo pipefail
 #   ./daily.sh progress --dry-run    — dry-run progress check for today
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only: teams/, skills/
+PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
+PA_CONFIG="${PA_CONFIG:-}"              # user overrides
 PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
 
-TEAMS_DIR="$PA_HOME/teams"
+# Resolve daily.yaml: PA_CONFIG first, then PA_HOME
+if [[ -n "$PA_CONFIG" && -f "$PA_CONFIG/teams/daily.yaml" ]]; then
+    TEAMS_DIR="$PA_CONFIG/teams"
+else
+    TEAMS_DIR="$PA_HOME/teams"
+fi
 
 mode="${1:?Usage: ./daily.sh <plan|progress|end> [YYYY-MM-DD] [--dry-run | --foreground]}"
 shift

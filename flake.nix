@@ -71,6 +71,7 @@
                 --set PA_HOME "$share" \
                 --set PA_BIN "$out/bin" \
                 --run 'export PA_DATA="''${PA_DATA:-$HOME/.local/share/personal-assistant}"' \
+                --run 'export PA_CONFIG="''${PA_CONFIG:-}"' \
                 --run 'mkdir -p "$PA_DATA/primers" "$PA_DATA/logs"' \
                 --prefix PATH : "${runtimePath}"
             done
@@ -109,16 +110,23 @@ case "$cmd" in
   daily)        exec "$self_dir/pa-daily" "$@" ;;
   teams)
     pa_home="''${PA_HOME:-}"
-    teams_dir="''${pa_home:+$pa_home/teams}"
-    teams_dir="''${teams_dir:-$(dirname "$(readlink -f "$0")")/../share/personal-assistant/teams}"
-    if [[ ! -d "$teams_dir" ]]; then
-      echo "No teams directory found" >&2; exit 1
-    fi
-    for f in "$teams_dir"/*.yaml; do
-      [[ -f "$f" ]] || continue
-      name="$(basename "$f" .yaml)"
-      desc="$(grep '^description:' "$f" | sed 's/^description:[[:space:]]*//' | head -1)"
-      printf "  %-20s %s\n" "$name" "$desc"
+    pa_config="''${PA_CONFIG:-}"
+    base_dir="''${pa_home:+$pa_home/teams}"
+    base_dir="''${base_dir:-$(dirname "$(readlink -f "$0")")/../share/personal-assistant/teams}"
+    config_dir="''${pa_config:+$pa_config/teams}"
+    declare -A seen
+    for tdir in ''${config_dir:+"$config_dir"} "$base_dir"; do
+      [[ -d "$tdir" ]] || continue
+      for f in "$tdir"/*.yaml; do
+        [[ -f "$f" ]] || continue
+        name="$(basename "$f" .yaml)"
+        [[ -n "''${seen[$name]:-}" ]] && continue
+        seen["$name"]=1
+        desc="$(grep '^description:' "$f" | sed 's/^description:[[:space:]]*//' | head -1)"
+        src=""
+        [[ "$tdir" == "$config_dir" ]] && src=" [user]"
+        printf "  %-20s %s%s\n" "$name" "$desc" "$src"
+      done
     done
     ;;
   schedule)     exec "$self_dir/pa-schedule" "$@" ;;

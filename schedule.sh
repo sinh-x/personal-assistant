@@ -20,7 +20,8 @@ set -euo pipefail
 #   ./schedule.sh daily:end daily 21:00
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only: teams/, skills/
+PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
+PA_CONFIG="${PA_CONFIG:-}"              # user overrides
 PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
 # PA_BIN: when set (Nix install), use wrapped binaries; otherwise use scripts directly
 
@@ -51,9 +52,14 @@ if [[ "$spec" == daily:* ]]; then
     description="personal-assistant daily ${daily_mode}"
 else
     team_name="$spec"
-    team_file="$PA_HOME/teams/${team_name}.yaml"
-    if [[ ! -f "$team_file" ]]; then
-        echo "Error: Team file not found: $team_file" >&2
+    team_file=""
+    if [[ -n "$PA_CONFIG" && -f "$PA_CONFIG/teams/${team_name}.yaml" ]]; then
+        team_file="$PA_CONFIG/teams/${team_name}.yaml"
+    elif [[ -f "$PA_HOME/teams/${team_name}.yaml" ]]; then
+        team_file="$PA_HOME/teams/${team_name}.yaml"
+    fi
+    if [[ -z "$team_file" ]]; then
+        echo "Error: Team not found: $team_name" >&2
         exit 1
     fi
     if [[ -n "${PA_BIN:-}" ]]; then
@@ -102,6 +108,10 @@ fi
 if [[ -n "${PA_BIN:-}" ]]; then
     env_lines="${env_lines}
 Environment=PA_BIN=${PA_BIN}"
+fi
+if [[ -n "${PA_CONFIG:-}" ]]; then
+    env_lines="${env_lines}
+Environment=PA_CONFIG=${PA_CONFIG}"
 fi
 
 # --- Write service unit ---

@@ -15,11 +15,10 @@ set -euo pipefail
 # --dry-run: generates primer and prints it, no execution
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only: teams/, skills/
+PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
+PA_CONFIG="${PA_CONFIG:-}"              # user overrides: ~/.config/sinh-x/personal-assistant/
 PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
 
-TEAMS_DIR="$PA_HOME/teams"
-SKILLS_DIR="$PA_HOME/skills"
 PRIMERS_DIR="$PA_DATA/primers"
 LOGS_DIR="$PA_DATA/logs"
 DEPLOYMENTS_DIR="${HOME}/Documents/ai-usage/deployments"
@@ -40,6 +39,17 @@ fi
 
 mode="${2:-background}"
 
+# --- Helper: resolve file from PA_CONFIG then PA_HOME ---
+
+resolve_file() {
+    local relpath="$1"
+    if [[ -n "$PA_CONFIG" && -f "$PA_CONFIG/$relpath" ]]; then
+        echo "$PA_CONFIG/$relpath"
+    elif [[ -f "$PA_HOME/$relpath" ]]; then
+        echo "$PA_HOME/$relpath"
+    fi
+}
+
 # --- Resolve team file: file path or name ---
 
 if [[ -f "$spec" ]]; then
@@ -47,11 +57,12 @@ if [[ -f "$spec" ]]; then
     team_name="$(basename "$spec" .yaml)"
 else
     team_name="$spec"
-    team_file="$TEAMS_DIR/${team_name}.yaml"
+    team_file="$(resolve_file "teams/${team_name}.yaml")"
 fi
 
-if [[ ! -f "$team_file" ]]; then
-    echo "Error: Team file not found: $team_file" >&2
+if [[ -z "$team_file" || ! -f "$team_file" ]]; then
+    echo "Error: Team not found: $spec" >&2
+    [[ -n "$PA_CONFIG" ]] && echo "  Searched: $PA_CONFIG/teams/ and $PA_HOME/teams/" >&2 || echo "  Searched: $PA_HOME/teams/" >&2
     exit 1
 fi
 
@@ -137,10 +148,11 @@ while IFS= read -r line; do
             if [[ -n "$current_agent_name" ]]; then
                 echo "### Agent: ${current_agent_name}" >> "$primer_file"
                 echo "Role: ${current_agent_role}" >> "$primer_file"
-                if [[ -n "$current_agent_skill" && -f "$PA_HOME/$current_agent_skill" ]]; then
+                skill_path="$(resolve_file "$current_agent_skill")"
+                if [[ -n "$current_agent_skill" && -n "$skill_path" ]]; then
                     echo "" >> "$primer_file"
                     echo "<skill-file name=\"${current_agent_name}\">" >> "$primer_file"
-                    cat "$PA_HOME/$current_agent_skill" >> "$primer_file"
+                    cat "$skill_path" >> "$primer_file"
                     echo "</skill-file>" >> "$primer_file"
                 fi
                 echo "" >> "$primer_file"
@@ -160,31 +172,36 @@ done < "$team_file"
 if [[ -n "$current_agent_name" ]]; then
     echo "### Agent: ${current_agent_name}" >> "$primer_file"
     echo "Role: ${current_agent_role}" >> "$primer_file"
-    if [[ -n "$current_agent_skill" && -f "$PA_HOME/$current_agent_skill" ]]; then
+    skill_path="$(resolve_file "$current_agent_skill")"
+    if [[ -n "$current_agent_skill" && -n "$skill_path" ]]; then
         echo "" >> "$primer_file"
         echo "<skill-file name=\"${current_agent_name}\">" >> "$primer_file"
-        cat "$PA_HOME/$current_agent_skill" >> "$primer_file"
+        cat "$skill_path" >> "$primer_file"
         echo "</skill-file>" >> "$primer_file"
     fi
     echo "" >> "$primer_file"
 fi
 
-# --- Inject global skills ---
+# --- Inject global skills (merge PA_CONFIG + PA_HOME, config wins) ---
 
-global_skills_dir="$SKILLS_DIR/global"
-if [[ -d "$global_skills_dir" ]]; then
-    echo "## Global Skills (apply to ALL agents)" >> "$primer_file"
-    echo "" >> "$primer_file"
-    for gskill in "$global_skills_dir"/*.md; do
+declare -A seen_global_skills
+echo "## Global Skills (apply to ALL agents)" >> "$primer_file"
+echo "" >> "$primer_file"
+
+for gdir in ${PA_CONFIG:+"$PA_CONFIG/skills/global"} "$PA_HOME/skills/global"; do
+    [[ -d "$gdir" ]] || continue
+    for gskill in "$gdir"/*.md; do
         [[ -f "$gskill" ]] || continue
         gskill_name="$(basename "$gskill" .md)"
+        [[ -n "${seen_global_skills[$gskill_name]:-}" ]] && continue
+        seen_global_skills["$gskill_name"]=1
         echo "<global-skill name=\"${gskill_name}\">" >> "$primer_file"
         cat "$gskill" >> "$primer_file"
         echo "" >> "$primer_file"
         echo "</global-skill>" >> "$primer_file"
         echo "" >> "$primer_file"
     done
-fi
+done
 
 cat >> "$primer_file" << OBJECTIVE_EOF
 
