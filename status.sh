@@ -152,17 +152,11 @@ fi
 # --- List view ---
 
 # Collect deployment IDs sorted by start time (most recent first)
-sorted_dids=()
-for did in "${!deploy_started[@]}"; do
-    echo "${deploy_started[$did]} $did"
-done | sort -r | while read -r _ did; do
-    sorted_dids+=("$did")
-done
-
-# If sort pipe didn't work (subshell), fallback to unsorted
-if [[ ${#sorted_dids[@]} -eq 0 ]]; then
-    sorted_dids=("${!deploy_started[@]}")
-fi
+mapfile -t sorted_dids < <(
+    for did in "${!deploy_started[@]}"; do
+        echo "${deploy_started[$did]} $did"
+    done | sort -r | while read -r _ did; do echo "$did"; done
+)
 
 # Header
 printf "%-12s %-22s %-10s %-20s %-20s %s\n" "DEPLOY-ID" "TEAM" "STATUS" "STARTED" "ENDED" "SUMMARY"

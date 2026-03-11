@@ -45,26 +45,42 @@ output_dir="$HOME/Documents/ai-usage/daily/${year}/${month}"
 
 case "$mode" in
     plan)
+        input_notes="$HOME/Documents/ai-usage/sinh-inputs/daily-plan/${today}"
         objective="MODE: DAILY PLAN (morning) — SOLO (no sub-agents)
 TARGET_DATE: ${today}
 
 Create the daily plan for ${today}. You do this YOURSELF — do NOT spawn any sub-agents.
 
 Workflow (you do all steps directly):
-1. Read yesterday's daily summary (end-of-day) from ${output_dir}/ — look for the most recent *-daily.md
+1. Check for user notes at ${input_notes}
+   - If the file exists, read it FIRST — these are Sinh's personal notes, priorities, or instructions for today
+   - Incorporate these notes as HIGH PRIORITY items in the plan
+   - The notes may contain specific goals, meetings, reminders, or overrides to the usual workflow
+2. Read yesterday's daily summary (end-of-day) from ${output_dir}/ — look for the most recent *-daily.md
    - Extract 'Tomorrow's Priorities' as today's starting goals
    - Extract 'Open Items (Carried Forward)' as carryover todos
    - If no daily summary exists, check for recent session logs in ~/Documents/ai-usage/sessions/${year}/${month}/
-2. Get current avo task list and status:
+3. Get current avo task list and status:
    - Run: /home/sinh/.nix-profile/bin/avo task list
    - Run: /home/sinh/.nix-profile/bin/avo plan list
    - Run: /home/sinh/.nix-profile/bin/avo status
-3. Write the daily plan document
+4. Write the daily plan as a DRAFT for Sinh to review when he's ready
 
-Output: ${output_dir}/${today}-plan.md
+Output: ${output_dir}/${today}-plan-draft.md
+
+IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
+- Save as *-plan-draft.md (not -plan.md)
+- Add a header: "## DRAFT — Review & adjust when ready"
+- Include a checklist at the top for quick review:
+  - [ ] Goals look right
+  - [ ] Time budget is realistic
+  - [ ] No missing priorities
+- Sinh will review this draft and finalize it himself
 
 Plan document structure:
-  ## Today's Goals (from yesterday's priorities + new items)
+  ## User Notes (if ${input_notes} exists)
+  (Sinh's own notes for the day, verbatim or summarized)
+  ## Today's Goals (from user notes + yesterday's priorities + new items)
   | # | Goal | Source | Priority |
   ## Time Budget
   | Category | Planned | Notes |
