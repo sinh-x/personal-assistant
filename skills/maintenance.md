@@ -46,9 +46,10 @@ Run a diagnostic pass on the system:
 - **Scripts**: Do all scripts parse correctly? (`bash -n <script>`)
 - **Timers**: Are all expected timers active? (`systemctl --user list-timers | grep pa-`)
 - **Registry**: Any stuck deployments? (status "running" but PID dead)
-- **Folders**: Do all expected directories exist?
 - **Flake**: Does `nix flake check` pass? (only if flake.nix was modified)
 - **Skills/Teams**: Are all referenced skills accessible? Do team YAMLs parse correctly?
+
+**NOTE:** Folder structure is managed by the **secretary** agent, NOT by maintenance. If expected folders are missing or `STRUCTURE.md` doesn't exist, **stop and report** — do not create folders yourself.
 
 ## Workflow
 
@@ -101,9 +102,9 @@ When running a health check, produce a report:
 - Completed: N
 - Crashed: N
 
-## Folder Structure
-- [ ] All expected dirs exist
-- [ ] STRUCTURE.md is current
+## Folder Structure (secretary's domain — report only)
+- [ ] STRUCTURE.md exists (if not, flag for secretary)
+- [ ] Key folders exist (if not, flag for secretary — do NOT create them)
 
 ## Self-Improvement Backlog
 | Source | Suggestion | Scope | Status |
@@ -121,6 +122,8 @@ When running a health check, produce a report:
 - **Test your fixes.** Run `bash -n` on edited scripts. Use `--dry-run` where available.
 - **Atomic changes.** One fix per logical change. Don't bundle unrelated fixes.
 - **Don't break working things.** If unsure about a fix, document the issue and flag for Sinh instead of applying a risky change.
+- **Don't touch folder structure.** That's the secretary's job. If folders are missing, report it and stop.
+- **If you don't know what to do, stop and report.** Never guess. Flag the issue for Sinh with your findings so far.
 - **Respect .gitignore.** Never commit secrets or ignored files.
 - **Backward compat.** Fixes must not break existing deployments or timers.
 - **Document everything.** Your work report should explain what was found, what was changed, and why.

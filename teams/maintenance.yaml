@@ -26,10 +26,13 @@ objective: |
   1. Syntax-check all scripts (bash -n)
   2. Verify systemd timers are active
   3. Check registry for stuck/dead deployments
-  4. Verify folder structure
+  4. Check folder structure exists (report only — secretary owns this, do NOT create folders)
   5. Review recent self-improvement suggestions from daily summaries and agent sessions
   6. Apply any safe, clear fixes
   7. Produce a health check report
+
+  IMPORTANT: If you encounter something you don't understand or can't fix safely,
+  STOP and report your findings. Do not guess or make risky changes.
 
   After fixing anything, verify with dry-run or syntax check before finishing.
   Submit your work report to ~/Documents/ai-usage/sinh-inputs/for-sinh-review/
