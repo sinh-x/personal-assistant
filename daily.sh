@@ -12,8 +12,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
-PA_CONFIG="${PA_CONFIG:-}"              # user overrides
+PA_CONFIG=""                            # user overrides (set by pa-config.sh)
 PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
+
+# Load user config from ~/.config/sinh-x/personal-assistant/config.yaml
+source "${PA_HOME}/pa-config.sh" 2>/dev/null || source "$SCRIPT_DIR/pa-config.sh" 2>/dev/null || true
 
 # Resolve daily.yaml: PA_CONFIG first, then PA_HOME
 if [[ -n "$PA_CONFIG" && -f "$PA_CONFIG/teams/daily.yaml" ]]; then

@@ -50,9 +50,11 @@
             # --- Install scripts to libexec ---
             libexec=$out/libexec/personal-assistant
             mkdir -p $libexec
-            for script in deploy.sh daily.sh schedule.sh status.sh list-timers.sh remove-timer.sh; do
+            for script in deploy.sh daily.sh schedule.sh status.sh list-timers.sh remove-timer.sh pa-config.sh; do
               install -Dm755 "$script" "$libexec/$script"
             done
+            # Also install pa-config.sh to share/ so scripts can find it via PA_HOME
+            install -Dm644 pa-config.sh "$share/pa-config.sh"
 
             # --- Create wrapped binaries ---
             mkdir -p $out/bin
@@ -71,7 +73,6 @@
                 --set PA_HOME "$share" \
                 --set PA_BIN "$out/bin" \
                 --run 'export PA_DATA="''${PA_DATA:-$HOME/.local/share/personal-assistant}"' \
-                --run 'export PA_CONFIG="''${PA_CONFIG:-}"' \
                 --run 'mkdir -p "$PA_DATA/primers" "$PA_DATA/logs"' \
                 --prefix PATH : "${runtimePath}"
             done
@@ -110,7 +111,12 @@ case "$cmd" in
   daily)        exec "$self_dir/pa-daily" "$@" ;;
   teams)
     pa_home="''${PA_HOME:-}"
-    pa_config="''${PA_CONFIG:-}"
+    # Load config file for PA_CONFIG
+    _cfg="$HOME/.config/sinh-x/personal-assistant/config.yaml"
+    pa_config=""
+    if [[ -f "$_cfg" ]]; then
+      pa_config="$(grep '^config_dir:' "$_cfg" 2>/dev/null | sed 's/^config_dir:[[:space:]]*//' | sed 's/^"//' | sed 's/"$//' | sed "s|^~|$HOME|")"
+    fi
     base_dir="''${pa_home:+$pa_home/teams}"
     base_dir="''${base_dir:-$(dirname "$(readlink -f "$0")")/../share/personal-assistant/teams}"
     config_dir="''${pa_config:+$pa_config/teams}"

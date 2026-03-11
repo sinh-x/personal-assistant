@@ -9,7 +9,12 @@ set -euo pipefail
 #        ./status.sh --team <name> — filter by team name
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PA_DATA="${PA_DATA:-$SCRIPT_DIR}"          # mutable: primers/, logs/
+PA_HOME="${PA_HOME:-$SCRIPT_DIR}"
+PA_CONFIG=""
+PA_DATA="${PA_DATA:-$PA_HOME}"
+
+# Load user config from ~/.config/sinh-x/personal-assistant/config.yaml
+source "${PA_HOME}/pa-config.sh" 2>/dev/null || source "$SCRIPT_DIR/pa-config.sh" 2>/dev/null || true
 
 DEPLOYMENTS_DIR="${HOME}/Documents/ai-usage/deployments"
 REGISTRY_FILE="$DEPLOYMENTS_DIR/registry.jsonl"

@@ -15,10 +15,14 @@ You will receive:
 | File | When to read |
 |------|-------------|
 | Yesterday's daily summary | Plan mode (for "Tomorrow's Priorities") |
+| Sinh's priority input (`sinh-inputs/daily-plan/YYYY-MM-DD`) | Plan mode — Sinh's raw priorities for the day |
 | Today's plan (`*-plan.md`) | Progress + End modes |
 | Today's progress (`*-progress.md`) | End mode |
 
-All in: `~/Documents/ai-usage/daily/YYYY/MM/`
+Daily files in: `~/Documents/ai-usage/daily/YYYY/MM/`
+Sinh's inputs in: `~/Documents/ai-usage/sinh-inputs/daily-plan/`
+
+**Important:** When creating the daily plan, always check `sinh-inputs/daily-plan/` for Sinh's confirmed priorities for the target date. These take precedence over auto-generated priorities from yesterday's summary.
 
 ```bash
 ls ~/Documents/ai-usage/daily/$(date +%Y)/$(date +%m)/ 2>/dev/null

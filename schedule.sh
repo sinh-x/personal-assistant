@@ -21,9 +21,15 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
-PA_CONFIG="${PA_CONFIG:-}"              # user overrides
+PA_CONFIG=""                            # user overrides (set by pa-config.sh)
 PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
+
+# Load user config from ~/.config/sinh-x/personal-assistant/config.yaml
+source "${PA_HOME}/pa-config.sh" 2>/dev/null || source "$SCRIPT_DIR/pa-config.sh" 2>/dev/null || true
 # PA_BIN: when set (Nix install), use wrapped binaries; otherwise use scripts directly
+
+# Resolve bash path at schedule-time (NixOS doesn't have /bin/bash)
+BASH_PATH="$(command -v bash)"
 
 spec="${1:?Usage: ./schedule.sh <team-name|daily:mode> <repeat> <time> [<time>...]}"
 repeat="${2:?Specify repeat: hourly | daily | weekly | monthly}"
@@ -46,7 +52,7 @@ if [[ "$spec" == daily:* ]]; then
     if [[ -n "${PA_BIN:-}" ]]; then
         exec_cmd="${PA_BIN}/pa-daily ${daily_mode}"
     else
-        exec_cmd="/bin/bash \"${SCRIPT_DIR}/daily.sh\" \"${daily_mode}\""
+        exec_cmd="${BASH_PATH} \"${SCRIPT_DIR}/daily.sh\" \"${daily_mode}\""
     fi
     unit_name="pa-daily-${daily_mode}"
     description="personal-assistant daily ${daily_mode}"
@@ -65,7 +71,7 @@ else
     if [[ -n "${PA_BIN:-}" ]]; then
         exec_cmd="${PA_BIN}/pa-deploy ${team_name}"
     else
-        exec_cmd="/bin/bash \"${SCRIPT_DIR}/deploy.sh\" \"${team_name}\""
+        exec_cmd="${BASH_PATH} \"${SCRIPT_DIR}/deploy.sh\" \"${team_name}\""
     fi
     unit_name="pa-${team_name}"
     description="personal-assistant deploy: ${team_name}"
@@ -109,10 +115,8 @@ if [[ -n "${PA_BIN:-}" ]]; then
     env_lines="${env_lines}
 Environment=PA_BIN=${PA_BIN}"
 fi
-if [[ -n "${PA_CONFIG:-}" ]]; then
-    env_lines="${env_lines}
-Environment=PA_CONFIG=${PA_CONFIG}"
-fi
+# PA_CONFIG is no longer passed as env — scripts load from
+# ~/.config/sinh-x/personal-assistant/config.yaml at runtime
 
 # --- Write service unit ---
 

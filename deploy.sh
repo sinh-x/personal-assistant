@@ -17,8 +17,11 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
-PA_CONFIG="${PA_CONFIG:-}"              # user overrides: ~/.config/sinh-x/personal-assistant/
+PA_CONFIG=""                            # user overrides (set by pa-config.sh)
 PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
+
+# Load user config from ~/.config/sinh-x/personal-assistant/config.yaml
+source "${PA_HOME}/pa-config.sh" 2>/dev/null || source "$SCRIPT_DIR/pa-config.sh" 2>/dev/null || true
 
 PRIMERS_DIR="$PA_DATA/primers"
 LOGS_DIR="$PA_DATA/logs"
@@ -130,6 +133,7 @@ deployed_at: ${deploy_ts}
 registry_file: ${REGISTRY_FILE}
 registry_lock: ${REGISTRY_LOCK}
 workspace_base: ${DEPLOYMENTS_DIR}/${deploy_id}
+team_workspace: ~/Documents/ai-usage/agent-teams/${team_name}
 agents:
 $(printf '  - %s\n' "${agent_names[@]}")
 </deployment-context>
@@ -324,7 +328,7 @@ LOG_HEADER
             echo '[$(date -Iseconds)] TIMED OUT after ${max_runtime}s' >> '${log_file}'
             flock -w 5 '${REGISTRY_LOCK}' bash -c \"echo '{\\\"deployment_id\\\":\\\"${deploy_id}\\\",\\\"team\\\":\\\"${team_name}\\\",\\\"event\\\":\\\"crashed\\\",\\\"timestamp\\\":\\\"'\\\$(date -Iseconds)'\\\",\\\"exit_code\\\":124,\\\"summary\\\":\\\"Timed out after ${max_runtime}s\\\"}' >> '${REGISTRY_FILE}'\"
         elif [[ \$exit_code -ne 0 ]]; then
-            flock -w 5 '${REGISTRY_LOCK}' bash -c \"echo '{\\\"deployment_id\\\":\\\"${deploy_id}\\\",\\\"team\\\":\\\"${team_name}\\\",\\\"event\\\":\\\"crashed\\\",\\\"timestamp\\\":\\\"'\\\$(date -Iseconds)'\\\",\\\"exit_code\\\":'\\\$exit_code'}' >> '${REGISTRY_FILE}'\"
+            ( flock -w 5 200; echo \"{\\\"deployment_id\\\":\\\"${deploy_id}\\\",\\\"team\\\":\\\"${team_name}\\\",\\\"event\\\":\\\"crashed\\\",\\\"timestamp\\\":\\\"\$(date -Iseconds)\\\",\\\"exit_code\\\":\$exit_code}\" >> '${REGISTRY_FILE}'; ) 200>'${REGISTRY_LOCK}'
         fi
     " > /dev/null 2>&1 &
 
