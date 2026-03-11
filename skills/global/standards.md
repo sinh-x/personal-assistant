@@ -187,6 +187,40 @@ mcp__ai-usage-log__save_session_bundle(
 | Agent | After all tasks done, before shutdown |
 | Team manager | After all agents done + completion marker, last thing before exit |
 
+### Work Report Submission
+
+After logging your session, **every team manager** MUST also submit a brief work report to the review queue for Sinh:
+
+```bash
+mkdir -p ~/Documents/ai-usage/sinh-inputs/for-sinh-review
+```
+
+Write a summary file: `~/Documents/ai-usage/sinh-inputs/for-sinh-review/YYYY-MM-DD-<team_name>-<deploy_id>.md`
+
+```markdown
+# Work Report: <team_name> (<deploy_id>)
+
+> **Date:** YYYY-MM-DD
+> **Team:** <team_name>
+> **Deployment:** <deploy_id>
+> **Status:** success | partial | failed
+
+## What Was Done
+- <bullet summary of work completed>
+
+## Outputs
+- <file paths to key outputs>
+
+## Needs Attention
+- <anything requiring Sinh's review or decision>
+- <or "None">
+
+## Suggested Next Steps
+- <what should happen next — which agent/team, or action for Sinh>
+```
+
+This report is how Sinh stays informed. The secretary agent routinely scans `for-sinh-review/` and routes confirmed items to the appropriate agent-team workspace.
+
 ### On failure
 
 Still log. Document what failed, what error occurred, and what was attempted. A failed session log is more valuable than no log.
@@ -225,7 +259,26 @@ Agents shut down in this order:
 
 ## 8. Agent Workspace
 
-Every agent saves working outputs, reports, and intermediate files to a per-deployment workspace directory:
+Agents have two workspace types:
+
+### 8a. Persistent Team Workspace (agent-teams/)
+
+Every team has a **persistent workspace** that survives across deployments:
+
+```
+~/Documents/ai-usage/agent-teams/<team_name>/
+```
+
+Use this for:
+- Ongoing state that must persist between runs (queues, indexes, accumulated data)
+- Cross-deployment context (e.g., what was done last run)
+- Files other teams or the secretary need to find reliably
+
+**On startup**, check your persistent workspace for files from previous runs or items routed by the secretary agent.
+
+### 8b. Per-Deployment Workspace (deployments/)
+
+Each deployment also gets an ephemeral workspace for run-specific outputs:
 
 ```
 ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/
@@ -234,7 +287,10 @@ Every agent saves working outputs, reports, and intermediate files to a per-depl
 ### Structure
 
 ```
-~/Documents/ai-usage/deployments/d-a3f7b2/
+~/Documents/ai-usage/agent-teams/daily/       # Persistent team workspace
+│   └── ...                                    # Cross-deployment state
+
+~/Documents/ai-usage/deployments/d-a3f7b2/    # Per-deployment workspace
 ├── session-gatherer/        # Each agent gets their own directory
 │   ├── report.md            # Agent's main output/report
 │   └── ...                  # Any intermediate files
@@ -248,11 +304,15 @@ Every agent saves working outputs, reports, and intermediate files to a per-depl
 
 ### Rules
 
-- **On startup**, every agent creates their workspace: `mkdir -p ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/`
-- **All output files** (reports, data, intermediate results) go here — NOT in /tmp or random locations
+- **On startup**, every agent creates both workspaces:
+  - `mkdir -p ~/Documents/ai-usage/agent-teams/<team_name>/`
+  - `mkdir -p ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/`
+- **Check for outstanding docs on startup**: Scan your persistent workspace (`agent-teams/<team_name>/`) for files left by previous runs or the secretary agent (e.g., routed items, pending reviews, follow-up tasks). Incorporate any relevant outstanding docs into your current run.
+- **Per-deployment outputs** (reports, data, intermediate results) go in `deployments/<deployment_id>/<agent_name>/`
+- **Persistent state** (cross-run data, queues, indexes) goes in `agent-teams/<team_name>/`
 - **Report back to team manager** with workspace path so the manager knows where to find outputs
 - **Team manager reviews** agent workspaces after agents report completion — read their files before synthesizing
-- **The workspace path** is provided in `<deployment-context>` as `workspace_base` — append your agent name to get your directory
+- **The deployment workspace path** is provided in `<deployment-context>` as `workspace_base` — append your agent name to get your directory
 - **Sub-agents** use their parent's workspace with a subdirectory: `<parent-workspace>/<sub-agent-name>/`
 
 ### What goes in the workspace
@@ -301,11 +361,12 @@ These suggestions are aggregated by the daily-end summary team into the daily re
 ## Quick Reference
 
 ```
-Identity:     deployment_id + team_name + agent_name + parent
-Registry:     ~/Documents/ai-usage/deployments/registry.jsonl (team manager only, flock)
-Workspace:    ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/
-Session logs: ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
-File naming:  YYYY-MM-DD-<hash>-<team>--<agent>--<topic>.md
-Tags:         autonomous team:<X> agent:<Y> deployment:<Z>
-Shutdown:     sub-agents → agents → manager (each logs before stopping)
+Identity:       deployment_id + team_name + agent_name + parent
+Registry:       ~/Documents/ai-usage/deployments/registry.jsonl (team manager only, flock)
+Team workspace: ~/Documents/ai-usage/agent-teams/<team-name>/  (persistent, cross-deployment)
+Run workspace:  ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/  (per-deployment)
+Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
+File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<topic>.md
+Tags:           autonomous team:<X> agent:<Y> deployment:<Z>
+Shutdown:       sub-agents → agents → manager (each logs before stopping)
 ```
