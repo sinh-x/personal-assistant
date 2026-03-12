@@ -63,21 +63,37 @@ Workflow (you do all steps directly):
    - Extract 'Tomorrow's Priorities' as today's starting goals
    - Extract 'Open Items (Carried Forward)' as carryover todos
    - If no daily summary exists, check for recent session logs in ~/Documents/ai-usage/sessions/${year}/${month}/
-3. Get current avo task list and status:
+3. Check your team inbox at ~/Documents/ai-usage/agent-teams/daily/inbox/
+   - Read any files — these are context documents routed by the secretary
+   - Incorporate relevant context into the plan
+   - After processing, move each file to inbox/processed/
+4. Get current avo task list and status:
    - Run: /home/sinh/.nix-profile/bin/avo task list
    - Run: /home/sinh/.nix-profile/bin/avo plan list
    - Run: /home/sinh/.nix-profile/bin/avo status
-4. Write the daily plan as a DRAFT for Sinh to review when he's ready
+5. Use avo to plan the day's tasks:
+   - Based on goals from steps 1-4, schedule tasks with avo:
+     /home/sinh/.nix-profile/bin/avo plan add -t <task-id> -d <duration> -m <notes>
+   - Prioritize P0 first, then P1, P2, etc.
+   - Do not over-schedule — respect realistic time budget
+   - If a goal has no matching avo task, note it for Sinh to create
+6. Write the daily plan as a DRAFT for Sinh to review when he's ready
 
-Output: ${output_dir}/${today}-plan-draft.md
+Output: $HOME/Documents/ai-usage/sinh-inputs/for-sinh-review/${today}-plan-draft.md
 
 IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
+- Save to sinh-inputs/for-sinh-review/ (NOT the daily folder) so Sinh finds it in his review queue
 - Save as *-plan-draft.md (not -plan.md)
 - Add a header: ## DRAFT — Review and adjust when ready
 - Include a checklist at the top for quick review:
   - [ ] Goals look right
   - [ ] Time budget is realistic
   - [ ] No missing priorities
+  - [ ] Avo plan looks right
+- Add a ## Next Steps section at the bottom explaining:
+  1. Review and adjust goals/time budget above
+  2. Finalize by copying to ${output_dir}/${today}-plan.md (or ask pa to finalize)
+  3. Optionally add notes for tomorrow at ${input_notes} before going to bed
 - Sinh will review this draft and finalize it himself
 
 Plan document structure:
@@ -85,6 +101,8 @@ Plan document structure:
   (Sinh's own notes for the day, verbatim or summarized)
   ## Today's Goals (from user notes + yesterday's priorities + new items)
   | # | Goal | Source | Priority |
+  ## Avo Day Plan
+  (output of avo plan list after scheduling)
   ## Time Budget
   | Category | Planned | Notes |
   ## Open Items Carried Forward
