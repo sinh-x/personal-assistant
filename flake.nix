@@ -72,6 +72,10 @@
               --run 'mkdir -p "$PA_DATA/primers" "$PA_DATA/logs"' \
               --prefix PATH : "${runtimePath}"
 
+            # --- Install fish completions ---
+            mkdir -p $out/share/fish/vendor_completions.d
+            cp completions/pa.fish $out/share/fish/vendor_completions.d/pa.fish
+
             runHook postInstall
           '';
 
