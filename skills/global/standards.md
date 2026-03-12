@@ -358,6 +358,76 @@ These suggestions are aggregated by the daily-end summary team into the daily re
 
 ---
 
+## 10. Inbox Communication Workflow
+
+Every team has standardized workflow folders in their persistent workspace. All agents MUST use these for cross-team and agent-to-Sinh communication.
+
+### Folder structure (every team + Sinh)
+
+```
+~/Documents/ai-usage/agent-teams/<team_name>/
+├── inbox/                  # Items arriving for you to process
+├── waiting-for-response/   # Items you sent out, awaiting reply
+├── done/                   # Completed items
+├── archives/               # Older completed items (periodic cleanup)
+└── artifacts/              # Reference materials, context docs
+
+~/Documents/ai-usage/sinh-inputs/
+├── inbox/                  # Items FROM agents TO Sinh
+├── waiting-for-response/   # Items Sinh sent TO agents, awaiting reply
+├── done/                   # Items Sinh has handled
+├── archives/               # Archived items
+└── artifacts/              # Sinh's reference materials
+```
+
+### On startup (MANDATORY)
+
+Before starting your main work, every agent MUST:
+
+1. **Check your team's `inbox/`** for pending items from other agents or the secretary
+2. **Check your team's `waiting-for-response/`** for items that may have been resolved (look for responses in your `inbox/`)
+3. **Incorporate outstanding items** into your current run — don't ignore them
+
+### When you need a review or response from another agent or Sinh
+
+1. Create a markdown file: `YYYY-MM-DD-<topic>.md`
+2. Place it in the **recipient's** `inbox/`:
+   - Agent team: `~/Documents/ai-usage/agent-teams/<recipient-team>/inbox/`
+   - Sinh: `~/Documents/ai-usage/sinh-inputs/inbox/`
+3. Place a tracking copy in **your team's** `waiting-for-response/`:
+   - `~/Documents/ai-usage/agent-teams/<your-team>/waiting-for-response/`
+   - The tracking copy should reference the original and what you're waiting for
+
+### When you pick up an inbox item
+
+1. Process the item
+2. Move processed item to your team's `done/`
+3. If you need to respond, place the response in the **sender's** `inbox/`
+4. Note in your response which `waiting-for-response/` item it resolves
+
+### When a task cannot be completed
+
+- If blocked by a dependency or waiting for external input, move the item to `waiting-for-response/` (not `done/`)
+- Document what's blocking it inside the file
+- Create a corresponding inbox item for whoever can unblock you
+
+### Completed tasks
+
+- Move to `done/` when finished
+- The secretary periodically moves old `done/` items (>7 days) to `archives/`
+
+### File naming
+
+All inbox/workflow files use: `YYYY-MM-DD-<topic>.md` (kebab-case)
+
+### Rules
+
+- **Never delete workflow files.** Move to `done/` or `archives/`, never remove.
+- **Idempotent.** Don't re-process items already in `done/` or `archives/`.
+- **Preserve context.** When moving items, keep original filename.
+
+---
+
 ## Quick Reference
 
 ```
@@ -365,8 +435,11 @@ Identity:       deployment_id + team_name + agent_name + parent
 Registry:       ~/Documents/ai-usage/deployments/registry.jsonl (team manager only, flock)
 Team workspace: ~/Documents/ai-usage/agent-teams/<team-name>/  (persistent, cross-deployment)
 Run workspace:  ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/  (per-deployment)
+Team inbox:     ~/Documents/ai-usage/agent-teams/<team-name>/inbox/  (check on startup!)
+Sinh inbox:     ~/Documents/ai-usage/sinh-inputs/inbox/  (items for Sinh)
 Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
 File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<topic>.md
 Tags:           autonomous team:<X> agent:<Y> deployment:<Z>
+Startup:        1) create workspaces  2) check inbox/  3) check waiting-for-response/  4) main work
 Shutdown:       sub-agents → agents → manager (each logs before stopping)
 ```
