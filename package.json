@@ -1,0 +1,29 @@
+{
+  "name": "personal-assistant",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "CLI agent team orchestrator for NixOS",
+  "main": "dist/cli.mjs",
+  "bin": {
+    "pa": "dist/cli.mjs"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsup --watch"
+  },
+  "dependencies": {
+    "commander": "^13.1.0",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@10.28.0"
+}

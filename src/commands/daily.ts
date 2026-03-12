@@ -1,65 +1,32 @@
-#!/usr/bin/env bash
-set -euo pipefail
+import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
+import { homedir, tmpdir } from "node:os";
+import { loadConfig } from "../lib/config.js";
+import { getHomeDir } from "../lib/paths.js";
+import { deployCommand } from "./deploy.js";
 
-# Daily lifecycle wrapper — sets the mode and deploys the daily team
-#
-# Usage: ./daily.sh <mode> [date] [--dry-run | --foreground | --interactive]
-#
-#   ./daily.sh plan                   — plan for today (background)
-#   ./daily.sh plan --interactive     — plan interactively (you approve tool calls)
-#   ./daily.sh end 2026-03-10        — end-of-day summary for a specific date
-#   ./daily.sh progress --dry-run    — dry-run progress check for today
+/** Format date as YYYY-MM-DD */
+function formatDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PA_HOME="${PA_HOME:-$SCRIPT_DIR}"       # read-only base: teams/, skills/
-PA_CONFIG=""                            # user overrides (set by pa-config.sh)
-PA_DATA="${PA_DATA:-$PA_HOME}"          # mutable: primers/, logs/
-
-# Load user config from ~/.config/sinh-x/personal-assistant/config.yaml
-source "${PA_HOME}/pa-config.sh" 2>/dev/null || source "$SCRIPT_DIR/pa-config.sh" 2>/dev/null || true
-
-# Resolve daily.yaml: PA_CONFIG first, then PA_HOME
-if [[ -n "$PA_CONFIG" && -f "$PA_CONFIG/teams/daily.yaml" ]]; then
-    TEAMS_DIR="$PA_CONFIG/teams"
-else
-    TEAMS_DIR="$PA_HOME/teams"
-fi
-
-mode="${1:?Usage: ./daily.sh <plan|progress|end> [YYYY-MM-DD] [--dry-run | --foreground]}"
-shift
-
-# Parse remaining args: optional date + optional flag
-target_date=""
-extra=""
-for arg in "$@"; do
-    if [[ "$arg" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-        target_date="$arg"
-    else
-        extra="$arg"
-    fi
-done
-
-today="${target_date:-$(date +%Y-%m-%d)}"
-year="${today:0:4}"
-month="${today:5:2}"
-output_dir="$HOME/Documents/ai-usage/daily/${year}/${month}"
-
-# --- Mode-specific objectives ---
-
-case "$mode" in
-    plan)
-        input_notes="$HOME/Documents/ai-usage/sinh-inputs/daily-plan/${today}"
-        objective="MODE: DAILY PLAN (morning) — SOLO (no sub-agents)
+/** Build the plan objective */
+function planObjective(today: string, year: string, month: string, outputDir: string): string {
+  const inputNotes = resolve(homedir(), `Documents/ai-usage/sinh-inputs/daily-plan/${today}`);
+  return `MODE: DAILY PLAN (morning) — SOLO (no sub-agents)
 TARGET_DATE: ${today}
 
 Create the daily plan for ${today}. You do this YOURSELF — do NOT spawn any sub-agents.
 
 Workflow (you do all steps directly):
-1. Check for user notes at ${input_notes}
+1. Check for user notes at ${inputNotes}
    - If the file exists, read it FIRST — these are Sinh's personal notes, priorities, or instructions for today
    - Incorporate these notes as HIGH PRIORITY items in the plan
    - The notes may contain specific goals, meetings, reminders, or overrides to the usual workflow
-2. Read yesterday's daily summary (end-of-day) from ${output_dir}/ — look for the most recent *-daily.md
+2. Read yesterday's daily summary (end-of-day) from ${outputDir}/ — look for the most recent *-daily.md
    - Extract 'Tomorrow's Priorities' as today's starting goals
    - Extract 'Open Items (Carried Forward)' as carryover todos
    - If no daily summary exists, check for recent session logs in ~/Documents/ai-usage/sessions/${year}/${month}/
@@ -79,7 +46,7 @@ Workflow (you do all steps directly):
    - If a goal has no matching avo task, note it for Sinh to create
 6. Write the daily plan as a DRAFT for Sinh to review when he's ready
 
-Output: $HOME/Documents/ai-usage/sinh-inputs/for-sinh-review/${today}-plan-draft.md
+Output: ${homedir()}/Documents/ai-usage/sinh-inputs/for-sinh-review/${today}-plan-draft.md
 
 IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
 - Save to sinh-inputs/for-sinh-review/ (NOT the daily folder) so Sinh finds it in his review queue
@@ -92,12 +59,12 @@ IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
   - [ ] Avo plan looks right
 - Add a ## Next Steps section at the bottom explaining:
   1. Review and adjust goals/time budget above
-  2. Finalize by copying to ${output_dir}/${today}-plan.md (or ask pa to finalize)
-  3. Optionally add notes for tomorrow at ${input_notes} before going to bed
+  2. Finalize by copying to ${outputDir}/${today}-plan.md (or ask pa to finalize)
+  3. Optionally add notes for tomorrow at ${inputNotes} before going to bed
 - Sinh will review this draft and finalize it himself
 
 Plan document structure:
-  ## User Notes (if ${input_notes} exists)
+  ## User Notes (if ${inputNotes} exists)
   (Sinh's own notes for the day, verbatim or summarized)
   ## Today's Goals (from user notes + yesterday's priorities + new items)
   | # | Goal | Source | Priority |
@@ -109,11 +76,12 @@ Plan document structure:
   - [ ] item (from session/date)
   ## Today's Task List
   (from avo task list, prioritized)
-"
-        ;;
+`;
+}
 
-    progress)
-        objective="MODE: DAILY PROGRESS (mid-day)
+/** Build the progress objective */
+function progressObjective(today: string, outputDir: string): string {
+  return `MODE: DAILY PROGRESS (mid-day)
 TARGET_DATE: ${today}
 
 Check progress toward the plan for ${today}.
@@ -124,11 +92,11 @@ Workflow:
    - jsonl-analyst: get today's JSONL stats so far
    - time-tracker: get avo current status, plan vs actual so far
 2. Once all three are done, spawn synthesizer with their data and this instruction:
-   - Read today's plan from ${output_dir}/${today}-plan.md
+   - Read today's plan from ${outputDir}/${today}-plan.md
    - Compare planned goals vs actual activity
    - Produce a progress report
 
-Output: ${output_dir}/${today}-progress.md
+Output: ${outputDir}/${today}-progress.md
 
 Progress document structure:
   ## Goal Progress
@@ -143,11 +111,12 @@ Progress document structure:
   - New items that emerged
   ## Remaining Plan
   - What to focus on for the rest of the day
-"
-        ;;
+`;
+}
 
-    end)
-        objective="MODE: DAILY END (evening)
+/** Build the end objective */
+function endObjective(today: string, outputDir: string): string {
+  return `MODE: DAILY END (evening)
 TARGET_DATE: ${today}
 
 Produce the end-of-day summary for ${today} and plan for the next day.
@@ -158,12 +127,12 @@ Workflow:
    - jsonl-analyst: get full day JSONL stats
    - time-tracker: get full day avo report
 2. Once all three are done, spawn synthesizer with their data and this instruction:
-   - Read today's plan from ${output_dir}/${today}-plan.md (if exists)
-   - Read today's progress from ${output_dir}/${today}-progress.md (if exists)
+   - Read today's plan from ${outputDir}/${today}-plan.md (if exists)
+   - Read today's progress from ${outputDir}/${today}-progress.md (if exists)
    - Compare planned vs actual for the full day
    - Produce the final daily summary
 
-Output: ${output_dir}/${today}-daily.md
+Output: ${outputDir}/${today}-daily.md
 
 Daily summary document structure:
   ## Day at a Glance
@@ -202,35 +171,120 @@ Daily summary document structure:
 
   ## Stats Deep Dive
   Token usage, tool histogram, model distribution, projects, activity timeline
-"
-        ;;
+`;
+}
 
-    *)
-        echo "Error: Unknown mode '$mode'. Use: plan | progress | end" >&2
-        exit 1
-        ;;
-esac
+/**
+ * Daily lifecycle wrapper — sets the mode and deploys the daily team.
+ * Replaces daily.sh (237 lines).
+ */
+export function dailyCommand(
+  mode: string,
+  args: string[]
+): void {
+  const config = loadConfig();
+  const paHome = getHomeDir();
 
-# --- Build temp team file with injected objective (never mutate source) ---
+  // Validate mode
+  if (!["plan", "progress", "end"].includes(mode)) {
+    console.error(`Error: Unknown mode '${mode}'. Use: plan | progress | end`);
+    process.exit(1);
+  }
 
-tmp_team="$(mktemp --suffix=.yaml)"
-trap 'rm -f "$tmp_team"' EXIT
+  // Parse remaining args: optional date + optional flag
+  let targetDate = "";
+  let extra = "";
+  for (const arg of args) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(arg)) {
+      targetDate = arg;
+    } else {
+      extra = arg;
+    }
+  }
 
-sed "/^objective:/,\$d" "$TEAMS_DIR/daily.yaml" > "$tmp_team"
-echo "objective: |" >> "$tmp_team"
-echo "$objective" | sed 's/^/  /' >> "$tmp_team"
+  const today = targetDate || formatDate(new Date());
+  const year = today.slice(0, 4);
+  const month = today.slice(5, 7);
+  const outputDir = resolve(homedir(), `Documents/ai-usage/daily/${year}/${month}`);
 
-# --- Deploy using temp file path ---
+  // Build mode-specific objective
+  let objective: string;
+  switch (mode) {
+    case "plan":
+      objective = planObjective(today, year, month, outputDir);
+      break;
+    case "progress":
+      objective = progressObjective(today, outputDir);
+      break;
+    case "end":
+      objective = endObjective(today, outputDir);
+      break;
+    default:
+      console.error(`Error: Unknown mode '${mode}'`);
+      process.exit(1);
+  }
 
-deploy_cmd="${PA_BIN:+${PA_BIN}/pa-deploy}"
-deploy_cmd="${deploy_cmd:-bash $SCRIPT_DIR/deploy.sh}"
+  // Resolve daily.yaml: PA_CONFIG first, then PA_HOME
+  let teamsDir: string;
+  if (config.configDir && existsSync(resolve(config.configDir, "teams/daily.yaml"))) {
+    teamsDir = resolve(config.configDir, "teams");
+  } else {
+    teamsDir = resolve(paHome, "teams");
+  }
 
-if [[ "$extra" == "--dry-run" ]]; then
-    $deploy_cmd "$tmp_team" --dry-run
-elif [[ "$extra" == "--interactive" ]]; then
-    $deploy_cmd "$tmp_team" --interactive
-elif [[ "$extra" == "--foreground" ]]; then
-    $deploy_cmd "$tmp_team" --foreground
-else
-    $deploy_cmd "$tmp_team"
-fi
+  const dailyYaml = resolve(teamsDir, "daily.yaml");
+  if (!existsSync(dailyYaml)) {
+    console.error(`Error: daily.yaml not found in ${teamsDir}`);
+    process.exit(1);
+  }
+
+  // Build temp team file with injected objective
+  const content = readFileSync(dailyYaml, "utf-8");
+  // Strip everything from "objective:" onwards
+  const lines = content.split("\n");
+  const objectiveIdx = lines.findIndex((l) => l.startsWith("objective:"));
+  const beforeObjective = objectiveIdx >= 0 ? lines.slice(0, objectiveIdx) : lines;
+
+  const tempContent =
+    beforeObjective.join("\n") +
+    "\nobjective: |\n" +
+    objective
+      .split("\n")
+      .map((l) => `  ${l}`)
+      .join("\n") +
+    "\n";
+
+  // Write to temp file
+  const tempDir = resolve(tmpdir(), "pa-daily");
+  mkdirSync(tempDir, { recursive: true });
+  const tmpFile = resolve(tempDir, `daily-${mode}-${Date.now()}.yaml`);
+  writeFileSync(tmpFile, tempContent);
+
+  // Deploy using temp file path
+  const deployOpts: {
+    dryRun?: boolean;
+    foreground?: boolean;
+    interactive?: boolean;
+  } = {};
+
+  switch (extra) {
+    case "--dry-run":
+      deployOpts.dryRun = true;
+      break;
+    case "--foreground":
+      deployOpts.foreground = true;
+      break;
+    case "--interactive":
+      deployOpts.interactive = true;
+      break;
+  }
+
+  deployCommand(tmpFile, deployOpts);
+
+  // Clean up temp file (non-critical)
+  try {
+    unlinkSync(tmpFile);
+  } catch {
+    // Best effort cleanup
+  }
+}
