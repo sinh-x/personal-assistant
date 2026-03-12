@@ -1,5 +1,7 @@
 import { Command } from "commander";
 import { teamsCommand } from "./commands/teams.js";
+import { deployCommand } from "./commands/deploy.js";
+import { dailyCommand } from "./commands/daily.js";
 import { statusCommand } from "./commands/status.js";
 import { scheduleCommand } from "./commands/schedule.js";
 import { timersCommand } from "./commands/timers.js";
@@ -23,17 +25,30 @@ program
 program
   .command("deploy")
   .description("Deploy an agent team")
-  .action(() => {
-    console.error("Not yet implemented — use pa-deploy (bash) for now.");
-    process.exit(1);
+  .argument("<team>", "Team name or path to YAML file")
+  .option("--dry-run", "Generate primer and print it, no execution")
+  .option("--foreground", "Run in foreground with auto-permissions")
+  .option("--interactive", "Run in foreground, user approves each tool call")
+  .option("--objective <text>", "Append extra instructions to the team objective")
+  .action((team: string, opts: { dryRun?: boolean; foreground?: boolean; interactive?: boolean; objective?: string }) => {
+    deployCommand(team, opts);
   });
 
 program
   .command("daily")
   .description("Daily lifecycle (plan|progress|end)")
-  .action(() => {
-    console.error("Not yet implemented — use pa-daily (bash) for now.");
-    process.exit(1);
+  .argument("<mode>", "Mode: plan | progress | end")
+  .argument("[date]", "Target date (YYYY-MM-DD)")
+  .option("--dry-run", "Generate primer and print it, no execution")
+  .option("--foreground", "Run in foreground with auto-permissions")
+  .option("--interactive", "Run in foreground, user approves each tool call")
+  .action((mode: string, date: string | undefined, opts: { dryRun?: boolean; foreground?: boolean; interactive?: boolean }) => {
+    const args: string[] = [];
+    if (date) args.push(date);
+    if (opts.dryRun) args.push("--dry-run");
+    else if (opts.foreground) args.push("--foreground");
+    else if (opts.interactive) args.push("--interactive");
+    dailyCommand(mode, args);
   });
 
 program
