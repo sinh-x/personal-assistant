@@ -186,6 +186,9 @@ EOF
               systemd
               git
               unixtools.xxd
+              # TypeScript migration
+              nodejs_22
+              pnpm
             ];
           };
         });

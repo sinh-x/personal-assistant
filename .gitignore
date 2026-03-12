@@ -5,3 +5,5 @@ result-*
 .env
 .env.*
 .direnv/
+node_modules/
+dist/
