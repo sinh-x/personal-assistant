@@ -28,9 +28,10 @@ export interface RegistryEvent {
   status?: "success" | "partial" | "failed";
   summary?: string;
   log_file?: string;
-  primer_file?: string;
-  agents?: string;
+  primer?: string;
+  agents?: string[];
   error?: string;
+  exit_code?: number;
 }
 
 /** Computed deployment status from registry events */
@@ -51,7 +52,7 @@ export interface DeploymentStatus {
   agents: string[];
   summary?: string;
   log_file?: string;
-  primer_file?: string;
+  primer?: string;
 }
 
 /** PA configuration paths */
