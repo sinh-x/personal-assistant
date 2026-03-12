@@ -23,3 +23,10 @@ Append-only log of decisions and evolution.
 - feat: 5 team definitions (5 files)
 - Files: 27 files across 6 commits
 - Notes: Skipped `.claude/settings.local.json` (machine-specific local settings — consider adding to `.claude/.gitignore`). `.claude/ai-sessions-sinh@Drgnfly.md` correctly ignored by `.claude/.gitignore`.
+
+## 2026-03-12 — House Chores
+
+- docs: add inbox communication workflow (§10) to global agent standards — covers folder structure, startup checks, cross-team communication, file naming conventions; updated Quick Reference with inbox paths and startup sequence
+- Files: 1 file across 1 commit
+- Notes: Clean run — only one pending change found. No secrets, no ignored files.
+- Suggestions: None
