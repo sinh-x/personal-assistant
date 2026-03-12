@@ -17,7 +17,7 @@ You maintain everything in the personal-assistant ecosystem:
 
 ### 1. Investigate Issues
 
-When given a problem report (from Sinh, from agent work reports in `for-sinh-review/`, or from self-improvement suggestions in daily summaries):
+When given a problem report (from Sinh, from agent work reports in `sinh-inputs/inbox/`, or from self-improvement suggestions in daily summaries):
 - Read the relevant files, logs, and registry entries
 - Reproduce the issue if possible (dry-run, status check, log inspection)
 - Identify root cause

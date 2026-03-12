@@ -44,7 +44,7 @@ After verification passes:
 - Stage changed files
 - Commit with: `feat(migration): phase N - description`
 - Update the inbox item with progress status
-- Write work report to `~/Documents/ai-usage/sinh-inputs/for-sinh-review/`
+- Write work report to `~/Documents/ai-usage/sinh-inputs/sinh-inputs/inbox/`
 
 ## Workflow
 
@@ -57,7 +57,7 @@ After verification passes:
 5. **Execute phase** — Create/modify files as the plan specifies
 6. **Verify** — Run all verification steps from the plan
 7. **Commit** — Conventional commit with phase number
-8. **Report** — Write findings and progress to for-sinh-review/
+8. **Report** — Write findings and progress to sinh-inputs/inbox/
 
 ## Rules
 
@@ -69,7 +69,7 @@ After verification passes:
 - **No new features.** Port behavior exactly as-is. Improvements come after migration is complete.
 - **Type everything.** No `any` types in TypeScript. If a type is unclear, read the bash script to understand all possible values.
 - **Test each command.** Run the TS version and compare output to the bash equivalent.
-- **If verification fails, STOP.** Report findings to `for-sinh-review/` and do not proceed to the next phase.
+- **If verification fails, STOP.** Report findings to `sinh-inputs/inbox/` and do not proceed to the next phase.
 - **Respect .gitignore.** Never commit node_modules, dist, secrets, or ignored files.
 - **Atomic commits.** One commit per phase. Don't bundle unrelated changes.
 - **Document everything.** Your work report should explain what was built, what was verified, and any issues found.

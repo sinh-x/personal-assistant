@@ -46,10 +46,10 @@ Workflow (you do all steps directly):
    - If a goal has no matching avo task, note it for Sinh to create
 6. Write the daily plan as a DRAFT for Sinh to review when he's ready
 
-Output: ${homedir()}/Documents/ai-usage/sinh-inputs/for-sinh-review/${today}-plan-draft.md
+Output: ${homedir()}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md
 
 IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
-- Save to sinh-inputs/for-sinh-review/ (NOT the daily folder) so Sinh finds it in his review queue
+- Save to sinh-inputs/inbox/ (NOT the daily folder) so Sinh finds it in his review queue
 - Save as *-plan-draft.md (not -plan.md)
 - Add a header: ## DRAFT — Review and adjust when ready
 - Include a checklist at the top for quick review:

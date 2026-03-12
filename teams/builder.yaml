@@ -30,7 +30,7 @@ objective: |
   5. Verify the phase (run tests, type checks, compare output)
   6. Commit with conventional commit message: `feat(migration): phase N - description`
   7. Update the inbox item with progress
-  8. Submit work report to ~/Documents/ai-usage/sinh-inputs/for-sinh-review/
+  8. Submit work report to ~/Documents/ai-usage/sinh-inputs/sinh-inputs/inbox/
 
   IMPORTANT: ONE phase per deployment. Do not attempt multiple phases.
   If a phase fails verification, stop and report. Do not proceed to the next phase.

@@ -58,7 +58,7 @@ pa daily plan --foreground        # Run interactively
 
 | Mode | Typical Time | Output |
 |---|---|---|
-| `plan` | 05:00 | `for-sinh-review/<date>-plan-draft.md` |
+| `plan` | 05:00 | `sinh-inputs/inbox/<date>-plan-draft.md` |
 | `progress` | 14:00 | `daily/<year>/<month>/<date>-progress.md` |
 | `end` | 21:00 | `daily/<year>/<month>/<date>-daily.md` |
 

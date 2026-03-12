@@ -192,16 +192,21 @@ mcp__ai-usage-log__save_session_bundle(
 After logging your session, **every team manager** MUST also submit a brief work report to the review queue for Sinh:
 
 ```bash
-mkdir -p ~/Documents/ai-usage/sinh-inputs/for-sinh-review
+mkdir -p ~/Documents/ai-usage/sinh-inputs/inbox
 ```
 
-Write a summary file: `~/Documents/ai-usage/sinh-inputs/for-sinh-review/YYYY-MM-DD-<team_name>-<deploy_id>.md`
+Write a summary file: `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team_name>-<descriptive-topic>.md`
+
+**File naming:** Use a descriptive topic, not just team + deploy ID. Examples:
+- `2026-03-12-maintenance-health-check.md`
+- `2026-03-12-requirements-pa-review-dashboard.md`
+- `2026-03-12-builder-ts-migration-phase-2.md`
 
 ```markdown
-# Work Report: <team_name> (<deploy_id>)
+# Work Report: <descriptive title>
 
 > **Date:** YYYY-MM-DD
-> **Team:** <team_name>
+> **From:** <team_name> / <agent_name>
 > **Deployment:** <deploy_id>
 > **Status:** success | partial | failed
 
@@ -219,7 +224,67 @@ Write a summary file: `~/Documents/ai-usage/sinh-inputs/for-sinh-review/YYYY-MM-
 - <what should happen next — which agent/team, or action for Sinh>
 ```
 
-This report is how Sinh stays informed. The secretary agent routinely scans `for-sinh-review/` and routes confirmed items to the appropriate agent-team workspace.
+This report is how Sinh stays informed. Place it in `~/Documents/ai-usage/sinh-inputs/inbox/` (the standardized inbox, not `for-sinh-review/`).
+
+### Delivering Key Deliverables to Sinh
+
+When your work produces a **deliverable** with lasting value (requirements doc, migration plan, analysis report, implementation result) — not just a routine work report — you MUST do three things:
+
+#### 1. Preserve in team artifacts
+
+Copy the deliverable from the ephemeral deployment workspace to your team's persistent `artifacts/` folder:
+```bash
+cp ~/Documents/ai-usage/deployments/<deploy_id>/<agent_name>/<output>.md \
+   ~/Documents/ai-usage/agent-teams/<team_name>/artifacts/YYYY-MM-DD-<descriptive-name>.md
+```
+
+#### 2. Send a review request to Sinh's inbox
+
+Create a file in `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-<descriptive-topic>.md`.
+
+The review request **embeds the full deliverable content inline** — Sinh should be able to review everything by reading this one file, without navigating to other paths.
+
+```markdown
+# Review Request: <descriptive title>
+
+> **Date:** YYYY-MM-DD
+> **From:** <team_name> / <agent_name>
+> **Deployment:** <deploy_id>
+> **Type:** Review & Feedback
+
+## What Was Done
+- <bullet summary of what was accomplished>
+
+## What Sinh Needs To Do
+- [ ] <specific action — e.g., "Review requirements doc and approve or request changes">
+- [ ] <specific decision — e.g., "Decide: web app vs TUI?">
+- [ ] <specific feedback — e.g., "Flag any missing requirements">
+
+## Suggested Next Steps
+- If approved: <what happens next — e.g., "Route to builder inbox for implementation">
+- If changes needed: <how to iterate — e.g., "Re-run with --interactive to refine">
+
+## Also Saved At
+- **Artifacts:** ~/Documents/ai-usage/agent-teams/<team_name>/artifacts/<filename>
+- **Deployment:** ~/Documents/ai-usage/deployments/<deploy_id>/<agent_name>/
+
+---
+
+## Full Deliverable
+
+<paste the ENTIRE deliverable content here — requirements doc, plan, report, etc.>
+<Sinh reads everything in this one file — no need to navigate elsewhere>
+```
+
+#### 3. Track in waiting-for-response
+
+Place a tracking copy in your team's `waiting-for-response/`:
+```bash
+~/Documents/ai-usage/agent-teams/<team_name>/waiting-for-response/YYYY-MM-DD-review-<topic>.md
+```
+
+**Use this flow for:** requirements docs, implementation plans, analysis reports, any output needing human review.
+**Do NOT use for:** routine health checks, daily summaries, session logs — use the standard work report above for those.
 
 ### On failure
 

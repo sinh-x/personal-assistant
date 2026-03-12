@@ -146,10 +146,25 @@ Items explicitly deferred from this scope.
 
 ## Output
 
-Save the requirements document to your workspace:
-```
-~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/requirements.md
-```
+Save the requirements document in three places:
+
+1. **Deployment workspace** (ephemeral):
+   ```
+   ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/requirements.md
+   ```
+
+2. **Team artifacts** (persistent):
+   ```
+   ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md
+   ```
+
+3. **Sinh's inbox** (review request with full content embedded):
+   ```
+   ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-<descriptive-topic>.md
+   ```
+   Follow the "Delivering Key Deliverables" template in `standards.md` §4.
+   The review request MUST embed the full requirements document inline — Sinh reads everything in one file.
+   Include what Sinh needs to do: approve, provide feedback, decide open questions, and what happens next.
 
 ## Rules
 
