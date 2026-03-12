@@ -1,5 +1,8 @@
 import { Command } from "commander";
 import { teamsCommand } from "./commands/teams.js";
+import { timersCommand } from "./commands/timers.js";
+import { removeTimerCommand } from "./commands/remove-timer.js";
+import { ideaCommand } from "./commands/idea.js";
 
 const program = new Command();
 
@@ -51,26 +54,22 @@ program
   .command("timers")
   .description("List scheduled timers")
   .action(() => {
-    console.error("Not yet implemented — use pa-timers (bash) for now.");
-    process.exit(1);
+    timersCommand();
   });
 
 program
   .command("remove-timer")
   .description("Remove a scheduled timer")
-  .action(() => {
-    console.error(
-      "Not yet implemented — use pa-remove-timer (bash) for now."
-    );
-    process.exit(1);
+  .argument("<team-name>", "Name of the team timer to remove")
+  .action((teamName: string) => {
+    removeTimerCommand(teamName);
   });
 
 program
   .command("idea")
   .description("Log an idea interactively")
-  .action(() => {
-    console.error("Not yet implemented — use pa-idea (bash) for now.");
-    process.exit(1);
+  .action(async () => {
+    await ideaCommand();
   });
 
 program.parse();
