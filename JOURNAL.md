@@ -30,3 +30,16 @@ Append-only log of decisions and evolution.
 - Files: 1 file across 1 commit
 - Notes: Clean run — only one pending change found. No secrets, no ignored files.
 - Suggestions: None
+
+## 2026-03-12 — TypeScript Migration
+
+- Decision: migrate ~1,100 lines of bash to TypeScript (Commander.js + tsup + pnpm)
+- Rationale: bash pain points — manual YAML/JSON parsing (50+ sed/grep calls), fragile process management, no input validation; TS gives strict types, ecosystem alignment with other sinh-x projects (anytype-mcp, claude-devtools, openclaw)
+- Phase 1: project scaffolding (package.json, tsconfig, tsup.config, lib modules)
+- Phase 2: simple commands (timers, remove-timer, idea)
+- Phase 3: medium commands (status, schedule) — verified output identical to bash via diff
+- Phase 4: complex commands (deploy, daily, primer) — verified primer output identical to bash
+- Phase 5: cleanup — deleted all 8 bash scripts, rewrote flake.nix for pnpm/TS build, updated maintenance skill and identity
+- Files: 18+ files across 5 commits on feature/typescript-migration
+- Key fixes: local timezone handling (localISOTimestamp), Commander.js option interception, Nix pnpmConfigHook packaging, ESM/CJS interop
+- Updated IDENTITY.md: "Declarative first" now reflects TypeScript orchestration
