@@ -127,6 +127,7 @@ Description=${description}
 [Service]
 Type=oneshot
 ExecStart=${exec_cmd}
+KillMode=process
 ${env_lines}
 EOF
 
