@@ -263,7 +263,7 @@ export function dailyCommand(
   // Deploy using temp file path
   const deployOpts: {
     dryRun?: boolean;
-    foreground?: boolean;
+    background?: boolean;
     interactive?: boolean;
   } = {};
 
@@ -271,8 +271,8 @@ export function dailyCommand(
     case "--dry-run":
       deployOpts.dryRun = true;
       break;
-    case "--foreground":
-      deployOpts.foreground = true;
+    case "--background":
+      deployOpts.background = true;
       break;
     case "--interactive":
       deployOpts.interactive = true;

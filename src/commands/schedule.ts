@@ -16,19 +16,14 @@ export function scheduleCommand(
 ): void {
   const config = loadConfig();
   const paHome = getHomeDir();
+
+  // Resolve pa binary path
   const paBin = process.env["PA_BIN"] ?? "";
+  const paCmd = paBin ? `${paBin}/pa` : execSync("command -v pa", { encoding: "utf-8" }).trim();
 
   // Default time if none given
   if (times.length === 0) {
     times = ["09:00"];
-  }
-
-  // Resolve bash path at schedule-time (NixOS doesn't have /bin/bash)
-  let bashPath: string;
-  try {
-    bashPath = execSync("command -v bash", { encoding: "utf-8" }).trim();
-  } catch {
-    bashPath = "/usr/bin/env bash";
   }
 
   // Determine exec command and unit name
@@ -44,13 +39,7 @@ export function scheduleCommand(
       );
       process.exit(1);
     }
-    if (paBin) {
-      execCmd = `${paBin}/pa-daily ${dailyMode}`;
-    } else {
-      // Use script directly (dev mode)
-      const scriptDir = resolve(paHome);
-      execCmd = `${bashPath} "${scriptDir}/daily.sh" "${dailyMode}"`;
-    }
+    execCmd = `${paCmd} daily ${dailyMode}`;
     unitName = `pa-daily-${dailyMode}`;
     description = `personal-assistant daily ${dailyMode}`;
   } else {
@@ -66,12 +55,7 @@ export function scheduleCommand(
       console.error(`Error: Team not found: ${teamName}`);
       process.exit(1);
     }
-    if (paBin) {
-      execCmd = `${paBin}/pa-deploy ${teamName}`;
-    } else {
-      const scriptDir = resolve(paHome);
-      execCmd = `${bashPath} "${scriptDir}/deploy.sh" "${teamName}"`;
-    }
+    execCmd = `${paCmd} deploy ${teamName} --background`;
     unitName = `pa-${teamName}`;
     description = `personal-assistant deploy: ${teamName}`;
   }

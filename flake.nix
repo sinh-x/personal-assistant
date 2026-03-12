@@ -94,7 +94,18 @@
       };
 
       devShells = forAllSystems (system:
-        let pkgs = pkgsFor system;
+        let
+          pkgs = pkgsFor system;
+          dev-pa = pkgs.writeShellScriptBin "dev-pa" ''
+            set -euo pipefail
+            PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+            RESULT="$PROJECT_ROOT/result"
+            if [ ! -x "$RESULT/bin/pa" ]; then
+              echo "No result/bin/pa found. Run: nix build" >&2
+              exit 1
+            fi
+            exec "$RESULT/bin/pa" "$@"
+          '';
         in {
           default = pkgs.mkShell {
             packages = with pkgs; [
@@ -106,6 +117,8 @@
               # TypeScript
               nodejs_22
               pnpm
+              # Dev wrapper
+              dev-pa
             ];
           };
         });

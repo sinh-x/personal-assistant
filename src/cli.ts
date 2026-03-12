@@ -13,7 +13,7 @@ const program = new Command();
 program
   .name("pa")
   .description("CLI agent team orchestrator for NixOS")
-  .version("0.1.0");
+  .version("0.1.1");
 
 program
   .command("teams")
@@ -27,10 +27,10 @@ program
   .description("Deploy an agent team")
   .argument("<team>", "Team name or path to YAML file")
   .option("--dry-run", "Generate primer and print it, no execution")
-  .option("--foreground", "Run in foreground with auto-permissions")
+  .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
   .option("--objective <text>", "Append extra instructions to the team objective")
-  .action((team: string, opts: { dryRun?: boolean; foreground?: boolean; interactive?: boolean; objective?: string }) => {
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string }) => {
     deployCommand(team, opts);
   });
 
@@ -40,13 +40,13 @@ program
   .argument("<mode>", "Mode: plan | progress | end")
   .argument("[date]", "Target date (YYYY-MM-DD)")
   .option("--dry-run", "Generate primer and print it, no execution")
-  .option("--foreground", "Run in foreground with auto-permissions")
+  .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
-  .action((mode: string, date: string | undefined, opts: { dryRun?: boolean; foreground?: boolean; interactive?: boolean }) => {
+  .action((mode: string, date: string | undefined, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean }) => {
     const args: string[] = [];
     if (date) args.push(date);
     if (opts.dryRun) args.push("--dry-run");
-    else if (opts.foreground) args.push("--foreground");
+    else if (opts.background) args.push("--background");
     else if (opts.interactive) args.push("--interactive");
     dailyCommand(mode, args);
   });

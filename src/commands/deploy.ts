@@ -49,7 +49,7 @@ export function deployCommand(
   spec: string,
   opts: {
     dryRun?: boolean;
-    foreground?: boolean;
+    background?: boolean;
     interactive?: boolean;
     objective?: string;
   }
@@ -65,10 +65,10 @@ export function deployCommand(
 
   const resolveFile = makeResolver(config.configDir, paHome);
 
-  // Determine mode
-  let mode: "background" | "dry-run" | "foreground" | "interactive" = "background";
+  // Determine mode — foreground by default, --background for automated/timer use
+  let mode: "background" | "dry-run" | "foreground" | "interactive" = "foreground";
   if (opts.dryRun) mode = "dry-run";
-  else if (opts.foreground) mode = "foreground";
+  else if (opts.background) mode = "background";
   else if (opts.interactive) mode = "interactive";
 
   // Resolve team file: file path or name
