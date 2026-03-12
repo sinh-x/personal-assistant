@@ -60,6 +60,7 @@ mkdir -p ~/Documents/ai-usage/daily/$(date +%Y)/$(date +%m)
 - Compare with previous days if yesterday's summary exists
 - "Tomorrow's Priorities" MUST be based on actual open items, not guesses
 - Flag recurring issues (check if same issue appeared yesterday too)
+- **When called from review mode**: you receive pre-gathered data from the gather phase PLUS Sinh's confirmed priorities. Use Sinh's priorities verbatim in "Tomorrow's Priorities" — do not override with auto-generated ones
 
 ## Rules
 

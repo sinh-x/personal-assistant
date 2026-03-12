@@ -114,27 +114,7 @@ Progress document structure:
 `;
 }
 
-/** Build the end objective */
-function endObjective(today: string, outputDir: string): string {
-  return `MODE: DAILY END (evening)
-TARGET_DATE: ${today}
-
-Produce the end-of-day summary for ${today} and plan for the next day.
-
-Workflow:
-1. Spawn session-gatherer, jsonl-analyst, and time-tracker IN PARALLEL
-   - session-gatherer: read ALL of today's sessions (human + agent-team)
-   - jsonl-analyst: get full day JSONL stats
-   - time-tracker: get full day avo report
-2. Once all three are done, spawn synthesizer with their data and this instruction:
-   - Read today's plan from ${outputDir}/${today}-plan.md (if exists)
-   - Read today's progress from ${outputDir}/${today}-progress.md (if exists)
-   - Compare planned vs actual for the full day
-   - Produce the final daily summary
-
-Output: ${outputDir}/${today}-daily.md
-
-Daily summary document structure:
+const DAILY_DOC_STRUCTURE = `
   ## Day at a Glance
   | Metric | Value |
   (sessions, duration, tracked time, tool calls, done items, completion rate, teams deployed)
@@ -155,6 +135,9 @@ Daily summary document structure:
   ### From Agent Teams
   ### Cross-Cutting Insights
 
+  ## Self-Improvement (aggregated from agent sessions)
+  Extracted from ## Self-Improvement sections in agent session logs
+
   ## Deductions & Observations
   - Productivity patterns (peak hours, session lengths)
   - Tool & workflow insights
@@ -170,7 +153,168 @@ Daily summary document structure:
   3. [ ] Priority — reasoning
 
   ## Stats Deep Dive
-  Token usage, tool histogram, model distribution, projects, activity timeline
+  Token usage, tool histogram, model distribution, projects, activity timeline`;
+
+/** Phase 1: gather all data into team inbox (background, no synthesis) */
+function endGatherObjective(today: string, outputDir: string): string {
+  const inboxDir = `${homedir()}/Documents/ai-usage/agent-teams/daily/inbox`;
+  const gatherReport = `${inboxDir}/${today}-end-gather.md`;
+  const readyMarker = `${inboxDir}/${today}-end-ready.md`;
+
+  return `MODE: DAILY END — PHASE 1: GATHER (background)
+TARGET_DATE: ${today}
+
+Gather all end-of-day data autonomously. Write reports to team inbox. Do NOT produce the final daily summary — that happens in Phase 2 (pa daily end --review).
+
+Workflow:
+1. Spawn session-gatherer, jsonl-analyst, and time-tracker IN PARALLEL
+   - session-gatherer: read ALL of today's sessions (human + agent-team)
+   - jsonl-analyst: get full day JSONL stats
+   - time-tracker: get full day avo report
+2. Once all three report back, detect tracking gaps:
+   - Compare total JSONL session duration vs avo tracked time
+   - Gap = JSONL session time where no avo worklog entry covers that window
+   - Flag as TRACKING GAP if untracked time > 30 min total
+   - Build list of untracked windows: start_time, end_time, duration, which sessions were active
+3. Read today's plan from ${outputDir}/${today}-plan.md (if exists) and compute goal completion
+4. Write consolidated gather report to ${gatherReport}:
+
+   ## Gather Report for ${today}
+   > Generated: <ISO timestamp>
+   > Status: ready for review
+
+   ### Session Summary
+   (full output from session-gatherer)
+
+   ### JSONL Stats
+   (full output from jsonl-analyst)
+
+   ### Time Tracking
+   (full output from time-tracker)
+
+   ### Gap Analysis
+   - Total JSONL session time: Xh Ym
+   - Total avo tracked time: Xh Ym
+   - Coverage: Z%
+   - Gaps detected: yes/no
+
+   #### Untracked Windows
+   | Start | End | Duration | Sessions Active |
+   |-------|-----|----------|-----------------|
+   (list each gap — omit table if no gaps)
+
+   ### Goal Completion (preliminary)
+   (compare today's plan goals vs session done items — if plan exists)
+
+5. Write ready marker to ${readyMarker}:
+   ready: true
+   gathered_at: <ISO timestamp>
+   gather_report: ${gatherReport}
+   gaps_detected: true/false
+   gap_count: N
+
+Output: ${gatherReport} (gather report) + ${readyMarker} (ready marker)
+
+After writing both files, log your session and exit.
+`;
+}
+
+/** Phase 2: interactive review — read gathered data, reconcile time, confirm priorities, synthesize */
+function endReviewObjective(today: string, outputDir: string): string {
+  const inboxDir = `${homedir()}/Documents/ai-usage/agent-teams/daily/inbox`;
+  const gatherReport = `${inboxDir}/${today}-end-gather.md`;
+  const readyMarker = `${inboxDir}/${today}-end-ready.md`;
+
+  return `MODE: DAILY END — PHASE 2: REVIEW (interactive)
+TARGET_DATE: ${today}
+
+Interactive end-of-day review: present gathered findings to Sinh, reconcile time tracking gaps, confirm tomorrow's priorities, then produce the final daily summary.
+
+Workflow:
+1. Check for gather report:
+   - Read ${readyMarker} (check if gaps_detected: true/false)
+   - Read ${gatherReport}
+   - If NOT found: offer to run Phase 1 first OR proceed with live gather (spawn gatherers now)
+2. Read today's plan from ${outputDir}/${today}-plan.md (if exists)
+3. Present findings to Sinh — show a compact summary:
+   === Daily End Review — ${today} ===
+   Sessions: N | JSONL time: Xh | Tracked: Xh | Coverage: Z%
+   Goals completed: N/M (XX%)
+   Gaps detected: yes/no
+
+   (Show untracked windows if any)
+
+4. If tracking gaps exist, walk through them interactively:
+   - For each untracked window, ask: "Window [HH:MM–HH:MM, Xh]: which task? (task ID or description, or 'skip')"
+   - On task given: run /home/sinh/.nix-profile/bin/avo worklog add -t <task> -d <duration> -m "<description>"
+   - Confirm: "Logged Xh to <task>"
+   - Continue until all gaps resolved or Sinh says 'done' or 'skip all'
+
+5. Show open items / carried-forward todos from gather report
+   - Ask: "What are tomorrow's top priorities?" (offer data-driven suggestions)
+   - Accept Sinh's input — these become the confirmed priorities
+
+6. Once Sinh says "ready", "done", or "synthesize":
+   - Spawn synthesizer with ALL gathered data + Sinh's confirmed priorities
+   - Pass these inputs:
+     a. Session report (from gather report)
+     b. JSONL stats (from gather report)
+     c. Avo report (from gather report, updated after any new worklogs)
+     d. Sinh's confirmed priorities for tomorrow
+   - Instruction to synthesizer: "Produce final daily summary. Tomorrow's Priorities = Sinh's confirmed list (not auto-generated). Include all data from gather report."
+
+7. After synthesizer completes, clean up:
+   - Move ${readyMarker} → ${inboxDir}/done/
+   - Move ${gatherReport} → ${inboxDir}/done/
+
+Output: ${outputDir}/${today}-daily.md
+${DAILY_DOC_STRUCTURE}
+
+Note: "Tomorrow's Priorities" section MUST use Sinh's confirmed priorities from Step 5, not auto-generated guesses.
+`;
+}
+
+/** Interactive finalization of the plan draft */
+function planReviewObjective(today: string, outputDir: string): string {
+  const draftPath = `${homedir()}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md`;
+
+  return `MODE: DAILY PLAN — REVIEW (interactive)
+TARGET_DATE: ${today}
+
+Finalize today's plan draft through interactive review with Sinh. You do this YOURSELF — do NOT spawn any sub-agents.
+
+Workflow:
+1. Check for draft at ${draftPath}
+   - If found: read it and present it
+   - If NOT found: check ${homedir()}/Documents/ai-usage/sinh-inputs/inbox/ for any *-plan-draft.md
+   - If still not found: read yesterday's daily summary + current avo tasks and create a quick draft inline
+2. Present the draft to Sinh section by section:
+   - Show "## Today's Goals" — ask: "Do these goals look right? Anything to add or remove?"
+   - Show "## Time Budget" — ask: "Is this realistic?"
+   - Show any open items / carryovers
+3. Accept corrections in plain conversation:
+   - "change goal X" → update it
+   - "add <goal>" → add to goals list
+   - "adjust time for <category> to <amount>" → update time budget
+   - "looks good" / "done" → proceed to finalize
+4. Update avo plan if needed:
+   - Run: /home/sinh/.nix-profile/bin/avo plan list (show current)
+   - If Sinh wants changes: /home/sinh/.nix-profile/bin/avo plan add -t <task-id> -d <duration>
+5. Write final plan to ${outputDir}/${today}-plan.md
+6. If draft existed, move it: mv ${draftPath} ${homedir()}/Documents/ai-usage/sinh-inputs/done/
+7. Confirm: "Plan finalized → ${outputDir}/${today}-plan.md"
+
+Final plan document structure:
+  ## Today's Goals
+  | # | Goal | Source | Priority |
+  ## Avo Day Plan
+  (output of avo plan list after any changes)
+  ## Time Budget
+  | Category | Planned | Notes |
+  ## Open Items Carried Forward
+  - [ ] item (from session/date)
+  ## Today's Task List
+  (from avo task list, prioritized)
 `;
 }
 
@@ -191,14 +335,17 @@ export function dailyCommand(
     process.exit(1);
   }
 
-  // Parse remaining args: optional date + optional flag
+  // Parse remaining args: optional date + --review + optional deploy flag
   let targetDate = "";
-  let extra = "";
+  let isReview = false;
+  let deployFlag = "";
   for (const arg of args) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(arg)) {
       targetDate = arg;
+    } else if (arg === "--review") {
+      isReview = true;
     } else {
-      extra = arg;
+      deployFlag = arg;
     }
   }
 
@@ -211,13 +358,17 @@ export function dailyCommand(
   let objective: string;
   switch (mode) {
     case "plan":
-      objective = planObjective(today, year, month, outputDir);
+      objective = isReview
+        ? planReviewObjective(today, outputDir)
+        : planObjective(today, year, month, outputDir);
       break;
     case "progress":
       objective = progressObjective(today, outputDir);
       break;
     case "end":
-      objective = endObjective(today, outputDir);
+      objective = isReview
+        ? endReviewObjective(today, outputDir)
+        : endGatherObjective(today, outputDir);
       break;
     default:
       console.error(`Error: Unknown mode '${mode}'`);
@@ -260,14 +411,19 @@ export function dailyCommand(
   const tmpFile = resolve(tempDir, `daily-${mode}-${Date.now()}.yaml`);
   writeFileSync(tmpFile, tempContent);
 
-  // Deploy using temp file path
+  // Build deploy opts
+  // Review modes default to foreground; gather/plan/progress default to background
   const deployOpts: {
     dryRun?: boolean;
     background?: boolean;
     interactive?: boolean;
   } = {};
 
-  switch (extra) {
+  if (!isReview && mode !== "progress") {
+    deployOpts.background = true; // gather and plan run unattended
+  }
+
+  switch (deployFlag) {
     case "--dry-run":
       deployOpts.dryRun = true;
       break;

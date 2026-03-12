@@ -42,9 +42,11 @@ program
   .option("--dry-run", "Generate primer and print it, no execution")
   .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
-  .action((mode: string, date: string | undefined, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean }) => {
+  .option("--review", "Interactive review mode: end=review+synthesize, plan=finalize draft")
+  .action((mode: string, date: string | undefined, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; review?: boolean }) => {
     const args: string[] = [];
     if (date) args.push(date);
+    if (opts.review) args.push("--review");
     if (opts.dryRun) args.push("--dry-run");
     else if (opts.background) args.push("--background");
     else if (opts.interactive) args.push("--interactive");
