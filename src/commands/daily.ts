@@ -40,7 +40,7 @@ Workflow (you do all steps directly):
    - Run: /home/sinh/.nix-profile/bin/avo status
 5. Use avo to plan the day's tasks:
    - Based on goals from steps 1-4, schedule tasks with avo:
-     /home/sinh/.nix-profile/bin/avo plan add -t <task-id> -d <duration> -m <notes>
+     /home/sinh/.nix-profile/bin/avo plan task <task-id> -e <duration>
    - Prioritize P0 first, then P1, P2, etc.
    - Do not over-schedule — respect realistic time budget
    - If a goal has no matching avo task, note it for Sinh to create
@@ -299,7 +299,7 @@ Workflow:
    - "looks good" / "done" → proceed to finalize
 4. Update avo plan if needed:
    - Run: /home/sinh/.nix-profile/bin/avo plan list (show current)
-   - If Sinh wants changes: /home/sinh/.nix-profile/bin/avo plan add -t <task-id> -d <duration>
+   - If Sinh wants changes: /home/sinh/.nix-profile/bin/avo plan task <task-id> -e <duration>
 5. Write final plan to ${outputDir}/${today}-plan.md
 6. If draft existed, move it: mv ${draftPath} ${homedir()}/Documents/ai-usage/sinh-inputs/done/
 7. Confirm: "Plan finalized → ${outputDir}/${today}-plan.md"
