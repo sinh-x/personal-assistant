@@ -12,17 +12,42 @@ variables:
   # YouTube queue (absorbed from youtube-processor team — path unchanged for compatibility)
   youtube_queue: ~/Documents/ai-usage/queue/youtube-video-queue.txt
 
-  # RSS feeds — Sinh to fill in when ready (one URL per line, lines starting with # are comments)
+  # RSS feeds — remove # from a line to activate that feed
+  # Lines starting with # are comments/suggestions and will be skipped by the gatherer
   rss_feeds: |
-    # Add RSS feed URLs below, one per line
-    # Example: https://feeds.feedburner.com/oreilly/radar
-    # Example: https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml
+    # --- AI / LLM / Tech ---
+    # https://simonwillison.net/atom/everything/             # Simon Willison (AI/LLM commentary)
+    # https://huggingface.co/blog/feed.xml                   # Hugging Face blog
+    # https://rss.arxiv.org/rss/cs.AI                       # arXiv CS.AI daily papers
+    # https://www.deeplearning.ai/the-batch/feed/            # The Batch (deeplearning.ai)
 
-  # Podcast feeds — Sinh to fill in when ready (one RSS URL per line)
+    # --- Learning Science ---
+    # https://www.learningscientists.org/feed                # The Learning Scientists blog
+    # https://www.edutopia.org/rss.xml                       # Edutopia (education research)
+    # https://www.cultofpedagogy.com/feed/                   # Cult of Pedagogy
+
+    # --- Personal Development ---
+    # https://jamesclear.com/feed                            # James Clear (Atomic Habits)
+    # https://waitbutwhy.com/feed                            # Wait But Why (long-form thinking)
+
+    # --- Add your feeds below ---
+
+  # Podcast feeds — remove # from a line to activate that feed
+  # Lines starting with # are comments/suggestions and will be skipped by the gatherer
   podcast_feeds: |
-    # Add podcast RSS/Atom feed URLs below, one per line
-    # Example: https://feeds.megaphone.fm/hubermanlab
-    # Example: https://lexfridman.com/feed/podcast/
+    # --- Science & Learning ---
+    # https://feeds.megaphone.fm/hubermanlab                            # Huberman Lab
+    # https://feeds.simplecast.com/54nAGcIl                             # Hidden Brain (NPR)
+
+    # --- AI / Tech ---
+    # https://lexfridman.com/feed/podcast/                              # Lex Fridman Podcast
+    # https://feeds.transistor.fm/machine-learning-street-talk          # ML Street Talk
+
+    # --- Personal Development ---
+    # https://tim.blog/feed/podcast/                                    # The Tim Ferriss Show
+    # https://80000hours.org/podcast/feed/                              # 80,000 Hours Podcast
+
+    # --- Add your feeds below ---
 
   # Topics of interest for content filtering and relevance scoring
   topics_of_interest: |
