@@ -25,7 +25,7 @@
         in
         pkgs.stdenv.mkDerivation (finalAttrs: {
           pname = "personal-assistant";
-          version = "0.1.2";
+          version = "0.1.3";
 
           src = ./.;
 
