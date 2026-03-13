@@ -10,7 +10,10 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "bump:patch": "bash scripts/version_bump.sh patch",
+    "bump:minor": "bash scripts/version_bump.sh minor",
+    "bump:major": "bash scripts/version_bump.sh major"
   },
   "dependencies": {
     "commander": "^13.1.0",
