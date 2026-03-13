@@ -76,9 +76,9 @@ export function deployCommand(
   let teamName: string;
 
   if (existsSync(spec)) {
-    // Absolute path to a YAML file
+    // Absolute path to a YAML file — team name comes from YAML content, not filename
     teamFile = resolve(dirname(spec), basename(spec));
-    teamName = basename(spec, ".yaml");
+    teamName = ""; // resolved after parsing below
   } else {
     teamName = spec;
     const resolved = resolveFile(`teams/${teamName}.yaml`);
@@ -113,6 +113,9 @@ export function deployCommand(
   // Parse team YAML
   const teamConfig = parseTeamYaml(teamFile);
   const agentNames = teamConfig.agents.map((a) => a.name);
+
+  // Use YAML name field as canonical team name (overrides filename-derived name)
+  if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
 
   // Generate primer
   const primerFile = resolve(primersDir, `${teamName}-${deployId}-primer.md`);
