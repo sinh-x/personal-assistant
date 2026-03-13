@@ -122,7 +122,7 @@ Global skills from PA_CONFIG shadow those from PA_HOME (matched by filename).
 | `secretary` | Intake, routing, and organization |
 | `house-chores` | Survey and commit uncommitted changes |
 | `requirements` | Requirements gathering and analysis |
-| `youtube-processor` | Process YouTube videos to structured notes |
+| `knowledge-hub` | Learning, research & intel — YouTube, RSS, Johari blind-spot analysis (absorbs `youtube-processor`) |
 
 ## Path Resolution
 
