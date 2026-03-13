@@ -1,0 +1,108 @@
+name: knowledge-hub
+description: Learning, research & intel team — multi-source knowledge ingestion, curation, interactive learning, and Johari blind-spot analysis
+
+context:
+  organization: sinh-x
+  notes: "Unified learning hub: YouTube, RSS, podcasts, system logs, and Johari blind-spot tracking. Absorbs youtube-processor team."
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+  anytype_space_id: bafyreifs6whb7td4qfzyqx5nh6krdmxosvbzxwnpn5eqeepivm3tc7ps6i.2eaoxbxt3otui
+
+  # YouTube queue (absorbed from youtube-processor team — path unchanged for compatibility)
+  youtube_queue: ~/Documents/ai-usage/queue/youtube-video-queue.txt
+
+  # RSS feeds — Sinh to fill in when ready (one URL per line, lines starting with # are comments)
+  rss_feeds: |
+    # Add RSS feed URLs below, one per line
+    # Example: https://feeds.feedburner.com/oreilly/radar
+    # Example: https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml
+
+  # Podcast feeds — Sinh to fill in when ready (one RSS URL per line)
+  podcast_feeds: |
+    # Add podcast RSS/Atom feed URLs below, one per line
+    # Example: https://feeds.megaphone.fm/hubermanlab
+    # Example: https://lexfridman.com/feed/podcast/
+
+  # Topics of interest for content filtering and relevance scoring
+  topics_of_interest: |
+    Learning Science
+    AI/LLM developments
+    Agent systems
+    Personal development
+    Parenting
+    Finance
+    Vietnamese culture
+
+  # Johari window domains (suggested defaults — Sinh to revise after first report)
+  johari_domains: |
+    Learning Science
+    AI/Tech
+    Agent System Health
+    Personal Health/Wellness
+    Parenting
+    Finance
+    Vietnamese/Culture
+
+agents:
+  - name: gatherer
+    role: "Multi-source content ingestion: YouTube videos (7-phase pipeline), RSS feeds, podcasts, and system log scanning"
+    skill: skills/knowledge-hub/gather.md
+
+  - name: curator
+    role: "Knowledge connection and curation: read recent gatherer outputs, surface cross-references, update knowledge base"
+    skill: skills/knowledge-hub/curate.md
+
+  - name: facilitator
+    role: "Interactive learning sessions: quiz mode, Q&A, briefing, and live learning support"
+    skill: skills/knowledge-hub/facilitate.md
+
+  - name: analyst
+    role: "Blind-spot analysis and Johari window tracking at daily/weekly/monthly/quarterly/yearly cadences"
+    skill: skills/knowledge-hub/analyze.md
+
+objective: |
+  ## Autonomous daily mode (cron / pa deploy knowledge-hub)
+
+  Run phases in order. Each agent produces a report to its deployment workspace.
+
+  1. gatherer:
+     - Process YouTube queue (~/Documents/ai-usage/queue/youtube-video-queue.txt)
+     - Scan RSS feeds defined in team variables
+     - Scan recent agent system logs (sessions/, deployments/registry.jsonl, daily/ summaries)
+     - Output: ingestion report listing what was processed + system anomalies found
+
+  2. curator:
+     - Read gatherer's ingestion report
+     - Cross-reference new content with existing knowledge base (~/Documents/ai-usage/knowledge-base/)
+     - Add cross-reference notes to knowledge-base/learning/ and knowledge-base/intel/
+     - Output: curation report with new connections found
+
+  3. analyst:
+     - Read johari-tracker.md (~/Documents/ai-usage/agent-teams/knowledge-hub/johari-tracker.md)
+     - Read gatherer and curator reports
+     - Determine cadence (daily micro / weekly / monthly / etc.) from tracker timestamps
+     - Update johari-tracker.md with today's engagement data
+     - Output: cadence-appropriate Johari analysis
+
+  4. Synthesize into intel digest → deliver to Sinh's inbox
+     - File: ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-knowledge-hub-daily-digest.md
+     - Contains: N items processed, system flags, daily Johari micro-note
+
+  Empty queue / no new content: exit cleanly with "Nothing new to process" and minimal digest confirming the run.
+
+  ## Interactive mode (pa deploy knowledge-hub --interactive)
+
+  Determine user intent from context:
+  - "quiz me on <topic>": facilitator reads knowledge base → generates ≥5 questions → interactive quiz
+  - "brief me on <topic>": facilitator reads recent gatherer output → structured briefing
+  - "Q&A" / "what do you know about X": facilitator answers from ingested content
+  - "join my learning session": facilitator loads relevant notes → assists live
+
+  ## Key invariants
+
+  - YouTube queue file path must remain ~/Documents/ai-usage/queue/youtube-video-queue.txt (backward compatible)
+  - Knowledge base: ~/Documents/ai-usage/knowledge-base/learning/ and knowledge-base/intel/
+  - Johari tracker: ~/Documents/ai-usage/agent-teams/knowledge-hub/johari-tracker.md
+  - Intel digest: ~/Documents/ai-usage/sinh-inputs/inbox/ per global standards §4
+  - Session logs per global standards §4 (all agents log before shutting down)

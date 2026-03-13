@@ -1,3 +1,6 @@
+# DEPRECATED: 2026-03-13 — Absorbed into knowledge-hub team (teams/knowledge-hub.yaml).
+# YouTube processing is now handled by the knowledge-hub/gatherer agent.
+# This file is preserved for reference only. Use: pa deploy knowledge-hub
 name: youtube-processor
 description: Process YouTube videos from queue and save structured notes to Anytype
 
