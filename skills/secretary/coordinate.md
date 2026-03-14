@@ -83,7 +83,11 @@ ls -la ~/Documents/ai-usage/sinh-inputs/waiting-for-response/ 2>/dev/null
 ```
 === Secretary Briefing ===
 
-📥 Inbox: N items — X review-requests, Y work-reports, Z other
+📥 Inbox: N items
+  #1 [review-request] 2026-03-14-review-lean-queue-daily-board.md (2d old)
+  #2 [work-report]    2026-03-14-builder-ts-migration-phase-3.md (1d old)
+  #3 [fyi]            2026-03-13-maintenance-health-check.md (3d old)
+  ...
 
 [If daily progress board found:]
 📊 Today's Progress:
@@ -94,8 +98,10 @@ ls -la ~/Documents/ai-usage/sinh-inputs/waiting-for-response/ 2>/dev/null
 
 📋 Today's agent activity: <count of session logs from today>
 
-Ready — what would you like to do?
+Ready — what would you like to do? (approve/reject/defer #N, show #N, route #N to [team], ...)
 ```
+
+**Numbering rules:** Always assign sequential numbers (#1, #2, ...) to inbox items in the order they are listed. Preserve this numbering throughout the Phase 4 session — Sinh will reference items by number (e.g., `approve #2`).
 
 **If the daily progress board file is not found:** Omit that section entirely. No "N/A" placeholder. Just skip it.
 
@@ -157,17 +163,44 @@ You are now in conversational mode. Sinh speaks natural language. Your job:
 |--------|--------|----------|
 | "show inbox" / "what's in inbox?" | Read `sinh-inputs/inbox/`, summarize by type in plain language | No |
 | "show #N" / "tell me more about X" | Read full file content, display to Sinh | No |
-| "route X to [team]" | Copy to `agent-teams/<team>/inbox/`, move original to `sinh-inputs/done/` | **Yes** — show proposal first |
-| "archive X" / "done with X" | Move to `sinh-inputs/done/` | **Yes** |
-| "approve X" | Move from `sinh-inputs/inbox/` to `sinh-inputs/approved/` | **Yes** |
-| "reject X" | Move from `sinh-inputs/inbox/` to `sinh-inputs/rejected/` | **Yes** |
-| "defer X" | Move from `sinh-inputs/inbox/` to `sinh-inputs/deferred/` | **Yes** |
+| "route #N to [team]" / "route X to [team]" | Copy to `agent-teams/<team>/inbox/`, move original to `sinh-inputs/done/` | **Yes** — show proposal first |
+| "archive #N" / "archive X" / "done with X" | Move to `sinh-inputs/done/` | **Yes** |
+| "approve #N" / "approve X" | Move from `sinh-inputs/inbox/` to `sinh-inputs/approved/` | **Yes** |
+| "reject #N" / "reject X" | Move from `sinh-inputs/inbox/` to `sinh-inputs/rejected/` | **Yes** |
+| "defer #N" / "defer X" | Move from `sinh-inputs/inbox/` to `sinh-inputs/deferred/` | **Yes** |
 | "what did [team] do today?" | Read today's session logs + work reports for that team | No |
 | "what's progress today?" | Read daily progress board if available | No |
 | "create task X" | Propose `avo` command (MCP preferred, CLI fallback), show to Sinh | **Yes** |
 | "tell [team] to do X" | Draft message file, show draft to Sinh, then write to `agent-teams/<team>/inbox/` + track in your `waiting-for-response/` | **Yes** — show draft first |
 | "check [team] status" | Read `agent-teams/<team>/` recent work reports and session logs | No |
 | "done" / "bye" / "that's it" | Exit loop, proceed to wrap-up | No |
+
+### Approve / Reject / Defer flow (step by step)
+
+When Sinh says `approve #N`, `reject #N`, or `defer #N`:
+
+1. Look up item `#N` from the numbered list presented in Phase 3 briefing
+2. Identify the source file path in `sinh-inputs/inbox/`
+3. Determine target folder based on command:
+   - `approve` → `sinh-inputs/approved/`
+   - `reject` → `sinh-inputs/rejected/`
+   - `defer` → `sinh-inputs/deferred/`
+4. Propose: "I'll move `<filename>` to `sinh-inputs/<approved|rejected|deferred>/`. Shall I proceed?"
+5. Wait for confirmation
+6. Execute:
+   ```bash
+   mkdir -p ~/Documents/ai-usage/sinh-inputs/<approved|rejected|deferred>/
+   mv ~/Documents/ai-usage/sinh-inputs/inbox/<filename> \
+      ~/Documents/ai-usage/sinh-inputs/<approved|rejected|deferred>/<filename>
+   ```
+7. Confirm: "Done. `<filename>` moved to `<approved|rejected|deferred>/`."
+   - Note: The originating team will self-close their WFR item on their next startup by detecting this file in the outcome folder.
+
+**Shorthand multi-commands:** Sinh may say "approve #1 #3 #5". Process each item in sequence, confirming all at once:
+- "I'll move items #1, #3, #5 to `approved/`. Shall I proceed?"
+- Wait for one combined confirmation, then execute all three moves.
+
+**If #N is out of range:** Ask "I only see N items in the inbox. Which item did you mean?"
 
 ### Routing flow (step by step)
 
