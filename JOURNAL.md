@@ -50,5 +50,6 @@ Append-only log of decisions and evolution.
 - Solution: WFR self-resolution protocol + human workflow guide + secretary enhancements
 - Phase 1 (done): Updated `skills/global/standards.md` startup sequence — agents now scan `sinh-inputs/approved|rejected|deferred/` on startup, self-close matching WFR items, and create 3-day reminders for stale items
 - Phase 2 (done): Updated `~/Documents/ai-usage/WORKFLOW.md` — replaced old lifecycle diagram with new approved/rejected/deferred flow; added WFR self-resolution protocol section, "How Sinh Closes Items" quick guide, and builder team to Current Teams table
-- Phases remaining: publish human workflow guide (knowledge-base/howtos/), update secretary coordinate.md (approve/reject/defer commands), update secretary collect.md (daily progress board + per-project tracking + orphan cleanup), update daily.yaml (secretary trigger)
+- Phase 3 (done): Published `~/Documents/ai-usage/knowledge-base/howtos/sinh-approving-items.md` — step-by-step guide for Sinh on approving/rejecting/deferring inbox items via shell mv commands or secretary interactive session; covers 3-day reminder rule, filename convention, and auto-resolution flow
+- Phases remaining: update secretary coordinate.md (approve/reject/defer commands), update secretary collect.md (daily progress board + per-project tracking + orphan cleanup), update daily.yaml (secretary trigger)
 - Branch: feature/lean-queue-protocol
