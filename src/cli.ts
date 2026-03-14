@@ -1,3 +1,4 @@
+import { createRequire } from "module";
 import { Command } from "commander";
 import { teamsCommand } from "./commands/teams.js";
 import { deployCommand } from "./commands/deploy.js";
@@ -8,12 +9,15 @@ import { timersCommand } from "./commands/timers.js";
 import { removeTimerCommand } from "./commands/remove-timer.js";
 import { ideaCommand } from "./commands/idea.js";
 
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
+
 const program = new Command();
 
 program
   .name("pa")
   .description("CLI agent team orchestrator for NixOS")
-  .version("0.1.2");
+  .version(version);
 
 program
   .command("teams")
