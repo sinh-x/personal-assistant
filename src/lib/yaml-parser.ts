@@ -14,6 +14,7 @@ export function parseTeamYaml(filePath: string): TeamConfig {
     name: a["name"],
     role: a["role"],
     skill: a["skill"],
+    model: a["model"] as TeamConfig["model"] | undefined,
   }));
 
   return {
@@ -23,5 +24,6 @@ export function parseTeamYaml(filePath: string): TeamConfig {
     variables: raw["variables"] as Record<string, string> | undefined,
     agents,
     objective: raw["objective"] as string,
+    model: raw["model"] as TeamConfig["model"] | undefined,
   };
 }
