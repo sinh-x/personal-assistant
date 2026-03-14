@@ -26,33 +26,23 @@ agents:
     role: "Combine gathered data and produce the output document"
     skill: skills/daily-summary/synthesize.md
 
-# Objective is set dynamically by daily.sh based on mode (plan|progress|end)
+# Objective is set dynamically by daily.ts based on mode (plan|progress|end).
+# This placeholder shows the end-of-day (end --gather) template for reference.
+# At runtime, daily.ts overwrites this field entirely.
 objective: |
-  MODE: DAILY PLAN (morning)
-  TARGET_DATE: 2026-03-11
-  
-  Create the daily plan for 2026-03-11.
-  
+  MODE: DAILY END — PHASE 1: GATHER (background)
+  TARGET_DATE: YYYY-MM-DD
+
+  Gather all end-of-day data autonomously. Write reports to team inbox.
+  Then trigger secretary to generate the daily progress board.
+
   Workflow:
-  1. Spawn session-gatherer and time-tracker IN PARALLEL (skip jsonl-analyst — not needed for planning)
-     - session-gatherer: read YESTERDAY's sessions + open todos carried forward
-     - time-tracker: get avo task list, yesterday's plan vs actual
-  2. Once both are done, spawn synthesizer with their data and this instruction:
-     - Read yesterday's daily summary from /home/sinh/Documents/ai-usage/daily/2026/03/ if it exists
-     - Extract yesterday's 'Tomorrow's Priorities' as today's starting goals
-     - Extract all open/carried-forward todos
-     - Get current avo task list
-     - Produce a daily plan document
-  
-  Output: /home/sinh/Documents/ai-usage/daily/2026/03/2026-03-11-plan.md
-  
-  Plan document structure:
-    ## Today's Goals (from yesterday's priorities + new items)
-    | # | Goal | Source | Priority |
-    ## Time Budget
-    | Category | Planned | Notes |
-    ## Open Items Carried Forward
-    - [ ] item (from session/date)
-    ## Today's Task List
-    (from avo task list, prioritized)
-  
+  1. Spawn session-gatherer, jsonl-analyst, and time-tracker IN PARALLEL
+  2. Detect tracking gaps (JSONL vs avo)
+  3. Read today's plan and compute goal completion
+  4. Write gather report to agent-teams/daily/inbox/YYYY-MM-DD-end-gather.md
+  5. Write ready marker to agent-teams/daily/inbox/YYYY-MM-DD-end-ready.md
+  6. Trigger secretary: write agent-teams/secretary/inbox/YYYY-MM-DD-daily-end-trigger.md
+     (idempotent — skip if already exists)
+
+  See daily.ts endGatherObjective() for the full runtime template.

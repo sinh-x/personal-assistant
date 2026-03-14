@@ -160,6 +160,8 @@ function endGatherObjective(today: string, outputDir: string): string {
   const inboxDir = `${homedir()}/Documents/ai-usage/agent-teams/daily/inbox`;
   const gatherReport = `${inboxDir}/${today}-end-gather.md`;
   const readyMarker = `${inboxDir}/${today}-end-ready.md`;
+  const year = today.slice(0, 4);
+  const month = today.slice(5, 7);
 
   return `MODE: DAILY END — PHASE 1: GATHER (background)
 TARGET_DATE: ${today}
@@ -213,9 +215,36 @@ Workflow:
    gaps_detected: true/false
    gap_count: N
 
-Output: ${gatherReport} (gather report) + ${readyMarker} (ready marker)
+6. Trigger secretary to generate the daily progress board:
+   - Create directory if needed: ~/Documents/ai-usage/agent-teams/secretary/inbox/
+   - Only write if file does not already exist (idempotent — skip if already triggered today)
+   - Write trigger file: ~/Documents/ai-usage/agent-teams/secretary/inbox/${today}-daily-end-trigger.md
 
-After writing both files, log your session and exit.
+   Content to write:
+   # Daily Progress Board Request: ${today}
+
+   > **Date:** ${today}
+   > **From:** daily / team-manager
+   > **Type:** trigger
+
+   Daily-end gather complete. Please generate the daily progress board and update project tracking.
+
+   ## What to Do
+
+   Follow your collect.md skill to:
+   1. Scan evidence (deployments, sessions, done/) for today
+   2. Write: ~/Documents/ai-usage/daily/${year}/${month}/${today}-progress.md
+   3. Update: ~/Documents/ai-usage/insights/projects/<project>.md for each project touched
+   4. Run orphan directory scan and cleanup
+
+   ## Inputs Available
+
+   - Gather report: ${gatherReport}
+   - Ready marker: ${readyMarker}
+
+Output: ${gatherReport} (gather report) + ${readyMarker} (ready marker) + secretary trigger
+
+After writing all files, log your session and exit.
 `;
 }
 
