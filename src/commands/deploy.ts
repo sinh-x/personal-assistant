@@ -8,7 +8,38 @@ import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent } from "../lib/registry.js";
 import { generatePrimer } from "../lib/primer.js";
 import { spawnDetached } from "../utils/process.js";
-import type { RegistryEvent } from "../lib/types.js";
+import type { RegistryEvent, TeamConfig } from "../lib/types.js";
+
+const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
+
+/** Resolve effective model for team-manager and each agent, applying Sonnet floor and validation */
+function resolveEffectiveModels(
+  teamConfig: TeamConfig,
+  opts: { teamModel?: string; agentModel?: string }
+): { tmModel: string | undefined; agentModels: Record<string, string | undefined> } {
+  let tmModel: string | undefined = opts.teamModel ?? teamConfig.model ?? undefined;
+  if (tmModel === "haiku") {
+    console.log('Warning: team-manager model "haiku" upgraded to "sonnet" (minimum floor)');
+    tmModel = "sonnet";
+  }
+  if (tmModel !== undefined && !VALID_MODELS.has(tmModel)) {
+    console.warn(`Warning: unknown model "${tmModel}" for team-manager — ignored`);
+    tmModel = undefined;
+  }
+
+  const agentModels: Record<string, string | undefined> = {};
+  for (const agent of teamConfig.agents) {
+    const m = opts.agentModel ?? agent.model ?? teamConfig.model ?? undefined;
+    if (m !== undefined && !VALID_MODELS.has(m)) {
+      console.warn(`Warning: unknown model "${m}" for agent "${agent.name}" — ignored`);
+      agentModels[agent.name] = undefined;
+    } else {
+      agentModels[agent.name] = m;
+    }
+  }
+
+  return { tmModel, agentModels };
+}
 
 /** Generate a 6-char hex deployment ID */
 function generateDeployId(): string {
@@ -52,6 +83,8 @@ export function deployCommand(
     background?: boolean;
     interactive?: boolean;
     objective?: string;
+    teamModel?: string;
+    agentModel?: string;
   }
 ): void {
   const config = loadConfig();
@@ -117,6 +150,13 @@ export function deployCommand(
   // Use YAML name field as canonical team name (overrides filename-derived name)
   if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
 
+  // Resolve effective models
+  const { tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
+    teamModel: opts.teamModel,
+    agentModel: opts.agentModel,
+  });
+  const modelFlag = tmModel ? `--model ${tmModel}` : "";
+
   // Generate primer
   const primerFile = resolve(primersDir, `${teamName}-${deployId}-primer.md`);
   const primerContent = generatePrimer({
@@ -143,6 +183,14 @@ export function deployCommand(
     return;
   }
 
+  // Build models map for registry (only include if any model is set)
+  const modelsMap: Record<string, string> = {};
+  if (tmModel) modelsMap["team-manager"] = tmModel;
+  for (const [name, m] of Object.entries(agentModels)) {
+    if (m) modelsMap[name] = m;
+  }
+  const anyModelSet = Object.keys(modelsMap).length > 0;
+
   // Write start event to registry
   const startEvent: RegistryEvent = {
     deployment_id: deployId,
@@ -151,6 +199,7 @@ export function deployCommand(
     timestamp: deployTs,
     agents: agentNames,
     primer: primerFile,
+    ...(anyModelSet ? { models: modelsMap } : {}),
   };
   appendRegistryEvent(startEvent);
 
@@ -160,12 +209,12 @@ export function deployCommand(
   if (mode === "interactive") {
     console.log(`Deploying team (interactive): ${teamConfig.name} [${deployId}]`);
     console.log("  You will be prompted to approve tool calls.");
-    execSync(`claude ${JSON.stringify(claudePrompt)}`, {
+    execSync(`claude ${modelFlag} ${JSON.stringify(claudePrompt)}`.trim(), {
       stdio: "inherit",
     });
   } else if (mode === "foreground") {
     console.log(`Deploying team (foreground): ${teamConfig.name} [${deployId}]`);
-    execSync(`claude --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`, {
+    execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
       stdio: "inherit",
     });
   } else {
@@ -201,7 +250,7 @@ Agents:     ${agentNames.join(" ")}
     // Build background script
     const bgScript = `
 echo '[$(date -Iseconds)] claude starting...' >> '${logFile}'
-stdbuf -oL timeout '${maxRuntime}' claude --dangerously-skip-permissions --print '${claudePrompt.replace(/'/g, "'\\''")}' >> '${logFile}' 2>'${logFile}.err'
+stdbuf -oL timeout '${maxRuntime}' claude ${modelFlag ? modelFlag + " " : ""}--dangerously-skip-permissions --print '${claudePrompt.replace(/'/g, "'\\''")}' >> '${logFile}' 2>'${logFile}.err'
 exit_code=$?
 echo '' >> '${logFile}'
 echo "[$(date -Iseconds)] claude exited with code $exit_code" >> '${logFile}'
