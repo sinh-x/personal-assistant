@@ -9,6 +9,7 @@ export interface TeamConfig {
   variables?: Record<string, string>;
   agents: Agent[];
   objective: string;
+  model?: 'haiku' | 'sonnet' | 'opus';
 }
 
 /** Agent definition within a team */
@@ -16,6 +17,7 @@ export interface Agent {
   name: string;
   role: string;
   skill: string;
+  model?: 'haiku' | 'sonnet' | 'opus';
 }
 
 /** Events written to the deployment registry JSONL */
@@ -30,6 +32,7 @@ export interface RegistryEvent {
   log_file?: string;
   primer?: string;
   agents?: string[];
+  models?: Record<string, string>;
   error?: string;
   exit_code?: number;
 }
