@@ -43,3 +43,12 @@ Append-only log of decisions and evolution.
 - Files: 18+ files across 5 commits on feature/typescript-migration
 - Key fixes: local timezone handling (localISOTimestamp), Commander.js option interception, Nix pnpmConfigHook packaging, ESM/CJS interop
 - Updated IDENTITY.md: "Declarative first" now reflects TypeScript orchestration
+
+## 2026-03-14 — Lean Queue Protocol
+
+- Problem: `waiting-for-response/` folders became graveyards — decisions made in chat never propagated back as file moves; agents saw 6+ stale items per run with no way to distinguish resolved from open
+- Solution: WFR self-resolution protocol + human workflow guide + secretary enhancements
+- Phase 1 (done): Updated `skills/global/standards.md` startup sequence — agents now scan `sinh-inputs/approved|rejected|deferred/` on startup, self-close matching WFR items, and create 3-day reminders for stale items
+- Phase 2 (done): Updated `~/Documents/ai-usage/WORKFLOW.md` — replaced old lifecycle diagram with new approved/rejected/deferred flow; added WFR self-resolution protocol section, "How Sinh Closes Items" quick guide, and builder team to Current Teams table
+- Phases remaining: publish human workflow guide (knowledge-base/howtos/), update secretary coordinate.md (approve/reject/defer commands), update secretary collect.md (daily progress board + per-project tracking + orphan cleanup), update daily.yaml (secretary trigger)
+- Branch: feature/lean-queue-protocol
