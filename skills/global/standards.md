@@ -476,11 +476,52 @@ Every team has standardized workflow folders in their persistent workspace. All 
 
 ### On startup (MANDATORY)
 
-Before starting your main work, every agent MUST:
+Before starting your main work, every agent MUST run this startup sequence in order:
 
-1. **Check your team's `inbox/`** for pending items from other agents or the secretary
-2. **Check your team's `waiting-for-response/`** for items that may have been resolved (look for responses in your `inbox/`)
-3. **Incorporate outstanding items** into your current run — don't ignore them
+**1. Create workspaces** (team + per-deployment)
+```bash
+mkdir -p ~/Documents/ai-usage/agent-teams/<team_name>/
+mkdir -p ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/
+```
+
+**2. Check your team's `inbox/`** for pending items from other agents or the secretary
+
+**3. WFR self-resolution check** — scan your `waiting-for-response/` against Sinh's outcome folders:
+
+For each file in `~/Documents/ai-usage/agent-teams/<team_name>/waiting-for-response/`:
+- a. Extract topic slug: strip date prefix from filename (`YYYY-MM-DD-<topic>.md` → `<topic>`)
+- b. Scan `~/Documents/ai-usage/sinh-inputs/approved/`, `rejected/`, `deferred/` for a filename containing the same topic slug
+- c. **If match found:** append an outcome note to the WFR file, then move it to `done/`:
+  ```
+  Closed — Approved/Rejected/Deferred by Sinh on YYYY-MM-DD
+  ```
+- d. **If no match AND item is >3 days old:** create a reminder in `~/Documents/ai-usage/sinh-inputs/inbox/` (check first — skip if a reminder for this topic already exists there):
+  ```markdown
+  # Reminder: Still waiting — <topic>
+
+  > **Date:** YYYY-MM-DD
+  > **From:** <team_name> / <agent_name>
+  > **Type:** reminder
+
+  Item has been waiting for response for >3 days.
+
+  - **Original item:** <filename>
+  - **Waiting since:** <item date>
+  - **Days waiting:** N
+  - **Suggested action:** Review and move to approved/, rejected/, or deferred/
+  ```
+
+**4. Incorporate outstanding active inbox items** into your current run — don't ignore them
+
+**5. Begin main work**
+
+### WFR Matching Rules
+
+- **Match strategy:** Compare topic slug (filename without date prefix) between WFR item and files in `approved/`, `rejected/`, `deferred/`
+  - Example: WFR `2026-03-13-review-pa-agent-model-selection.md` → topic `review-pa-agent-model-selection`
+  - Approved: `2026-03-13-review-pa-agent-model-selection.md` → match ✓
+- **Idempotent:** Never duplicate reminders. Before creating a reminder, check `sinh-inputs/inbox/` for an existing file with the same topic slug.
+- **Do NOT re-process** WFR items already in `done/` or `archives/`.
 
 ### When you need a review or response from another agent or Sinh
 
@@ -534,6 +575,6 @@ Sinh inbox:     ~/Documents/ai-usage/sinh-inputs/inbox/  (items for Sinh)
 Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
 File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<topic>.md
 Tags:           autonomous team:<X> agent:<Y> deployment:<Z>
-Startup:        1) create workspaces  2) check inbox/  3) check waiting-for-response/  4) main work
+Startup:        1) create workspaces  2) check inbox/  3) WFR self-resolve (approved|rejected|deferred) + 3-day reminder  4) incorporate active items  5) main work
 Shutdown:       sub-agents → agents → manager (each logs before stopping)
 ```
