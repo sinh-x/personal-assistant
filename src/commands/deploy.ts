@@ -172,6 +172,7 @@ export function deployCommand(
     resolveFile,
     configDir: config.configDir,
     homeDir: paHome,
+    effectiveModels: { tmModel, agentModels },
   });
   writeFileSync(primerFile, primerContent);
   console.log(`Primer generated: ${primerFile}`);

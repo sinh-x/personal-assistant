@@ -15,6 +15,10 @@ interface PrimerOptions {
   resolveFile: (relpath: string) => string | undefined;
   configDir: string;
   homeDir: string;
+  effectiveModels?: {
+    tmModel: string | undefined;
+    agentModels: Record<string, string | undefined>;
+  };
 }
 
 /**
@@ -34,10 +38,26 @@ export function generatePrimer(opts: PrimerOptions): string {
     resolveFile,
     configDir,
     homeDir,
+    effectiveModels,
   } = opts;
 
   const agentNames = teamConfig.agents.map((a) => a.name);
   const agentsList = agentNames.map((n) => `  - ${n}`).join("\n");
+
+  // Build models block for deployment-context (only if any model is set)
+  let modelsBlock = "";
+  if (effectiveModels) {
+    const { tmModel, agentModels } = effectiveModels;
+    const anySet = tmModel || Object.values(agentModels).some(Boolean);
+    if (anySet) {
+      const lines: string[] = ["models:"];
+      if (tmModel) lines.push(`  team-manager: ${tmModel}`);
+      for (const [name, m] of Object.entries(agentModels)) {
+        if (m) lines.push(`  ${name}: ${m}`);
+      }
+      modelsBlock = "\n" + lines.join("\n");
+    }
+  }
 
   let primer = `# Deployment Primer: ${teamConfig.name}
 
@@ -53,7 +73,7 @@ registry_lock: ${registryLock}
 workspace_base: ${deploymentsDir}/${deployId}
 team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
 agents:
-${agentsList}
+${agentsList}${modelsBlock}
 </deployment-context>
 
 Your identity is **team-manager** (team: **${teamName}**, deployment: **${deployId}**).
@@ -71,6 +91,12 @@ ${teamConfig.description}
     primer += `### Agent: ${agent.name}\n`;
     primer += `Role: ${agent.role}\n`;
 
+    // Add effective model line if set for this agent
+    const agentEffectiveModel = effectiveModels?.agentModels[agent.name];
+    if (agentEffectiveModel) {
+      primer += `Model: ${agentEffectiveModel}\n`;
+    }
+
     if (agent.skill) {
       const skillPath = resolveFile(agent.skill);
       if (skillPath && existsSync(skillPath)) {
@@ -83,6 +109,32 @@ ${teamConfig.description}
       }
     }
     primer += "\n";
+  }
+
+  // Add Model Policy section if any model is set
+  if (effectiveModels) {
+    const { tmModel, agentModels } = effectiveModels;
+    const anySet = tmModel || Object.values(agentModels).some(Boolean);
+    if (anySet) {
+      primer += `## Model Policy
+
+### Named Agents
+See \`models:\` in the deployment-context block above.
+
+### Dynamic Agent Policy
+
+When spawning unplanned sub-agents, use this policy:
+
+| Task type | Recommended model |
+|-----------|-------------------|
+| File reading, data gathering | haiku |
+| Classification, cross-referencing | sonnet |
+| Synthesis, planning, judgment | opus |
+| User-facing interactive output | opus |
+| Routine formatting, transforms | haiku |
+
+`;
+    }
   }
 
   // Inject global skills (merge PA_CONFIG + PA_HOME, config wins)
