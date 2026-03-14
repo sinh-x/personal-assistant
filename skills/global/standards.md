@@ -208,6 +208,7 @@ Write a summary file: `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team_n
 > **Date:** YYYY-MM-DD
 > **From:** <team_name> / <agent_name>
 > **Deployment:** <deploy_id>
+> **Type:** work-report
 > **Status:** success | partial | failed
 
 ## What Was Done
@@ -250,7 +251,7 @@ The review request **embeds the full deliverable content inline** — Sinh shoul
 > **Date:** YYYY-MM-DD
 > **From:** <team_name> / <agent_name>
 > **Deployment:** <deploy_id>
-> **Type:** Review & Feedback
+> **Type:** review-request
 
 ## What Was Done
 - <bullet summary of what was accomplished>
@@ -285,6 +286,34 @@ Place a tracking copy in your team's `waiting-for-response/`:
 
 **Use this flow for:** requirements docs, implementation plans, analysis reports, any output needing human review.
 **Do NOT use for:** routine health checks, daily summaries, session logs — use the standard work report above for those.
+
+### Plan Draft Template
+
+For daily/weekly plans emitted by the daily team:
+
+```markdown
+# Daily Plan — YYYY-MM-DD
+
+> **Type:** plan-draft
+> **Generated:** YYYY-MM-DD HH:MM
+> **By:** <agent>
+
+<plan content — goals, time budget, avo tasks>
+```
+
+### FYI Template
+
+For informational notifications requiring no action from Sinh:
+
+```markdown
+# FYI: <descriptive title>
+
+> **Date:** YYYY-MM-DD
+> **From:** <team_name> / <agent_name>
+> **Type:** fyi
+
+<brief informational content — what happened, why Sinh might want to know>
+```
 
 ### On failure
 
