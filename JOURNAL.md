@@ -53,3 +53,12 @@ Append-only log of decisions and evolution.
 - Phase 3 (done): Published `~/Documents/ai-usage/knowledge-base/howtos/sinh-approving-items.md` — step-by-step guide for Sinh on approving/rejecting/deferring inbox items via shell mv commands or secretary interactive session; covers 3-day reminder rule, filename convention, and auto-resolution flow
 - Phases remaining: update secretary coordinate.md (approve/reject/defer commands), update secretary collect.md (daily progress board + per-project tracking + orphan cleanup), update daily.yaml (secretary trigger)
 - Branch: feature/lean-queue-protocol
+
+## 2026-03-15 — House Chores
+
+- **fix**: Fixed JSON quoting in crash registry writer in `src/commands/deploy.ts`
+  - Old code embedded `$(date -Iseconds)` inside `bash -c "echo '...'"` causing shell quoting issues with JSON
+  - New code: captures timestamp first, builds JSON string separately, uses fd-based `{ flock -w 5 9; printf ...; } 9>lock` pattern
+- Files: 1 file across 1 commit
+- Notes: Only one uncommitted change found. Clean repo state otherwise.
+- Suggestions: None — no files to add to .gitignore, no secrets found
