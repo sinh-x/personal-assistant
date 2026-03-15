@@ -31,6 +31,61 @@ Internalize this knowledge — you will use it throughout Phase 4 without re-rea
 
 ---
 
+## Phase 0.5: Stale Ongoing Cleanup
+
+Before collecting evidence, scan all teams' `ongoing/` folders for items stuck there >3 days.
+
+**Stale = file mtime >3 days ago.** Detect with bash:
+
+```bash
+TEAMS_DIR=~/Documents/ai-usage/agent-teams
+find "$TEAMS_DIR" -path "*/ongoing/*" -maxdepth 3 -name "*.md" -mtime +3 -type f 2>/dev/null
+```
+
+For each stale file found:
+
+**1. Move to that team's inbox:**
+```bash
+stale_file=<path to stale file>
+team=$(basename "$(dirname "$(dirname "$stale_file")")")
+mv "$stale_file" "$TEAMS_DIR/$team/inbox/"
+```
+
+**2. Write FYI to Sinh's inbox** (idempotent — skip if a FYI for this file already exists):
+```bash
+# Check first: does a FYI mentioning this filename already exist in sinh-inputs/inbox/?
+filename=$(basename "$stale_file")
+if ! grep -rl "$filename" ~/Documents/ai-usage/sinh-inputs/inbox/ >/dev/null 2>&1; then
+  # Write FYI
+fi
+```
+
+FYI file: `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-fyi-stale-ongoing-<team>-<basename>.md`
+
+```markdown
+# FYI: Stale Ongoing Item Re-queued — <team>
+
+> **Date:** YYYY-MM-DD
+> **From:** secretary / team-manager
+> **Type:** fyi
+
+An item in `agent-teams/<team>/ongoing/` was stale (>3 days old) and has been
+automatically re-queued to `agent-teams/<team>/inbox/` for reprocessing.
+
+- **Item:** <filename>
+- **Team:** <team>
+- **Stale since:** <mtime date>
+- **Moved to:** `agent-teams/<team>/inbox/<filename>`
+```
+
+**Idempotency:** Once moved to `inbox/`, the item is no longer in `ongoing/` — it won't be detected as stale again.
+
+**If no stale items found:** Skip this phase silently.
+
+**Log results:** Note stale items found and actions taken in your session log.
+
+---
+
 ## Phase 1: Collect Evidence
 
 Spawn the **collector** agent:
