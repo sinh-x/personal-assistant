@@ -461,6 +461,7 @@ Every team has standardized workflow folders in their persistent workspace. All 
 ```
 ~/Documents/ai-usage/agent-teams/<team_name>/
 ├── inbox/                  # Items arriving for you to process
+├── ongoing/                # Items this team is actively working on   ← NEW
 ├── waiting-for-response/   # Items you sent out, awaiting reply
 ├── done/                   # Completed items
 ├── archives/               # Older completed items (periodic cleanup)
@@ -480,7 +481,7 @@ Before starting your main work, every agent MUST run this startup sequence in or
 
 **1. Create workspaces** (team + per-deployment)
 ```bash
-mkdir -p ~/Documents/ai-usage/agent-teams/<team_name>/
+mkdir -p ~/Documents/ai-usage/agent-teams/<team_name>/{inbox,ongoing,waiting-for-response,done,archives,artifacts}
 mkdir -p ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/
 ```
 
@@ -533,12 +534,39 @@ For each file in `~/Documents/ai-usage/agent-teams/<team_name>/waiting-for-respo
    - `~/Documents/ai-usage/agent-teams/<your-team>/waiting-for-response/`
    - The tracking copy should reference the original and what you're waiting for
 
+### Ongoing item claim/release protocol
+
+Use `ongoing/` when you pick up a team inbox item that requires multi-step or multi-session work:
+
+```
+Team inbox/ item arrives
+  ↓
+Agent picks it up for multi-step work
+  → move file: inbox/ → ongoing/
+  → begin work
+
+Agent work completes
+  → move item: ongoing/ → done/
+  → send work report to Sinh inbox/ (separate file, as usual)
+
+Agent work fails / aborts
+  → move item: ongoing/ → inbox/
+  → write FYI to Sinh inbox/ explaining the failure
+```
+
+**Rules:**
+- Short work that completes in a single step may go directly `inbox/` → `done/` — use judgment
+- Every agent startup MUST create `ongoing/` alongside other folders (`mkdir -p` in startup step 1)
+- Never leave items in `ongoing/` without attempting to move them out — the secretary stale check will re-queue items after 3 days
+
 ### When you pick up an inbox item
 
-1. Process the item
-2. Move processed item to your team's `done/`
-3. If you need to respond, place the response in the **sender's** `inbox/`
-4. Note in your response which `waiting-for-response/` item it resolves
+1. For multi-step work: move item from `inbox/` → `ongoing/` (claim it)
+2. Process the item
+3. On completion: move from `ongoing/` → `done/`
+4. On failure/abort: move from `ongoing/` → `inbox/` + write FYI to Sinh inbox
+5. If you need to respond, place the response in the **sender's** `inbox/`
+6. Note in your response which `waiting-for-response/` item it resolves
 
 ### When a task cannot be completed
 
@@ -571,10 +599,12 @@ Registry:       ~/Documents/ai-usage/deployments/registry.jsonl (team manager on
 Team workspace: ~/Documents/ai-usage/agent-teams/<team-name>/  (persistent, cross-deployment)
 Run workspace:  ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/  (per-deployment)
 Team inbox:     ~/Documents/ai-usage/agent-teams/<team-name>/inbox/  (check on startup!)
+Team ongoing:   ~/Documents/ai-usage/agent-teams/<team-name>/ongoing/  (actively working on)
 Sinh inbox:     ~/Documents/ai-usage/sinh-inputs/inbox/  (items for Sinh)
 Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
 File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<topic>.md
 Tags:           autonomous team:<X> agent:<Y> deployment:<Z>
-Startup:        1) create workspaces  2) check inbox/  3) WFR self-resolve (approved|rejected|deferred) + 3-day reminder  4) incorporate active items  5) main work
+Startup:        1) create workspaces (incl. ongoing/)  2) check inbox/  3) WFR self-resolve (approved|rejected|deferred) + 3-day reminder  4) incorporate active items  5) main work
+Ongoing:        inbox/ → ongoing/ (start) → done/ (complete) | inbox/ (abort/fail)
 Shutdown:       sub-agents → agents → manager (each logs before stopping)
 ```

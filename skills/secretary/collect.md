@@ -168,7 +168,7 @@ Use the evidence report you just collected to fill in the template:
 
 **How to populate:**
 - **Completed** = items in each team's `done/` folder dated today, plus deployments with status `success` or `partial`
-- **In Progress** = deployments with status `ghost` (started but no completion) or `in_progress`
+- **In Progress** = count of files in each team's `ongoing/` folder (use `ls ~/Documents/ai-usage/agent-teams/<team>/ongoing/ 2>/dev/null | wc -l`)
 - **Waiting Sinh** = items in `sinh-inputs/inbox/` dated today, plus any WFR items >3 days old
 - **Items Needing Sinh's Attention** = scan `~/Documents/ai-usage/sinh-inputs/inbox/` for items >0 days old with no match in `approved/`, `rejected/`, `deferred/`; sort by age (oldest first)
 
