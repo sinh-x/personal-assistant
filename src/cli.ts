@@ -32,9 +32,10 @@ program
   .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
   .option("--objective <text>", "Append extra instructions to the team objective")
+  .option("--route-decisions", "Inject mode: route-decisions into the deployment primer")
   .option("--team-model <model>", "Model for the team-manager process (haiku|sonnet|opus)")
   .option("--agent-model <model>", "Model for all named agents, overrides per-agent YAML (haiku|sonnet|opus)")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; teamModel?: string; agentModel?: string }) => {
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; routeDecisions?: boolean; teamModel?: string; agentModel?: string }) => {
     deployCommand(team, opts);
   });
 

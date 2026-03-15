@@ -206,7 +206,8 @@ Write a summary file: `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team_n
 # Work Report: <descriptive title>
 
 > **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>
+> **From:** <team_name> / <agent_name>          ← Reporting team
+> **To:** sinh                                   ← Work reports always go to Sinh (do not change)
 > **Deployment:** <deploy_id>
 > **Type:** work-report
 > **Status:** success | partial | failed
@@ -249,7 +250,8 @@ The review request **embeds the full deliverable content inline** — Sinh shoul
 # Review Request: <descriptive title>
 
 > **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>
+> **From:** <team_name> / <agent_name>          ← Sender. Router uses this to notify you of the decision.
+> **To:** <target_team_name>                     ← Recipient after approval/rejection. Router uses this to forward the document.
 > **Deployment:** <deploy_id>
 > **Type:** review-request
 
@@ -309,11 +311,37 @@ For informational notifications requiring no action from Sinh:
 # FYI: <descriptive title>
 
 > **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>
+> **From:** <team_name> / <agent_name>          ← Sender
+> **To:** <recipient_team_name>                  ← Who this is for (e.g., sinh, builder, secretary)
 > **Type:** fyi
 
 <brief informational content — what happened, why Sinh might want to know>
 ```
+
+### Team-to-Team Message Template
+
+For messages between agent teams (routing notifications, decision notifications, coordination):
+
+```markdown
+# <Title>
+
+> **Date:** YYYY-MM-DD
+> **From:** <team_name> / <agent_name>          ← Who is sending
+> **To:** <recipient_team_name>                  ← Team inbox this is placed in
+> **Type:** fyi | routing-notification | decision-notification
+
+<content>
+```
+
+Both `From:` and `To:` are mandatory. Reference coordinate.md for secretary routing patterns.
+
+### Agent Self-Validation (mandatory before saving review-request or FYI)
+
+Before writing any review-request or FYI to an inbox, verify:
+1. `From:` is populated with your `<team_name> / <agent_name>`
+2. `To:` is populated with the intended recipient team or `sinh`
+
+**Missing either field = write error, not downstream concern.** Do not save a document without both fields — the router cannot notify you or forward the document if they are missing.
 
 ### On failure
 
@@ -588,6 +616,31 @@ All inbox/workflow files use: `YYYY-MM-DD-<topic>.md` (kebab-case)
 - **Never delete workflow files.** Move to `done/` or `archives/`, never remove.
 - **Idempotent.** Don't re-process items already in `done/` or `archives/`.
 - **Preserve context.** When moving items, keep original filename.
+
+---
+
+## 11. Routing Fields: From: and To: (mandatory on all documents)
+
+Every document you write — review-request, FYI, work report, team message — MUST include:
+
+- **`From:`** — Your team name and agent name. The router uses this to send you a decision notification when Sinh approves or rejects your item.
+- **`To:`** — The intended recipient. The router uses this to forward the document to the right team after a decision.
+
+**Why these fields exist:**
+Without `From:`, the router cannot notify the sender of the outcome — approved work goes unstarted, rejected work goes unrevised. Without `To:`, the router cannot forward the document — it becomes unroutable and lands in `secretary/pending-route/` requiring manual Sinh intervention. These fields are the connective tissue of the coordination culture.
+
+**What breaks when missing:**
+- Missing `From:` → no decision notification sent to originating team
+- Missing `To:` → document becomes unroutable; goes to `pending-route/`; Sinh must manually resolve
+- Missing both → both effects above; Sinh informed via `decision-needed` report
+
+**Rules:**
+- Work reports: `To: sinh` — always hardcoded, do not change
+- Review requests: `To:` is the downstream team that receives the document if approved (e.g., `builder`)
+- FYIs: `To:` is the team whose inbox you are writing to
+- Team messages: `To:` is the recipient team inbox
+
+**Self-validation (mandatory):** Before saving any review-request or FYI, verify both fields are populated. Missing = write error, not downstream concern.
 
 ---
 

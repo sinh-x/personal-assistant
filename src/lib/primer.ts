@@ -12,6 +12,7 @@ interface PrimerOptions {
   registryLock: string;
   deploymentsDir: string;
   extraObjective?: string;
+  deployMode?: string;
   resolveFile: (relpath: string) => string | undefined;
   configDir: string;
   homeDir: string;
@@ -35,6 +36,7 @@ export function generatePrimer(opts: PrimerOptions): string {
     registryLock,
     deploymentsDir,
     extraObjective,
+    deployMode,
     resolveFile,
     configDir,
     homeDir,
@@ -59,6 +61,8 @@ export function generatePrimer(opts: PrimerOptions): string {
     }
   }
 
+  const modeBlock = deployMode ? `\nmode: ${deployMode}` : "";
+
   let primer = `# Deployment Primer: ${teamConfig.name}
 
 You are being deployed as the team manager for "${teamConfig.name}".
@@ -73,7 +77,7 @@ registry_lock: ${registryLock}
 workspace_base: ${deploymentsDir}/${deployId}
 team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
 agents:
-${agentsList}${modelsBlock}
+${agentsList}${modelsBlock}${modeBlock}
 </deployment-context>
 
 Your identity is **team-manager** (team: **${teamName}**, deployment: **${deployId}**).

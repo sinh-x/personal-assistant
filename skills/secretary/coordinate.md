@@ -129,6 +129,9 @@ ls ~/Documents/ai-usage/sessions/$YEAR/$MONTH/agent-team/ 2>/dev/null | grep "^$
 
 # 4. Check waiting-for-response for items older than 24h
 ls -la ~/Documents/ai-usage/sinh-inputs/waiting-for-response/ 2>/dev/null
+
+# 5. Count items in secretary pending-route/ (unroutable items awaiting decision)
+ls ~/Documents/ai-usage/agent-teams/secretary/pending-route/ 2>/dev/null | wc -l
 ```
 
 **Parse inbox items by type:** For each file in `sinh-inputs/inbox/`, try to read the `> **Type:**` frontmatter line. Classify as: `review-request`, `work-report`, `plan-draft`, `fyi`, or `other`.
@@ -152,6 +155,9 @@ ls -la ~/Documents/ai-usage/sinh-inputs/waiting-for-response/ 2>/dev/null
 ⏳ Waiting > 24h: <list of items needing follow-up>
 
 📋 Today's agent activity: <count of session logs from today>
+
+[If pending-route/ count > 0:]
+⚠️  Pending-route: N items awaiting routing decision (in agent-teams/secretary/pending-route/)
 
 Ready — what would you like to do? (approve/reject/defer #N, show #N, route #N to [team], ...)
 ```

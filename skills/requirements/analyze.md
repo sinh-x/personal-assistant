@@ -166,6 +166,12 @@ Save the requirements document in three places:
    The review request MUST embed the full requirements document inline — Sinh reads everything in one file.
    Include what Sinh needs to do: approve, provide feedback, decide open questions, and what happens next.
 
+   **Required frontmatter fields (mandatory — do not omit):**
+   - `From: requirements / <agent_name>` — Router uses this to notify you when Sinh decides.
+   - `To: builder` — Router uses this to forward the approved doc to builder's inbox. If a different downstream team will implement, use that team name instead.
+
+   Both fields are required for the router to function. Missing either → document becomes unroutable.
+
 ## Rules
 
 - **Always interactive** — this skill is meant for `--interactive` mode. Ask the user, don't guess.

@@ -83,6 +83,7 @@ export function deployCommand(
     background?: boolean;
     interactive?: boolean;
     objective?: string;
+    routeDecisions?: boolean;
     teamModel?: string;
     agentModel?: string;
   }
@@ -169,6 +170,7 @@ export function deployCommand(
     registryLock,
     deploymentsDir,
     extraObjective: opts.objective,
+    deployMode: opts.routeDecisions ? "route-decisions" : undefined,
     resolveFile,
     configDir: config.configDir,
     homeDir: paHome,
