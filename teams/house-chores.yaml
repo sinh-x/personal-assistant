@@ -1,6 +1,17 @@
 name: house-chores
 description: Solo agent that surveys, groups, and commits uncommitted changes with journal entries
 
+deploy_modes:
+  - id: background
+    label: Background
+    phone_visible: true
+  - id: foreground
+    label: Foreground
+    phone_visible: true
+  - id: interactive
+    label: Interactive
+    phone_visible: false
+
 context:
   organization: sinh-x
   notes: "Run interactively for first use; can be scheduled after trust is established"

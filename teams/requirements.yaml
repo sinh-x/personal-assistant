@@ -1,6 +1,14 @@
 name: requirements
 description: "Requirements gathering and analysis — structured planning before implementation"
 
+deploy_modes:
+  - id: interactive
+    label: Interactive
+    phone_visible: false
+  - id: background
+    label: Background
+    phone_visible: true
+
 context:
   organization: sinh-x
   notes: "Solo agent (team manager does the work directly). Always run with --interactive."

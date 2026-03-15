@@ -1,6 +1,17 @@
 name: maintenance
 description: "Investigate, diagnose, and fix issues in the personal-assistant system"
 
+deploy_modes:
+  - id: background
+    label: Background
+    phone_visible: true
+  - id: foreground
+    label: Foreground
+    phone_visible: true
+  - id: interactive
+    label: Interactive
+    phone_visible: false
+
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."
