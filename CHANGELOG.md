@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.8 (2026-03-15)
+
+### Added
+- Secretary `--route-decisions` mode — automated pipeline that processes Sinh's `approved/`, `rejected/`, and `deferred/` folders and routes documents to the right team inboxes without manual intervention
+- Routing fields guidance in `standards.md` — explains why `From:` and `To:` fields are mandatory on all documents, with agent self-validation requirement
+- `--route-decisions` CLI flag for `pa deploy` — injects `mode: route-decisions` into the primer so the secretary skips its normal phases and runs the router instead
+
+### Changed
+- All 4 agent document templates in `standards.md` (review-request, FYI, work-report, team-to-team) now explicitly show `From:` and `To:` with inline routing comments
+- `requirements/analyze.md` Output section now explicitly names `From:` and `To:` fields (not just a reference to standards.md)
+- Secretary `coordinate.md` Phase 3 briefing now shows live count of pending items in `secretary/pending-route/`
+
+## 0.1.7 (2026-03-15)
+
+### Added
+- `ongoing/` folder and claim/release protocol for all agent teams — items move `inbox/ → ongoing/` when picked up, `ongoing/ → done/` on completion, `ongoing/ → inbox/` on abort
+- Secretary stale-ongoing detection — items stuck in `ongoing/` for >3 days are automatically re-queued to `inbox/`
+
+## 0.1.6 (2026-03-14)
+
+### Added
+- `--team-model` and `--agent-model` CLI flags for `pa deploy` — override the model used for the team-manager and individual agents (haiku / sonnet / opus)
+- Model policy section in deployment primers — shows which model each agent will use before the run starts
+- Sonnet floor policy — agents cannot be downgraded below Sonnet regardless of YAML setting
+
 ## 0.1.5 (2026-03-14)
 
 ### Added
