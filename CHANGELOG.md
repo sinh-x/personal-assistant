@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.9 (2026-03-15)
+
+### Added
+- `deploy_modes:` section in all 9 PA team YAML files — declares which modes are available for phone-triggered deployments, with `phone_visible` flag to control what appears in the Avodah phone app
+- `daily` team deploy modes map to `pa daily <mode>` (`plan`, `progress`, `end`); all other teams map to `pa deploy <team> [--flag]`
+
 ## 0.1.8 (2026-03-15)
 
 ### Added
