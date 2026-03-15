@@ -265,9 +265,13 @@ fi
 rm -f '${logFile}.err'
 if [[ $exit_code -eq 124 ]]; then
   echo '[$(date -Iseconds)] TIMED OUT after ${maxRuntime}s' >> '${logFile}'
-  flock -w 5 '${registryLock}' bash -c "echo '{\"deployment_id\":\"${deployId}\",\"team\":\"${teamName}\",\"event\":\"crashed\",\"timestamp\":\"'$(date -Iseconds)'\",\"exit_code\":124,\"summary\":\"Timed out after ${maxRuntime}s\"}' >> '${registryFile}'"
+  crash_ts=$(date -Iseconds)
+  crash_json='{"deployment_id":"${deployId}","team":"${teamName}","event":"crashed","timestamp":"'"$crash_ts"'","exit_code":124,"summary":"Timed out after ${maxRuntime}s"}'
+  { flock -w 5 9; printf '%s\n' "$crash_json" >> '${registryFile}'; } 9>'${registryLock}'
 elif [[ $exit_code -ne 0 ]]; then
-  flock -w 5 '${registryLock}' bash -c "echo '{\"deployment_id\":\"${deployId}\",\"team\":\"${teamName}\",\"event\":\"crashed\",\"timestamp\":\"'$(date -Iseconds)'\",\"exit_code\":'$exit_code'}' >> '${registryFile}'"
+  crash_ts=$(date -Iseconds)
+  crash_json='{"deployment_id":"${deployId}","team":"${teamName}","event":"crashed","timestamp":"'"$crash_ts"'","exit_code":'"$exit_code"'}'
+  { flock -w 5 9; printf '%s\n' "$crash_json" >> '${registryFile}'; } 9>'${registryLock}'
 fi
 `.trim();
 
