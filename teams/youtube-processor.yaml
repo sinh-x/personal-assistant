@@ -4,6 +4,14 @@
 name: youtube-processor
 description: Process YouTube videos from queue and save structured notes to Anytype
 
+deploy_modes:
+  - id: background
+    label: Background
+    phone_visible: true
+  - id: foreground
+    label: Foreground
+    phone_visible: true
+
 context:
   organization: sinh-x
   notes: "Autonomous video processing — no user interaction required"

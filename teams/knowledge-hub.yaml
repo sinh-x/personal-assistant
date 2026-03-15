@@ -1,6 +1,17 @@
 name: knowledge-hub
 description: Learning, research & intel team — multi-source knowledge ingestion, curation, interactive learning, and Johari blind-spot analysis
 
+deploy_modes:
+  - id: background
+    label: Background
+    phone_visible: true
+  - id: foreground
+    label: Foreground
+    phone_visible: true
+  - id: interactive
+    label: Interactive
+    phone_visible: false
+
 context:
   organization: sinh-x
   notes: "Unified learning hub: YouTube, RSS, podcasts, system logs, and Johari blind-spot tracking. Absorbs youtube-processor team."

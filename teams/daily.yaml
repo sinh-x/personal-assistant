@@ -1,6 +1,17 @@
 name: daily
 description: Daily lifecycle team — plan, track progress, and close the day
 
+deploy_modes:
+  - id: plan
+    label: Plan
+    phone_visible: true
+  - id: progress
+    label: Progress
+    phone_visible: true
+  - id: end
+    label: End
+    phone_visible: true
+
 context:
   organization: sinh-x
   notes: "One team, three modes: plan | progress | end"

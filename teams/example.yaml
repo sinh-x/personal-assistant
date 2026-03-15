@@ -4,6 +4,17 @@
 name: example-team
 description: An example agent team
 
+deploy_modes:
+  - id: background
+    label: Background
+    phone_visible: true
+  - id: foreground
+    label: Foreground
+    phone_visible: true
+  - id: interactive
+    label: Interactive
+    phone_visible: false
+
 # Optional context passed to all agents
 context:
   organization: sinh-x
