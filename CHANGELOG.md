@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.14 (2026-03-16)
+
+### Changed
+- **Inbox → ongoing enforcement across all teams** — All team skill files (builder, requirements, maintenance, house-chores) now explicitly require claiming items from `inbox/` into `ongoing/` before starting work. Team YAMLs (builder, requirements, maintenance, house-chores, daily) include ongoing reminders in their objectives.
+- **Secretary audit enhanced** — `audit.md` now scans `ongoing/` folders across all teams, classifying items as `ACTIVE` (in-flight) or `STUCK` (>3 days in ongoing/), and surfaces stuck items for re-queue.
+
 ## 0.1.12 (2026-03-16)
 
 ### Added
