@@ -69,6 +69,7 @@ Every requirements document MUST cover these sections. If a section doesn't appl
 > **Author:** <agent_name> + <user>
 > **Status:** Draft / Approved
 > **Deployment:** <deployment_id>
+> **Repository:** <git repo path, e.g. ~/git-repos/sinh-x/tools/personal-assistant>
 
 ## 1. Context & Background
 Why are we doing this? What's the current state?

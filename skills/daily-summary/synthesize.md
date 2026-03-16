@@ -40,7 +40,7 @@ mkdir -p ~/Documents/ai-usage/daily/$(date +%Y)/$(date +%m)
 
 ### PLAN mode
 - Focus on actionable goals, not analysis
-- Pull yesterday's "Tomorrow's Priorities" as starting goals
+- Pull yesterday's "Tomorrow's Priorities" as starting goals — **first check whether a `YYYY-MM-DD-daily.md` exists for yesterday**. If not, add a visible note: `> **Note:** No end-of-day summary for yesterday — carry-forward items may be incomplete. Verify manually.`
 - Include avo task list with priorities
 - Time budgets should be realistic based on yesterday's actuals
 - Keep it short — this is a morning kickoff, not a report
