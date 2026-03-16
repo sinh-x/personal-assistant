@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.15 (2026-03-16)
+
+### Added
+- **Deployment context injection** — `deploy.ts` now injects `cwd` and `repo_root` into the `<deployment-context>` block of primers, giving agents awareness of their working directory and repository root
+
+### Fixed
+- **Multi-phase completion bug** — Builder agent now correctly enforces `ongoing/` and checklist-based completion for multi-phase items; previously could prematurely move items to `done/` before all phases were checked off
+
 ## 0.1.14 (2026-03-16)
 
 ### Changed
