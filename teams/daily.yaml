@@ -44,6 +44,10 @@ objective: |
   MODE: DAILY END — PHASE 1: GATHER (background)
   TARGET_DATE: YYYY-MM-DD
 
+  When you pick up an inbox item for multi-step work, move it to
+  `agent-teams/daily/ongoing/` BEFORE starting. Move to `done/` when complete.
+  (Note: sub-agents are directed by team manager — they have no inbox to claim.)
+
   Gather all end-of-day data autonomously. Write reports to team inbox.
   Then trigger secretary to generate the daily progress board.
 

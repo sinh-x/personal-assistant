@@ -96,6 +96,16 @@ Now you are on the correct branch. Proceed with the plan.
 
 Each deployment starts by reading your inbox at `~/Documents/ai-usage/agent-teams/builder/inbox/`. The inbox item will reference a detailed plan document. Read the full plan before doing anything.
 
+### Inbox Claim Protocol
+
+When you start working on an item from your team inbox:
+1. Move the item to `ongoing/` first: `mv ~/Documents/ai-usage/agent-teams/builder/inbox/<item> ~/Documents/ai-usage/agent-teams/builder/ongoing/`
+2. Work on it from `ongoing/`
+3. On completion: move to `done/`
+4. On failure/abort: move back to `inbox/` + write FYI to Sinh inbox
+
+Short single-step work that completes in one action may skip `ongoing/` and go directly `inbox/ → done/`.
+
 ### 2. Identify Next Phase
 
 Check git log for commits matching `feat(migration):` or `feat(builder):` to determine which phases are already complete. Execute only the next incomplete phase.
@@ -126,15 +136,18 @@ After verification passes:
 
 ### On Each Deployment
 
-1. **Read inbox** — Find the current implementation plan
-2. **Read plan document** — Identify repo path, feature branch, and full scope
-3. **Pre-flight checks** — Switch to repo, check branch, create feature branch (§Pre-flight Checks). Stop here if check fails.
-4. **Check progress** — `git log --oneline | grep 'feat('` to find completed phases
-5. **Read existing code** — Always read files before modifying them
-6. **Execute phase** — Create/modify files as the plan specifies
-7. **Verify** — Run all verification steps from the plan
-8. **Commit** — Conventional commit with phase number
-9. **Report** — Write findings and progress to `~/Documents/ai-usage/sinh-inputs/inbox/`
+1. **Check `ongoing/` first** — Scan `~/Documents/ai-usage/agent-teams/builder/ongoing/` for in-progress items from previous deployments. If found, resume that item before picking up anything new from `inbox/`.
+2. **Read inbox** — If nothing in `ongoing/`, find the current implementation plan in `~/Documents/ai-usage/agent-teams/builder/inbox/`
+3. **Claim inbox item** — Move item to `ongoing/` (see §Inbox Claim Protocol) before starting any work
+4. **Read plan document** — Identify repo path, feature branch, and full scope
+5. **Pre-flight checks** — Switch to repo, check branch, create feature branch (§Pre-flight Checks). Stop here if check fails.
+6. **Check progress** — `git log --oneline | grep 'feat('` to find completed phases
+7. **Read existing code** — Always read files before modifying them
+8. **Execute phase** — Create/modify files as the plan specifies
+9. **Verify** — Run all verification steps from the plan
+10. **Commit** — Conventional commit with phase number
+11. **Update item** — Check off completed phase in item file; if ALL phases done, move item `ongoing/ → done/`. Otherwise leave in `ongoing/`.
+12. **Report** — Write findings and progress to `~/Documents/ai-usage/sinh-inputs/inbox/`
 
 ## Rules
 

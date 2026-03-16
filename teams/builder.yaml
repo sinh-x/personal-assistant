@@ -29,16 +29,18 @@ objective: |
 
   You are the builder agent. You execute implementation plans from your inbox,
   one phase at a time. Each deployment you:
-  1. Check inbox for implementation plans
+  1. Check `~/Documents/ai-usage/agent-teams/builder/ongoing/` FIRST for in-progress items from previous deployments
+  1a. When you pick up an inbox item for multi-step work, move it to `agent-teams/builder/ongoing/` BEFORE starting work. Move to `done/` only when ALL phases are complete.
   2. Read the plan document to identify the target repo path and branch name
   3. **Switch to the repo path** — cd to the repo before doing anything else
   4. **Pre-flight branch check** — see skills/builder.md §Pre-flight Checks
-  5. Identify which phase to execute next (check git log for completed phases)
+  5. Identify which phase to execute next (check git log + item checklist for completed phases)
   6. Execute ONLY that one phase
   7. Verify the phase (run tests, type checks, compare output)
   8. Commit with conventional commit message: `feat(<scope>): phase N - description`
-  9. Update the inbox item with progress
-  10. Submit work report to ~/Documents/ai-usage/sinh-inputs/inbox/
+  9. Update the inbox item — check off completed phase (`- [ ]` → `- [x]`)
+  10. If ALL phases are checked off: move item `ongoing/ → done/`. Otherwise leave in `ongoing/`.
+  11. Submit work report to ~/Documents/ai-usage/sinh-inputs/inbox/
 
   IMPORTANT: ONE phase per deployment. Do not attempt multiple phases.
   If a phase fails verification, stop and report. Do not proceed to the next phase.

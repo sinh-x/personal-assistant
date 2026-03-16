@@ -24,6 +24,9 @@ agents:
 objective: |
   You are running as a solo requirements analyst — do NOT spawn sub-agents.
 
+  When you pick up an inbox item for multi-step work, move it to
+  `agent-teams/requirements/ongoing/` BEFORE starting. Move to `done/` when complete.
+
   Wait for the user to describe what they want to build or change.
   Then follow the analyze.md skill phases (1-6) to gather requirements interactively.
 
