@@ -16,6 +16,7 @@ function formatDate(d: Date): string {
 /** Build the plan objective */
 function planObjective(today: string, year: string, month: string, outputDir: string): string {
   const inputNotes = resolve(homedir(), `Documents/ai-usage/sinh-inputs/daily-plan/${today}`);
+  const rpmBlocks = resolve(homedir(), `Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml`);
   return `MODE: DAILY PLAN (morning) — SOLO (no sub-agents)
 TARGET_DATE: ${today}
 
@@ -34,17 +35,23 @@ Workflow (you do all steps directly):
    - Read any files — these are context documents routed by the secretary
    - Incorporate relevant context into the plan
    - After processing, move each file to inbox/processed/
-4. Get current avo task list and status:
+4. [RPM CONTEXT — opt-in] Check for RPM blocks at ${rpmBlocks}
+   - If the file exists: read it and apply skills/rpm/context.md to build "Today's RPM Focus" section
+   - Filter: status=active AND (horizon=weekly OR horizon=project)
+   - Build RPM Focus section for the plan document (see Plan document structure below)
+   - If the file does not exist: skip silently — do not mention RPM
+5. Get current avo task list and status:
    - Run: /home/sinh/.nix-profile/bin/avo task list
    - Run: /home/sinh/.nix-profile/bin/avo plan list
    - Run: /home/sinh/.nix-profile/bin/avo status
-5. Use avo to plan the day's tasks:
+6. Use avo to plan the day's tasks:
    - Based on goals from steps 1-4, schedule tasks with avo:
      /home/sinh/.nix-profile/bin/avo plan task <task-id> -e <duration>
+   - If RPM blocks exist: prioritize tasks that map to active RPM results
    - Prioritize P0 first, then P1, P2, etc.
    - Do not over-schedule — respect realistic time budget
    - If a goal has no matching avo task, note it for Sinh to create
-6. Write the daily plan as a DRAFT for Sinh to review when he's ready
+7. Write the daily plan as a DRAFT for Sinh to review when he's ready
 
 Output: ${homedir()}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md
 
@@ -66,6 +73,9 @@ IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
 Plan document structure:
   ## User Notes (if ${inputNotes} exists)
   (Sinh's own notes for the day, verbatim or summarized)
+  ## Today's RPM Focus (ONLY if ${rpmBlocks} exists)
+  (active RPM blocks — results and active MAP items; see skills/rpm/context.md)
+  | ID | Area | Horizon | Result |
   ## Today's Goals (from user notes + yesterday's priorities + new items)
   | # | Goal | Source | Priority |
   ## Avo Day Plan
@@ -75,7 +85,8 @@ Plan document structure:
   ## Open Items Carried Forward
   - [ ] item (from session/date)
   ## Today's Task List
-  (from avo task list, prioritized)
+  (from avo task list — each task labeled with RPM result ID or [UNALIGNED] if rpm-blocks.yaml exists)
+  | # | Task | Priority | Est. | RPM |
 `;
 }
 
@@ -306,6 +317,7 @@ Note: "Tomorrow's Priorities" section MUST use Sinh's confirmed priorities from 
 /** Interactive finalization of the plan draft */
 function planReviewObjective(today: string, outputDir: string): string {
   const draftPath = `${homedir()}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md`;
+  const rpmBlocks = resolve(homedir(), `Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml`);
 
   return `MODE: DAILY PLAN — REVIEW (interactive)
 TARGET_DATE: ${today}
@@ -317,23 +329,29 @@ Workflow:
    - If found: read it and present it
    - If NOT found: check ${homedir()}/Documents/ai-usage/sinh-inputs/inbox/ for any *-plan-draft.md
    - If still not found: read yesterday's daily summary + current avo tasks and create a quick draft inline
-2. Present the draft to Sinh section by section:
+2. [RPM CONTEXT — opt-in] If ${rpmBlocks} exists and the draft does NOT already have a "## Today's RPM Focus" section:
+   - Read rpm-blocks.yaml and apply skills/rpm/context.md to inject the RPM Focus section
+   - Insert it between "## User Notes" and "## Today's Goals"
+3. Present the draft to Sinh section by section:
+   - Show "## Today's RPM Focus" (if present) — ask: "Are these the right results to focus on today?"
    - Show "## Today's Goals" — ask: "Do these goals look right? Anything to add or remove?"
    - Show "## Time Budget" — ask: "Is this realistic?"
    - Show any open items / carryovers
-3. Accept corrections in plain conversation:
+4. Accept corrections in plain conversation:
    - "change goal X" → update it
    - "add <goal>" → add to goals list
    - "adjust time for <category> to <amount>" → update time budget
    - "looks good" / "done" → proceed to finalize
-4. Update avo plan if needed:
+5. Update avo plan if needed:
    - Run: /home/sinh/.nix-profile/bin/avo plan list (show current)
    - If Sinh wants changes: /home/sinh/.nix-profile/bin/avo plan task <task-id> -e <duration>
-5. Write final plan to ${outputDir}/${today}-plan.md
-6. If draft existed, move it: mv ${draftPath} ${homedir()}/Documents/ai-usage/sinh-inputs/done/
-7. Confirm: "Plan finalized → ${outputDir}/${today}-plan.md"
+6. Write final plan to ${outputDir}/${today}-plan.md
+7. If draft existed, move it: mv ${draftPath} ${homedir()}/Documents/ai-usage/sinh-inputs/done/
+8. Confirm: "Plan finalized → ${outputDir}/${today}-plan.md"
 
 Final plan document structure:
+  ## Today's RPM Focus (ONLY if ${rpmBlocks} exists)
+  | ID | Area | Horizon | Result |
   ## Today's Goals
   | # | Goal | Source | Priority |
   ## Avo Day Plan
@@ -343,7 +361,8 @@ Final plan document structure:
   ## Open Items Carried Forward
   - [ ] item (from session/date)
   ## Today's Task List
-  (from avo task list, prioritized)
+  (from avo task list — each task labeled with RPM result ID or [UNALIGNED] if rpm-blocks.yaml exists)
+  | # | Task | Priority | Est. | RPM |
 `;
 }
 
