@@ -108,7 +108,11 @@ Short single-step work that completes in one action may skip `ongoing/` and go d
 
 ### 2. Identify Next Phase
 
-Check git log for commits matching `feat(migration):` or `feat(builder):` to determine which phases are already complete. Execute only the next incomplete phase.
+Cross-reference two sources to determine which phase to execute next:
+1. **Item checklist** (primary) — read the item file in `ongoing/` and find the first unchecked `- [ ]` phase
+2. **Git log** (verification) — `git log --oneline | grep 'feat('` to confirm completed phases match checked items
+
+If the checklist and git log disagree, trust the checklist — it is the ground truth. Execute only the next incomplete phase.
 
 ### 3. Execute One Phase
 
@@ -129,7 +133,8 @@ Every phase has verification steps listed in the plan. Run ALL of them. Common c
 After verification passes:
 - Stage changed files
 - Commit with: `feat(<scope>): phase N - description`
-- Update the inbox item with progress status
+- **Update the item file checklist** — change `- [ ] Phase N` to `- [x] Phase N` for the phase just completed
+- **Check done condition** — see §Multi-Phase Completion Logic below
 - Write work report to `~/Documents/ai-usage/sinh-inputs/inbox/`
 
 ## Workflow
@@ -163,3 +168,34 @@ After verification passes:
 - **Respect .gitignore.** Never commit node_modules, dist, secrets, or ignored files.
 - **Atomic commits.** One commit per phase. Don't bundle unrelated changes.
 - **Document everything.** Your work report should explain what was built, what was verified, and any issues found.
+
+## Multi-Phase Completion Logic
+
+### After each successful commit
+
+```
+Phase N committed successfully:
+  → Update item file checklist: `- [ ] Phase N` → `- [x] Phase N`
+  → Are ALL phases in checklist now [x]?
+     YES → move item from ongoing/ → done/
+     NO  → leave item in ongoing/, write progress work report, stop deployment
+```
+
+**Never move a multi-phase item to `done/` unless every phase is checked off.** This is the single most important rule for multi-phase items.
+
+### Items without a checklist
+
+If the item file has no phase checklist, use git log only to detect completed phases. In this case, never move to `done/` automatically — leave in `ongoing/` and note in the work report that manual review is needed to determine completion.
+
+### Failure handling
+
+```
+Phase N fails verification:
+  → Do NOT commit
+  → Do NOT update checklist
+  → Item stays in ongoing/
+  → Background mode: write failed work report to sinh-inputs/inbox/, stop deployment
+  → Foreground mode: pause and ask user for direction (retry, skip, or abort)
+```
+
+**Background vs foreground detection:** Check the `PA_DEPLOY_MODE` environment variable. If not set, default to background behavior (stop and report).
