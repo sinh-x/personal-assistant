@@ -151,6 +151,15 @@ export function deployCommand(
   // Use YAML name field as canonical team name (overrides filename-derived name)
   if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
 
+  // Detect git repo root from cwd (for repo-aware agents)
+  const cwd = process.cwd();
+  let repoRoot: string | undefined;
+  try {
+    repoRoot = execSync("git rev-parse --show-toplevel", { cwd, encoding: "utf-8" }).trim();
+  } catch {
+    repoRoot = undefined;
+  }
+
   // Resolve effective models
   const { tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
     teamModel: opts.teamModel,
@@ -171,6 +180,8 @@ export function deployCommand(
     deploymentsDir,
     extraObjective: opts.objective,
     deployMode: opts.routeDecisions ? "route-decisions" : undefined,
+    cwd,
+    repoRoot,
     resolveFile,
     configDir: config.configDir,
     homeDir: paHome,

@@ -16,6 +16,14 @@ When starting a requirements session from an inbox item:
 
 Short single-step work that completes in one action may skip `ongoing/` and go directly `inbox/ → done/`.
 
+### Repo Context (mandatory startup)
+
+Read `repo_root` from the `<deployment-context>` block in your primer.
+
+- If `repo_root` is set: **restrict all Phase 3 exploration to files under that path**.
+  Do not read files outside `repo_root`. Use `repo_root` as the `Repository:` value in the output doc.
+- If `repo_root` is absent: proceed without a restriction (legacy / non-git context).
+
 ### Phase 1: Understand the Problem (2-3 questions)
 
 Start by understanding what the user wants at a high level:
@@ -36,7 +44,9 @@ Narrow down what's in and out:
 
 ### Phase 3: Technical Exploration (do this yourself)
 
-Before asking more questions, **explore the codebase and existing systems yourself**:
+Before asking more questions, **explore the codebase and existing systems yourself**.
+
+**Scoping rule:** If `repo_root` was set in the Repo Context step above, restrict all file reads and searches to paths under `repo_root`. Do not explore files outside that directory.
 
 - Read relevant files, configs, existing implementations
 - Check for existing patterns, conventions, dependencies

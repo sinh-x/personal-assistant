@@ -13,6 +13,8 @@ interface PrimerOptions {
   deploymentsDir: string;
   extraObjective?: string;
   deployMode?: string;
+  cwd?: string;
+  repoRoot?: string;
   resolveFile: (relpath: string) => string | undefined;
   configDir: string;
   homeDir: string;
@@ -37,6 +39,8 @@ export function generatePrimer(opts: PrimerOptions): string {
     deploymentsDir,
     extraObjective,
     deployMode,
+    cwd,
+    repoRoot,
     resolveFile,
     configDir,
     homeDir,
@@ -76,7 +80,7 @@ registry_file: ${registryFile}
 registry_lock: ${registryLock}
 workspace_base: ${deploymentsDir}/${deployId}
 team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
-agents:
+${cwd ? `cwd: ${cwd}\n` : ""}${repoRoot ? `repo_root: ${repoRoot}\n` : ""}agents:
 ${agentsList}${modelsBlock}${modeBlock}
 </deployment-context>
 
