@@ -1,0 +1,36 @@
+name: rpm
+description: RPM personal planning — create/update RPM blocks, weekly gather, and weekly review
+
+deploy_modes:
+  - id: interactive
+    label: Interactive
+    phone_visible: true
+
+context:
+  organization: sinh-x
+  notes: "Solo agent (team manager does the work directly). Mode: interactive | weekly-gather | weekly-review"
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+  rpm_blocks: ~/Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml
+  anytype_space: bafyreifs6whb7td4qfzyqx5nh6krdmxosvbzxwnpn5eqeepivm3tc7ps6i.2eaoxbxt3otui
+
+agents:
+  - name: planner
+    role: "Create and update RPM blocks via guided conversation, sync to Anytype"
+    skill: skills/rpm/manage.md
+
+# Objective is passed at deploy time.
+# Phase 1 (interactive): guide Sinh through creating/updating RPM blocks.
+objective: |
+  You are running as a solo RPM agent — do NOT spawn sub-agents.
+
+  MODE: interactive — Guide Sinh through creating or updating RPM blocks.
+
+  Follow the manage.md skill to:
+  1. Check for existing rpm-blocks.yaml and display current blocks
+  2. Guide Sinh through creating, updating, or reviewing RPM blocks
+  3. Save to ~/Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml
+  4. Mirror to Anytype
+
+  See skills/rpm/manage.md for the full skill.
