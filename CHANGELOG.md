@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.12 (2026-03-16)
+
+### Added
+- **RPM Weekly Review system** — `pa deploy rpm --mode=weekly-review` launches an interactive session that presents weekly avo time by RPM area, completed vs skipped MAP items, and guides block updates. New `skills/rpm/weekly-review.md` and `skills/rpm/weekly-gather.md` skills added.
+- **Schedulable RPM gather team** — `pa schedule rpm-gather weekly` sets up a background Sunday gather that collects avo time, daily summaries, and completed MAP items into `agent-teams/rpm/inbox/` for review. New `teams/rpm-gather.yaml` added.
+- **RPM daily context injection** — `pa daily plan` now includes a "Today's RPM Focus" section showing active results. Each avo task is labeled with its mapped RPM result ID or flagged as `[UNALIGNED]` when no mapping is found. Supports `#rpm:rN` manual tag override.
+- **RPM block management** — `pa deploy rpm --interactive` guides creation and updates of RPM blocks (Result + Purpose + MAP). Blocks stored as YAML at `agent-teams/rpm/rpm-blocks.yaml` and mirrored to Anytype. Supports 4 life areas (work, learning, health, relationships) and 3 horizons (project, monthly, weekly).
+
 ## 0.1.9 (2026-03-15)
 
 ### Added
