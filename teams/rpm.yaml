@@ -1,0 +1,56 @@
+name: rpm
+description: RPM personal planning — create/update RPM blocks, weekly gather, and weekly review
+
+deploy_modes:
+  - id: interactive
+    label: Interactive
+    phone_visible: true
+  - id: weekly-review
+    label: Weekly Review
+    phone_visible: true
+
+context:
+  organization: sinh-x
+  notes: "Solo agent (team manager does the work directly). Mode: interactive | weekly-review. For weekly gather, use team: rpm-gather"
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+  rpm_blocks: ~/Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml
+  anytype_space: bafyreifs6whb7td4qfzyqx5nh6krdmxosvbzxwnpn5eqeepivm3tc7ps6i.2eaoxbxt3otui
+
+agents:
+  - name: planner
+    role: "Create and update RPM blocks via guided conversation, sync to Anytype"
+    skill: skills/rpm/manage.md
+
+  - name: reviewer
+    role: "Guide weekly RPM review — present week data, update MAP items, sync blocks"
+    skill: skills/rpm/weekly-review.md
+
+# Objective is passed at deploy time via EXTRA_OBJECTIVE or detected from deploy_mode.
+# Use `pa deploy rpm --interactive` for block management.
+# Use `pa deploy rpm --interactive --objective "MODE: weekly-review"` for weekly review.
+# For background weekly gather, use team: rpm-gather.
+objective: |
+  You are running as a solo RPM agent — do NOT spawn sub-agents.
+
+  Detect your MODE from the context:
+  - If EXTRA_OBJECTIVE contains "MODE: weekly-review" → follow skills/rpm/weekly-review.md
+  - Otherwise → MODE: interactive — follow skills/rpm/manage.md
+
+  ## MODE: interactive (default)
+
+  Follow skills/rpm/manage.md to:
+  1. Check for existing rpm-blocks.yaml and display current blocks
+  2. Guide Sinh through creating, updating, or reviewing RPM blocks
+  3. Save to ~/Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml
+  4. Mirror to Anytype
+
+  ## MODE: weekly-review
+
+  Follow skills/rpm/weekly-review.md to:
+  1. Find latest weekly gather report in agent-teams/rpm/inbox/
+  2. Present week summary (time distribution + block status)
+  3. Guide Sinh through per-block review (MAP updates, status changes)
+  4. Save updated blocks to rpm-blocks.yaml + sync to Anytype
+  5. Move gather report to done/, write review artifact, write work report

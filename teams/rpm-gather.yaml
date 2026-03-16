@@ -1,0 +1,38 @@
+name: rpm-gather
+description: RPM weekly gather — runs automatically on schedule to collect weekly RPM data
+
+deploy_modes:
+  - id: background
+    label: Background
+    phone_visible: false
+
+context:
+  organization: sinh-x
+  notes: "Solo agent, background only. Schedule via: pa schedule rpm-gather weekly --at 21:00"
+
+variables:
+  project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
+  rpm_blocks: ~/Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml
+
+agents:
+  - name: gatherer
+    role: "Collect weekly avo time, daily summaries, and MAP item progress — write to RPM inbox"
+    skill: skills/rpm/weekly-gather.md
+
+# This team is designed for background/scheduled use only.
+# Schedule: pa schedule rpm-gather weekly --at 21:00
+# Trigger manually: pa deploy rpm-gather --background
+objective: |
+  You are running as a solo RPM gather agent — do NOT spawn sub-agents.
+  You are in background mode. Do NOT ask Sinh any questions.
+
+  Follow skills/rpm/weekly-gather.md to:
+  1. Read rpm-blocks.yaml (if missing, write minimal report and exit)
+  2. Run avo week to get this week's time data
+  3. Map avo time to RPM life areas
+  4. Read daily summaries from this week
+  5. Estimate MAP item progress via keyword matching in avo worklogs
+  6. Write gather report to ~/Documents/ai-usage/agent-teams/rpm/inbox/YYYY-MM-DD-weekly-gather.md
+  7. Write work report to ~/Documents/ai-usage/sinh-inputs/inbox/
+
+  When done, write the completion marker and exit.
