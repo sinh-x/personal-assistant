@@ -16,6 +16,7 @@ You receive two things:
 
 ### Agent team inboxes and pending items
 - `~/Documents/ai-usage/agent-teams/*/inbox/` — items waiting for each team
+- `~/Documents/ai-usage/agent-teams/*/ongoing/` — items actively being worked on
 - `~/Documents/ai-usage/agent-teams/*/waiting-for-response/` — items awaiting replies
 
 For each item found, read at minimum the file's frontmatter/header (first 20-30 lines) to understand what it's about, who it's from, and what it references (deployment IDs, topics, dates).
@@ -29,7 +30,8 @@ For each inbox item, assign ONE classification:
 | **DONE** | Evidence confirms the referenced work is completed (matching deployment success, git commits, session log with success status) | Can be archived |
 | **OBSOLETE** | Superseded by a newer item covering the same topic, or references something that no longer exists | Can be dismissed |
 | **STALE** | >3 days old with no matching recent activity in the evidence report | Needs attention — may be forgotten |
-| **ACTIVE** | Evidence shows matching work is in progress (partial deployment, recent commits, open tasks) | Keep — work ongoing |
+| **ACTIVE** | Item is in a team's `ongoing/` folder — explicitly claimed and in-flight | Keep — work in progress |
+| **STUCK** | Item has been in `ongoing/` for >3 days — work stalled | Flag for Sinh; coordinate.md will re-queue |
 | **NEEDS-ACTION** | No matching evidence found, or item explicitly requests a decision/review from Sinh | Requires Sinh's decision |
 
 ### Classification Logic
@@ -42,7 +44,10 @@ For each inbox item, assign ONE classification:
 3. **Apply time rules:**
    - Item >3 days old + no evidence match = STALE
    - Item has a newer version in the same inbox = older one is OBSOLETE
-4. **Default to NEEDS-ACTION** if uncertain — better to ask Sinh than to silently archive
+4. **Classify `ongoing/` items separately:**
+   - Item found in `agent-teams/*/ongoing/` = ACTIVE (explicitly claimed, in-flight)
+   - Item in `ongoing/` AND >3 days old = STUCK (flag for Sinh; coordinate.md re-queues after 3 days)
+5. **Default to NEEDS-ACTION** if uncertain — better to ask Sinh than to silently archive
 
 ## Output Format
 
@@ -64,6 +69,7 @@ Write `audit-report.md` to your workspace:
 | OBSOLETE | X |
 | STALE | X |
 | ACTIVE | X |
+| STUCK | X |
 | NEEDS-ACTION | X |
 
 ## Sinh's Inbox
@@ -73,13 +79,22 @@ Write `audit-report.md` to your workspace:
 | 1 | builder-feature-x-report.md | sinh-inputs/inbox | 1d | DONE | d-abc123 success | Archive |
 | 2 | review-login-requirements.md | sinh-inputs/inbox | 5d | STALE | No matching activity | Needs attention |
 
+## In-Flight (ongoing/)
+
+| # | Item | Team | Age | Classification | Suggested Action |
+|---|------|------|-----|---------------|-----------------|
+| 9 | bimputh-docs.md | builder | 1d | ACTIVE | Keep — work in progress |
+| 10 | stale-task.md | requirements | 5d | STUCK | Flag for Sinh — stalled >3 days |
+
+(list all items found in agent-teams/*/ongoing/)
+
 ## Agent Team Inboxes
 
 ### team-name
 
 | # | Item | Folder | Age | Classification | Evidence | Suggested Action |
 |---|------|--------|-----|---------------|----------|-----------------|
-| 10 | build-request.md | inbox | 2d | ACTIVE | d-def456 partial | Keep |
+| 11 | build-request.md | inbox | 2d | NEEDS-ACTION | No evidence | Needs attention |
 
 (repeat per team with items)
 

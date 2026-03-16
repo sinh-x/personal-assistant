@@ -29,6 +29,9 @@ objective: |
 
   Working directory: /home/sinh/git-repos/sinh-x/tools/personal-assistant
 
+  When you pick up an inbox item for multi-step work, move it to
+  `agent-teams/house-chores/ongoing/` BEFORE starting. Move to `done/` when complete.
+
   Follow the house-chores skill workflow exactly:
   1. Survey all uncommitted changes (git status + git diff)
   2. Read and understand each changed/new file

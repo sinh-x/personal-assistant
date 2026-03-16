@@ -29,6 +29,9 @@ objective: |
 
   Working directory: /home/sinh/git-repos/sinh-x/tools/personal-assistant
 
+  When you pick up an inbox item for multi-step work, move it to
+  `agent-teams/maintenance/ongoing/` BEFORE starting. Move to `done/` when complete.
+
   You are the maintenance agent for the personal-assistant system. Your job is to
   keep the system healthy and fix problems.
 

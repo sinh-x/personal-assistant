@@ -54,14 +54,26 @@ Run a diagnostic pass on the system:
 
 ## Workflow
 
+### Inbox Claim Protocol
+
+When you start working on an item from your team inbox:
+1. Move the item to `ongoing/` first: `mv ~/Documents/ai-usage/agent-teams/maintenance/inbox/<item> ~/Documents/ai-usage/agent-teams/maintenance/ongoing/`
+2. Work on it from `ongoing/`
+3. On completion: move to `done/`
+4. On failure/abort: move back to `inbox/` + write FYI to Sinh inbox
+
+Short single-step work that completes in one action may skip `ongoing/` and go directly `inbox/ → done/`.
+
 ### On Each Run
 
-1. **Read objective** — What specific issue to investigate, OR "health check" for a full diagnostic
-2. **Gather context** — Read relevant files, logs, registry, timer status
-3. **Diagnose** — Identify the root cause or current health status
-4. **Fix** — Apply changes if issues found (edit files, fix configs)
-5. **Verify** — Test the fix (dry-run, bash -n, status check)
-6. **Document** — Write findings and changes to work report
+1. **Check `ongoing/`** — Scan `~/Documents/ai-usage/agent-teams/maintenance/ongoing/` for in-progress items from previous deployments. Resume if found.
+2. **Claim inbox item** — If picking up a new item from `inbox/`, move it to `ongoing/` (see §Inbox Claim Protocol) before starting work.
+3. **Read objective** — What specific issue to investigate, OR "health check" for a full diagnostic
+4. **Gather context** — Read relevant files, logs, registry, timer status
+5. **Diagnose** — Identify the root cause or current health status
+6. **Fix** — Apply changes if issues found (edit files, fix configs)
+7. **Verify** — Test the fix (dry-run, bash -n, status check)
+8. **Document** — Write findings and changes to work report
 
 ## Investigation Checklist
 
