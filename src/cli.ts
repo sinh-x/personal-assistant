@@ -19,9 +19,10 @@ program
 
 program
   .command("teams")
-  .description("List available teams")
-  .action(() => {
-    teamsCommand();
+  .description("Show agent team workflow status (inbox/ongoing/wfr counts). With [name]: show folder detail for one team.")
+  .argument("[name]", "Team name for detailed view")
+  .action((name?: string) => {
+    teamsCommand(name);
   });
 
 program

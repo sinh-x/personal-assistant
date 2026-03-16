@@ -79,3 +79,8 @@ export function getPrimersDir(): string {
 export function getLogsDir(): string {
   return resolve(getDataDir(), "logs");
 }
+
+/** Agent teams persistent workspace directory */
+export function getAgentTeamsDir(): string {
+  return expandHome("~/Documents/ai-usage/agent-teams");
+}
