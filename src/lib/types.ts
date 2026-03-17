@@ -1,3 +1,28 @@
+/** Mode-specific deployment configuration within a team */
+export interface DeployMode {
+  id: string;
+  label: string;
+  phone_visible?: boolean;
+  /** Path to a mode-specific objective markdown file (relative to PA_CONFIG or PA_HOME) */
+  objective?: string;
+  /** Subset of agent names to include in this mode; empty array = team-manager only; omitted = all agents */
+  agents?: string[];
+  /** Skills to surface in this mode's primer */
+  skills?: string[];
+}
+
+/** Hierarchy member entry (team-manager or an agent in the hierarchy block) */
+export interface HierarchyMember {
+  role?: string;
+  participates_in?: 'all' | string[];
+}
+
+/** Team hierarchy definition — who does what and in which modes */
+export interface Hierarchy {
+  'team-manager'?: HierarchyMember;
+  agents?: Array<{ name: string } & HierarchyMember>;
+}
+
 /** Team configuration from YAML files */
 export interface TeamConfig {
   name: string;
@@ -10,6 +35,10 @@ export interface TeamConfig {
   agents: Agent[];
   objective: string;
   model?: 'haiku' | 'sonnet' | 'opus';
+  /** Available deployment modes for this team */
+  deploy_modes?: DeployMode[];
+  /** Team hierarchy definition */
+  hierarchy?: Hierarchy;
 }
 
 /** Agent definition within a team */
