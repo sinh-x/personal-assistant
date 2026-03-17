@@ -1,7 +1,6 @@
 name: maintenance
-model: sonnet  # diagnosis and fixes require reasoning; issues may be subtle
+model: sonnet # diagnosis and fixes require reasoning; issues may be subtle
 description: "Investigate, diagnose, and fix issues in the personal-assistant system"
-
 deploy_modes:
   - id: background
     label: Background
@@ -12,19 +11,15 @@ deploy_modes:
   - id: interactive
     label: Interactive
     phone_visible: false
-
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."
-
 variables:
   project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
-
 agents:
   - name: mechanic
     role: "Investigate issues, apply fixes, run health checks on the personal-assistant system"
     skill: skills/maintenance.md
-
 objective: |
   You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
 

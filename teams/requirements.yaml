@@ -1,7 +1,6 @@
 name: requirements
-model: sonnet  # requirements sessions involve interactive reasoning and structured analysis
+model: opus # requirements sessions involve interactive reasoning and structured analysis
 description: "Requirements gathering and analysis — structured planning before implementation"
-
 deploy_modes:
   - id: interactive
     label: Interactive
@@ -12,16 +11,13 @@ deploy_modes:
   - id: background
     label: Background
     phone_visible: true
-
 context:
   organization: sinh-x
   notes: "Solo agent (team manager does the work directly). Always run with --interactive."
-
 agents:
   - name: analyst
     role: "Gather requirements through structured conversation, explore codebase, produce a plan covering the standard checklist"
     skill: skills/requirements/analyze.md
-
 # Objective is passed at deploy time, e.g.:
 #   ./deploy.sh requirements --interactive
 # Then tell it what you want to plan.
