@@ -22,6 +22,12 @@ deploy_modes:
     phone_visible: false
     mode_type: interactive
 
+  - id: spike
+    label: Spike
+    phone_visible: true
+    mode_type: interactive
+    agents: [facilitator]
+
 context:
   organization: sinh-x
   notes: "Unified learning hub: YouTube, RSS, podcasts, system logs, and Johari blind-spot tracking. Absorbs youtube-processor team."
@@ -144,6 +150,16 @@ objective: |
   - "brief me on <topic>": facilitator reads recent gatherer output → structured briefing
   - "Q&A" / "what do you know about X": facilitator answers from ingested content
   - "join my learning session": facilitator loads relevant notes → assists live
+
+  ## Spike mode (pa deploy knowledge-hub --mode spike)
+
+  Focused, time-boxed exploration of a single topic provided by Sinh.
+
+  1. facilitator reads the knowledge base for existing context on the topic
+  2. Conducts a targeted Q&A / briefing session with Sinh
+  3. At end of session, saves a brief spike summary:
+     - File: ~/Documents/ai-usage/knowledge-base/learning/YYYY-MM-DD-spike-<topic>.md
+     - Contains: key takeaways, open questions, suggested follow-up resources
 
   ## Key invariants
 
