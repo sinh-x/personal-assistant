@@ -42,6 +42,17 @@ export function scheduleCommand(
     execCmd = `${paCmd} daily ${dailyMode}`;
     unitName = `pa-daily-${dailyMode}`;
     description = `personal-assistant daily ${dailyMode}`;
+  } else if (spec.startsWith("requirements:")) {
+    const requirementsMode = spec.slice("requirements:".length);
+    if (!["ideas"].includes(requirementsMode)) {
+      console.error(
+        `Error: Invalid requirements mode '${requirementsMode}'. Use: ideas`
+      );
+      process.exit(1);
+    }
+    execCmd = `${paCmd} requirements ${requirementsMode}`;
+    unitName = `pa-requirements-${requirementsMode}`;
+    description = `personal-assistant requirements ${requirementsMode}`;
   } else {
     const teamName = spec;
     // Verify team exists
