@@ -19,16 +19,33 @@ function listMdFiles(dir: string): string[] {
     .sort();
 }
 
-/** Extract title from a markdown file — first `# ` heading or filename slug */
-function extractTitle(filePath: string): string {
+interface ItemInfo {
+  slug: string; // filename without date prefix and .md
+  date: string; // YYYY-MM-DD from filename, or '?' if non-standard
+  from: string; // From: frontmatter value or 'unknown'
+  to: string; // To: frontmatter value or 'unknown'
+}
+
+/** Extract item info from filename + frontmatter */
+function extractItemInfo(filePath: string): ItemInfo {
+  const name = basename(filePath, ".md");
+  const dateMatch = name.match(/^(\d{4}-\d{2}-\d{2})-(.+)$/);
+  const date = dateMatch ? dateMatch[1] : "?";
+  const slug = dateMatch ? dateMatch[2] : name;
+
+  let from = "unknown";
+  let to = "unknown";
   try {
     const content = readFileSync(filePath, "utf-8");
-    const match = content.match(/^#\s+(.+)$/m);
-    if (match) return match[1].trim();
+    const fromMatch = content.match(/^>\s+\*\*From:\*\*\s*(.+)$/m);
+    const toMatch = content.match(/^>\s+\*\*To:\*\*\s*(.+)$/m);
+    if (fromMatch) from = fromMatch[1].trim();
+    if (toMatch) to = toMatch[1].trim();
   } catch {
-    // fall through to filename
+    // leave from/to as 'unknown'
   }
-  return basename(filePath, ".md").replace(/-/g, " ");
+
+  return { slug, date, from, to };
 }
 
 /** Get running deployment IDs for a specific team */
@@ -140,8 +157,9 @@ function showOneTeam(name: string): void {
       console.log("  (empty)");
     } else {
       for (const file of files) {
-        const title = extractTitle(resolve(folderDir, file));
-        console.log(`  • ${title}`);
+        const info = extractItemInfo(resolve(folderDir, file));
+        console.log(`  • ${info.slug}`);
+        console.log(`    ${info.date} | From: ${info.from} → To: ${info.to}`);
       }
     }
   }
