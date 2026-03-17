@@ -7,6 +7,7 @@ import { scheduleCommand } from "./commands/schedule.js";
 import { timersCommand } from "./commands/timers.js";
 import { removeTimerCommand } from "./commands/remove-timer.js";
 import { ideaCommand } from "./commands/idea.js";
+import { requirementsCommand } from "./commands/requirements.js";
 
 declare const __PA_VERSION__: string;
 
@@ -101,6 +102,23 @@ program
   .argument("<team-name>", "Name of the team timer to remove")
   .action((teamName: string) => {
     removeTimerCommand(teamName);
+  });
+
+program
+  .command("requirements")
+  .description("Requirements lifecycle (ideas)")
+  .argument("<mode>", "Mode: ideas")
+  .option("--force", "Re-triage all ideas, not just new ones")
+  .option("--dry-run", "Generate primer and print it, no execution")
+  .option("--background", "Run in background (default for ideas)")
+  .option("--interactive", "Run in foreground, user approves each tool call")
+  .action((mode: string, opts: { force?: boolean; dryRun?: boolean; background?: boolean; interactive?: boolean }) => {
+    const args: string[] = [];
+    if (opts.force) args.push("--force");
+    if (opts.dryRun) args.push("--dry-run");
+    else if (opts.background) args.push("--background");
+    else if (opts.interactive) args.push("--interactive");
+    requirementsCommand(mode, args);
   });
 
 program
