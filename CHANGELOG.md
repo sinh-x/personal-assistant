@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.2 (2026-03-18)
+
+### Added
+- **Spike learning session mode for knowledge-hub** — new `--mode spike` runs only the facilitator agent for focused, time-boxed topic exploration; phone-visible for quick launch; saves a spike summary to `knowledge-base/learning/` at session end
+
+### Changed
+- **Mode-aware primer generation** — primers now select standards modules based on `mode_type` (`housekeeping` / `work` / `interactive`), reducing primer size by 35–60% depending on mode
+- **Standards modularized** — `skills/global/standards.md` split into 4 composable modules: `core.md`, `work.md`, `housekeeping.md`, `inbox-output.md`
+- **Housekeeping mode added to all 11 teams** — every team now has a `housekeeping` mode (team-manager only, no sub-agents) for inbox/WFR/ongoing lifecycle management
+- **`default_mode` field on all team YAMLs** — prevents accidental full-agent inclusion when mode is unspecified
+- **`mode_type` field on `DeployMode`** — parsed from YAML, controls which standards modules are embedded in the primer
+
+### Fixed
+- **Secretary rejected-item routing** — rejected items now route back to the `From:` team only; previously also notified the `To:` team which had never received the work
+
 ## 0.1.20 (2026-03-17)
 
 ### Added
