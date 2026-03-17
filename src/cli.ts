@@ -7,6 +7,7 @@ import { scheduleCommand } from "./commands/schedule.js";
 import { timersCommand } from "./commands/timers.js";
 import { removeTimerCommand } from "./commands/remove-timer.js";
 import { ideaCommand } from "./commands/idea.js";
+import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 
 declare const __PA_VERSION__: string;
@@ -126,6 +127,13 @@ program
   .description("Log an idea interactively")
   .action(async () => {
     await ideaCommand();
+  });
+
+program
+  .command("report")
+  .description("Submit a bug report, feature request, agent self-report, or feedback")
+  .action(async () => {
+    await reportCommand();
   });
 
 program.parse();
