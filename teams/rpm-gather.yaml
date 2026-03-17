@@ -1,4 +1,5 @@
 name: rpm-gather
+model: haiku  # scheduled data collection; read-only scan with keyword matching
 description: RPM weekly gather — runs automatically on schedule to collect weekly RPM data
 
 deploy_modes:

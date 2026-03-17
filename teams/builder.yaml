@@ -1,4 +1,5 @@
 name: builder
+model: sonnet  # implementation work requires judgment and code reasoning
 description: "Execute multi-phase implementation projects for the personal-assistant system"
 
 deploy_modes:

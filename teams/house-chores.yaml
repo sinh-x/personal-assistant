@@ -1,4 +1,5 @@
 name: house-chores
+model: sonnet  # requires judgment to group commits and write meaningful messages
 description: Solo agent that surveys, groups, and commits uncommitted changes with journal entries
 
 deploy_modes:

@@ -1,6 +1,7 @@
 import { readdirSync, existsSync, readFileSync, statSync } from "node:fs";
 import { resolve, basename } from "node:path";
-import { getAgentTeamsDir } from "../lib/paths.js";
+import { getAgentTeamsDir, getTeamsDir } from "../lib/paths.js";
+import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { readRegistry } from "../lib/registry.js";
 import { isProcessAlive } from "../utils/process.js";
 import type { RegistryEvent } from "../lib/types.js";
@@ -46,6 +47,18 @@ function extractItemInfo(filePath: string): ItemInfo {
   }
 
   return { slug, date, from, to };
+}
+
+/** Get the team-level model from YAML, or "-" if not declared or YAML not found */
+function getTeamModel(teamName: string): string {
+  try {
+    const yamlPath = resolve(getTeamsDir(), `${teamName}.yaml`);
+    if (!existsSync(yamlPath)) return "-";
+    const config = parseTeamYaml(yamlPath);
+    return config.model ?? "-";
+  } catch {
+    return "-";
+  }
 }
 
 /** Get running deployment IDs for a specific team */
@@ -109,6 +122,7 @@ function showAllTeams(): void {
 
   console.log(
     "TEAM".padEnd(20) +
+      "MODEL".padEnd(9) +
       "INBOX".padEnd(8) +
       "ONGOING".padEnd(9) +
       "WFR".padEnd(7) +
@@ -117,6 +131,7 @@ function showAllTeams(): void {
 
   for (const team of entries.sort()) {
     const teamDir = resolve(agentTeamsDir, team);
+    const model = getTeamModel(team);
     const inbox = countMdFiles(resolve(teamDir, "inbox"));
     const ongoing = countMdFiles(resolve(teamDir, "ongoing"));
     const wfr = countMdFiles(resolve(teamDir, "waiting-for-response"));
@@ -125,6 +140,7 @@ function showAllTeams(): void {
 
     console.log(
       team.padEnd(20) +
+        model.padEnd(9) +
         String(inbox).padEnd(8) +
         String(ongoing).padEnd(9) +
         String(wfr).padEnd(7) +

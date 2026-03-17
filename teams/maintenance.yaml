@@ -1,4 +1,5 @@
 name: maintenance
+model: sonnet  # diagnosis and fixes require reasoning; issues may be subtle
 description: "Investigate, diagnose, and fix issues in the personal-assistant system"
 
 deploy_modes:

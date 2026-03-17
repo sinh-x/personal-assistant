@@ -1,4 +1,5 @@
 name: requirements
+model: sonnet  # requirements sessions involve interactive reasoning and structured analysis
 description: "Requirements gathering and analysis — structured planning before implementation"
 
 deploy_modes:

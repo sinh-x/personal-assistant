@@ -1,4 +1,5 @@
 name: daily
+model: sonnet  # default for synthesis; read-only agents overridden to haiku below
 description: Daily lifecycle team — plan, track progress, and close the day
 
 deploy_modes:
@@ -24,18 +25,22 @@ agents:
   - name: session-gatherer
     role: "Gather session logs from ai-usage folder (human + agent team)"
     skill: skills/daily-summary/gather-sessions.md
+    model: haiku  # read-only file scan; cost optimization
 
   - name: jsonl-analyst
     role: "Analyze Claude JSONL session files for stats"
     skill: skills/daily-summary/gather-jsonl-stats.md
+    model: haiku  # structured data extraction; no synthesis
 
   - name: time-tracker
     role: "Gather avo time tracking data"
     skill: skills/daily-summary/gather-avo.md
+    model: haiku  # reads avo output; no synthesis
 
   - name: synthesizer
     role: "Combine gathered data and produce the output document"
     skill: skills/daily-summary/synthesize.md
+    # inherits team-level: sonnet — synthesis requires judgment
 
 # Objective is set dynamically by daily.ts based on mode (plan|progress|end).
 # This placeholder shows the end-of-day (end --gather) template for reference.
