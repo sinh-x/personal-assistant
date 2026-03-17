@@ -2,16 +2,39 @@ name: daily
 model: sonnet  # default for synthesis; read-only agents overridden to haiku below
 description: Daily lifecycle team — plan, track progress, and close the day
 
+hierarchy:
+  team-manager:
+    role: "Orchestrate daily lifecycle — plan, progress, end"
+    participates_in: all
+  agents:
+    - name: session-gatherer
+      participates_in: [progress, end]
+    - name: jsonl-analyst
+      participates_in: [progress, end]
+    - name: time-tracker
+      participates_in: [progress, end]
+    - name: synthesizer
+      participates_in: [progress, end-review]
+
 deploy_modes:
   - id: plan
     label: Plan
     phone_visible: true
+    agents: []  # solo, no sub-agents
+  - id: plan-review
+    label: Plan Review
+    phone_visible: false
+    agents: []  # solo, no sub-agents
   - id: progress
     label: Progress
     phone_visible: true
   - id: end
     label: End
     phone_visible: true
+  - id: end-review
+    label: End Review
+    phone_visible: false
+    agents: []  # TM spawns synthesizer interactively after Sinh confirms
 
 context:
   organization: sinh-x
@@ -42,27 +65,10 @@ agents:
     skill: skills/daily-summary/synthesize.md
     # inherits team-level: sonnet — synthesis requires judgment
 
-# Objective is set dynamically by daily.ts based on mode (plan|progress|end).
-# This placeholder shows the end-of-day (end --gather) template for reference.
-# At runtime, daily.ts overwrites this field entirely.
+# Objectives are defined in teams/daily/modes/<mode-id>.md and substituted
+# at runtime by daily.ts (dynamic variables: TODAY, OUTPUT_DIR, etc.).
+# Modes: plan, plan-review, progress, end, end-review
+# This field serves as fallback if mode files are not found.
 objective: |
-  MODE: DAILY END — PHASE 1: GATHER (background)
-  TARGET_DATE: YYYY-MM-DD
-
-  When you pick up an inbox item for multi-step work, move it to
-  `agent-teams/daily/ongoing/` BEFORE starting. Move to `done/` when complete.
-  (Note: sub-agents are directed by team manager — they have no inbox to claim.)
-
-  Gather all end-of-day data autonomously. Write reports to team inbox.
-  Then trigger secretary to generate the daily progress board.
-
-  Workflow:
-  1. Spawn session-gatherer, jsonl-analyst, and time-tracker IN PARALLEL
-  2. Detect tracking gaps (JSONL vs avo)
-  3. Read today's plan and compute goal completion
-  4. Write gather report to agent-teams/daily/inbox/YYYY-MM-DD-end-gather.md
-  5. Write ready marker to agent-teams/daily/inbox/YYYY-MM-DD-end-ready.md
-  6. Trigger secretary: write agent-teams/secretary/inbox/YYYY-MM-DD-daily-end-trigger.md
-     (idempotent — skip if already exists)
-
-  See daily.ts endGatherObjective() for the full runtime template.
+  See teams/daily/modes/ for mode-specific objectives.
+  Run with: pa daily plan | pa daily plan --review | pa daily progress | pa daily end | pa daily end --review
