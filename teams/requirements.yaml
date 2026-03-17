@@ -5,6 +5,9 @@ deploy_modes:
   - id: interactive
     label: Interactive
     phone_visible: false
+  - id: ideas
+    label: Ideas Triage
+    phone_visible: true
   - id: background
     label: Background
     phone_visible: true
