@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.1.19 (2026-03-17)
+
+### Added
+- **`pa report` command** — submit structured reports (bug / feature / agent / feedback) saved to `~/Documents/ai-usage/sinh-inputs/reports/` with `Status: new` frontmatter; works interactively and via piped stdin for agent self-reports
+
+### Fixed
+- **`pa idea` double-input bug** — notes field no longer echoes characters twice; removed `rl.pause()` + secondary readline interfaces that fought over stdin raw mode
+
+## 0.1.18 (2026-03-17)
+
+### Added
+- **Richer `pa teams <name>` output** — shows slug, date, and from/to fields per inbox item for quicker triage at a glance
+
+## 0.1.17 (2026-03-17)
+
+### Added
+- **`pa requirements ideas` command** — full 5-phase automated triage pipeline: reads `sinh-inputs/ideas/`, scores and categorizes each idea, groups by effort, generates a triage report, and deploys to requirements team for interactive review
+- **Requirements spec parsing in `pa schedule`** — schedule entries can reference requirements specs by name
+
+## 0.1.16 (2026-03-16)
+
+### Added
+- **Secretary `--direct` mode** — lightweight single-agent deploy that skips sub-agent spawning; useful for quick secretary tasks without full team overhead
+
 ## 0.1.15 (2026-03-16)
 
 ### Added

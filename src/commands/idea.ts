@@ -122,25 +122,19 @@ export async function ideaCommand(): Promise<void> {
   console.log("");
   console.log("Notes (extra context, press Ctrl-D when done, or Enter to skip):");
 
-  // Pause the readline to read raw multi-line input
-  rl.pause();
-  const notesRl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
+  let rlClosed = false;
+  rl.once("close", () => {
+    rlClosed = true;
   });
-  const notes = await readMultiLine(notesRl);
-  notesRl.close();
+  const notes = await readMultiLine(rl);
 
-  // Reopen for tags
-  const rl2 = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
+  // Tags — only if rl is still open (not closed by Ctrl-D)
   console.log("");
-  const tagsInput = await prompt(rl2, "Tags (space-separated, or Enter to skip): ");
-  rl2.close();
-  rl.close();
+  let tagsInput = "";
+  if (!rlClosed) {
+    tagsInput = await prompt(rl, "Tags (space-separated, or Enter to skip): ");
+    rl.close();
+  }
 
   // Generate filename
   const slug = slugify(title);
