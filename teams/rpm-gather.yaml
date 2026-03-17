@@ -1,11 +1,19 @@
 name: rpm-gather
 model: haiku  # scheduled data collection; read-only scan with keyword matching
 description: RPM weekly gather — runs automatically on schedule to collect weekly RPM data
+default_mode: background
 
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: background
     label: Background
     phone_visible: false
+    mode_type: work
 
 context:
   organization: sinh-x

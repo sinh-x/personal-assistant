@@ -1,17 +1,27 @@
 name: house-chores
 model: sonnet  # requires judgment to group commits and write meaningful messages
 description: Solo agent that surveys, groups, and commits uncommitted changes with journal entries
+default_mode: background
 
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: background
     label: Background
     phone_visible: true
+    mode_type: work
   - id: foreground
     label: Foreground
     phone_visible: true
+    mode_type: work
   - id: interactive
     label: Interactive
     phone_visible: false
+    mode_type: interactive
 
 context:
   organization: sinh-x

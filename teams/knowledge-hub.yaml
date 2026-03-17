@@ -1,16 +1,26 @@
 name: knowledge-hub
 description: Learning, research & intel team — multi-source knowledge ingestion, curation, interactive learning, and Johari blind-spot analysis
+default_mode: background
 
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: background
     label: Background
     phone_visible: true
+    mode_type: work
   - id: foreground
     label: Foreground
     phone_visible: true
+    mode_type: work
   - id: interactive
     label: Interactive
     phone_visible: false
+    mode_type: interactive
 
 context:
   organization: sinh-x

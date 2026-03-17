@@ -3,14 +3,23 @@
 # This file is preserved for reference only. Use: pa deploy knowledge-hub
 name: youtube-processor
 description: Process YouTube videos from queue and save structured notes to Anytype
+default_mode: background
 
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: background
     label: Background
     phone_visible: true
+    mode_type: work
   - id: foreground
     label: Foreground
     phone_visible: true
+    mode_type: work
 
 context:
   organization: sinh-x

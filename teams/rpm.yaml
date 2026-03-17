@@ -1,13 +1,22 @@
 name: rpm
 description: RPM personal planning — create/update RPM blocks, weekly gather, and weekly review
+default_mode: interactive
 
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: interactive
     label: Interactive
     phone_visible: true
+    mode_type: interactive
   - id: weekly-review
     label: Weekly Review
     phone_visible: true
+    mode_type: work
 
 context:
   organization: sinh-x

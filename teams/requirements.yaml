@@ -1,16 +1,26 @@
 name: requirements
 model: opus # requirements sessions involve interactive reasoning and structured analysis
 description: "Requirements gathering and analysis — structured planning before implementation"
+default_mode: interactive
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: interactive
     label: Interactive
     phone_visible: false
+    mode_type: interactive
   - id: ideas
     label: Ideas Triage
     phone_visible: true
+    mode_type: work
   - id: review
     label: Review
     phone_visible: false
+    mode_type: work
     agents: [reviewer]
     objective: skills/requirements/review-objective.md
     skills:
@@ -21,6 +31,7 @@ deploy_modes:
   - id: background
     label: Background
     phone_visible: true
+    mode_type: work
 context:
   organization: sinh-x
   notes: "Solo agent (team manager does the work directly). Always run with --interactive."
