@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.20 (2026-03-17)
+
+### Added
+- **YAML model selection for teams** — all 7 production team YAMLs now declare a `model:` field; `pa teams` shows a MODEL column; per-agent overrides in `daily` (gatherers: haiku) and `secretary` (collector: haiku); `requirements` uses opus, `rpm-gather` uses haiku, rest use sonnet
+
 ## 0.1.19 (2026-03-17)
 
 ### Added
