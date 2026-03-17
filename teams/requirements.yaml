@@ -12,6 +12,7 @@ deploy_modes:
     label: Review
     phone_visible: false
     agents: [reviewer]
+    objective: skills/requirements/review-objective.md
     skills:
       - skills/requirements/review-code-quality.md
       - skills/requirements/review-security.md
