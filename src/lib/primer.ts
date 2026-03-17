@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, existsSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import type { TeamConfig, DeployMode } from "./types.js";
 
 interface PrimerOptions {
@@ -22,6 +22,19 @@ interface PrimerOptions {
     tmModel: string | undefined;
     agentModels: Record<string, string | undefined>;
   };
+}
+
+/**
+ * Returns the list of standards module names to include for a given mode type.
+ *   'housekeeping' → ['core', 'housekeeping']
+ *   'work'         → ['core', 'work', 'inbox-output']
+ *   'interactive'  → ['core', 'work', 'inbox-output']
+ */
+function selectModules(modeType: string): string[] {
+  if (modeType === 'housekeeping') {
+    return ['core', 'housekeeping'];
+  }
+  return ['core', 'work', 'inbox-output'];
 }
 
 /**
@@ -215,10 +228,13 @@ When spawning unplanned sub-agents, use this policy:
     }
   }
 
-  // Inject global skills (merge PA_CONFIG + PA_HOME, config wins)
+  // Inject global skills — standards modules selected by mode type
   primer += "## Global Skills (apply to ALL agents)\n\n";
 
-  const seenSkills = new Set<string>();
+  const modeType = modeConfig?.mode_type ?? 'work';
+  const selectedModules = selectModules(modeType);
+  const seenModules = new Set<string>();
+
   const globalDirs: string[] = [];
   if (configDir) {
     globalDirs.push(resolve(configDir, "skills/global"));
@@ -227,19 +243,18 @@ When spawning unplanned sub-agents, use this policy:
 
   for (const gdir of globalDirs) {
     if (!existsSync(gdir)) continue;
-    const files = readdirSync(gdir)
-      .filter((f) => f.endsWith(".md"))
-      .sort();
-    for (const file of files) {
-      const skillName = basename(file, ".md");
-      if (seenSkills.has(skillName)) continue;
-      seenSkills.add(skillName);
+    const standardsDir = resolve(gdir, "standards");
+    if (!existsSync(standardsDir)) continue;
 
-      const content = readFileSync(resolve(gdir, file), "utf-8");
-      primer += `<global-skill name="${skillName}">\n`;
+    for (const moduleName of selectedModules) {
+      if (seenModules.has(moduleName)) continue;
+      const modulePath = resolve(standardsDir, `${moduleName}.md`);
+      if (!existsSync(modulePath)) continue;
+      seenModules.add(moduleName);
+
+      const content = readFileSync(modulePath, "utf-8");
+      primer += `<global-skill name="${moduleName}">\n`;
       primer += content;
-      // In bash: cat content + echo "" + echo "</global-skill>" + echo ""
-      // content ends with \n, then blank line, then closing tag, then blank line
       if (!content.endsWith("\n")) primer += "\n";
       primer += "\n</global-skill>\n\n";
     }

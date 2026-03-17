@@ -78,12 +78,12 @@ For each item, read the frontmatter `From:` and `To:` fields.
 5. Move original from `approved/` to `sinh-inputs/done/<filename>`
 
 **Rejected items (from `rejected/`):**
-1. Parse `From:` and `To:` from frontmatter
-2. If `To:` is missing → unroutable (collect for Phase R5)
-3. Check for `Note:` field in human_feedback frontmatter — include as "Feedback from Sinh" if present
-4. Write notification + full doc to `To:` team inbox:
+1. Parse `From:` from frontmatter (`To:` is not needed — rejected work goes back to sender only)
+2. If `From:` is missing → unroutable (collect for Phase R5)
+3. Check for `Note:` / `what_to_fix` fields in human_feedback frontmatter — include as "Feedback from Sinh" if present
+4. Write notification + full doc to `From:` team inbox only — do NOT notify `To:` team (they never received the work; unfinished requirements are not their concern):
    ```
-   ~/Documents/ai-usage/agent-teams/<to-team>/inbox/YYYY-MM-DD-rejected-<topic>.md
+   ~/Documents/ai-usage/agent-teams/<from-team>/inbox/YYYY-MM-DD-rejected-<topic>.md
    ```
    Content:
    ```markdown
@@ -91,22 +91,20 @@ For each item, read the frontmatter `From:` and `To:` fields.
 
    > **Date:** YYYY-MM-DD
    > **From:** secretary / team-manager
-   > **To:** <to-team>
+   > **To:** <from-team>
    > **Type:** decision-notification
 
-   Sinh rejected this item on YYYY-MM-DD.
+   Sinh rejected your review request on YYYY-MM-DD.
 
-   [If Note: field present:]
+   [If feedback fields present:]
    ## Feedback from Sinh
 
-   <note content>
+   <feedback content>
 
-   ---
-
-   <original file content>
+   - **Original item:** <filename>
+   - **Decision:** Rejected
    ```
-5. Also notify `From:` team if `From:` is present
-6. Move original from `rejected/` to `sinh-inputs/done/<filename>`
+5. Move original from `rejected/` to `sinh-inputs/done/<filename>`
 
 **Deferred items (from `deferred/`):**
 1. Parse `From:` from frontmatter (no forwarding needed)

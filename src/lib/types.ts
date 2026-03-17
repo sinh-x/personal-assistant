@@ -9,6 +9,8 @@ export interface DeployMode {
   agents?: string[];
   /** Skills to surface in this mode's primer */
   skills?: string[];
+  /** Determines which standards modules are included in the primer; defaults to 'work' */
+  mode_type?: 'housekeeping' | 'work' | 'interactive';
 }
 
 /** Hierarchy member entry (team-manager or an agent in the hierarchy block) */

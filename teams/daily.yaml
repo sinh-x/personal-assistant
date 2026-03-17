@@ -1,6 +1,7 @@
 name: daily
 model: sonnet  # default for synthesis; read-only agents overridden to haiku below
 description: Daily lifecycle team — plan, track progress, and close the day
+default_mode: plan
 
 hierarchy:
   team-manager:
@@ -17,23 +18,34 @@ hierarchy:
       participates_in: [progress, end-review]
 
 deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: true
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
   - id: plan
     label: Plan
     phone_visible: true
+    mode_type: work
     agents: []  # solo, no sub-agents
   - id: plan-review
     label: Plan Review
     phone_visible: false
+    mode_type: work
     agents: []  # solo, no sub-agents
   - id: progress
     label: Progress
     phone_visible: true
+    mode_type: work
   - id: end
     label: End
     phone_visible: true
+    mode_type: work
   - id: end-review
     label: End Review
     phone_visible: false
+    mode_type: work
     agents: []  # TM spawns synthesizer interactively after Sinh confirms
 
 context:
