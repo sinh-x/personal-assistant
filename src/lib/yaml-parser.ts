@@ -28,6 +28,7 @@ export function parseTeamYaml(filePath: string): TeamConfig {
       objective: m["objective"] as string | undefined,
       agents: m["agents"] as string[] | undefined,
       skills: m["skills"] as string[] | undefined,
+      mode_type: m["mode_type"] as DeployMode["mode_type"] | undefined,
     }));
   }
 
