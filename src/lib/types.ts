@@ -37,6 +37,8 @@ export interface TeamConfig {
   model?: 'haiku' | 'sonnet' | 'opus';
   /** Available deployment modes for this team */
   deploy_modes?: DeployMode[];
+  /** Default mode to use when no --mode flag is provided */
+  default_mode?: string;
   /** Team hierarchy definition */
   hierarchy?: Hierarchy;
 }

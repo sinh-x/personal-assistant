@@ -64,6 +64,7 @@ export function parseTeamYaml(filePath: string): TeamConfig {
     agents,
     objective: raw["objective"] as string,
     model: raw["model"] as TeamConfig["model"] | undefined,
+    ...(raw["default_mode"] ? { default_mode: raw["default_mode"] as string } : {}),
     ...(deployModes ? { deploy_modes: deployModes } : {}),
     ...(hierarchy ? { hierarchy } : {}),
   };

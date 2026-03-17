@@ -47,9 +47,10 @@ export function generatePrimer(opts: PrimerOptions): string {
     effectiveModels,
   } = opts;
 
-  // Resolve active mode config
-  const modeConfig: DeployMode | undefined = deployMode
-    ? teamConfig.deploy_modes?.find((m) => m.id === deployMode)
+  // Resolve active mode config (explicit > default_mode > none)
+  const effectiveMode = deployMode ?? teamConfig.default_mode;
+  const modeConfig: DeployMode | undefined = effectiveMode
+    ? teamConfig.deploy_modes?.find((m) => m.id === effectiveMode)
     : undefined;
 
   // Determine active agents (mode-filtered or all)
@@ -82,7 +83,7 @@ export function generatePrimer(opts: PrimerOptions): string {
     }
   }
 
-  const modeBlock = deployMode ? `\nmode: ${deployMode}` : "";
+  const modeBlock = effectiveMode ? `\nmode: ${effectiveMode}` : "";
 
   let primer = `# Deployment Primer: ${teamConfig.name}
 
