@@ -8,6 +8,16 @@ deploy_modes:
   - id: ideas
     label: Ideas Triage
     phone_visible: true
+  - id: review
+    label: Review
+    phone_visible: false
+    agents: [reviewer]
+    objective: skills/requirements/review-objective.md
+    skills:
+      - skills/requirements/review-code-quality.md
+      - skills/requirements/review-security.md
+      - skills/requirements/review-ops.md
+      - skills/requirements/review-ui-uat.md
   - id: background
     label: Background
     phone_visible: true
@@ -18,6 +28,9 @@ agents:
   - name: analyst
     role: "Gather requirements through structured conversation, explore codebase, produce a plan covering the standard checklist"
     skill: skills/requirements/analyze.md
+  - name: reviewer
+    role: "Review existing system against structured checklist, produce severity-rated findings report"
+    skill: skills/requirements/review.md
 # Objective is passed at deploy time, e.g.:
 #   ./deploy.sh requirements --interactive
 # Then tell it what you want to plan.
