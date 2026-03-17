@@ -87,6 +87,8 @@ export function deployCommand(
     direct?: boolean;
     teamModel?: string;
     agentModel?: string;
+    mode?: string;
+    listModes?: boolean;
   }
 ): void {
   const config = loadConfig();
@@ -148,6 +150,35 @@ export function deployCommand(
 
   // Parse team YAML
   const teamConfig = parseTeamYaml(teamFile);
+
+  // Handle --list-modes: print modes table and exit
+  if (opts.listModes) {
+    const modes = teamConfig.deploy_modes;
+    if (!modes || modes.length === 0) {
+      console.log(`No modes configured for team: ${teamConfig.name}`);
+      return;
+    }
+    console.log(`Modes for team: ${teamConfig.name}\n`);
+    const rows = modes.map((m) => [
+      m.id,
+      m.label,
+      m.phone_visible ? "yes" : "no",
+      m.agents === undefined ? "all" : m.agents.length === 0 ? "(tm only)" : m.agents.join(", "),
+      m.skills?.join(", ") ?? "—",
+    ]);
+    const headers = ["ID", "LABEL", "PHONE", "AGENTS", "SKILLS"];
+    const widths = headers.map((h, i) =>
+      Math.max(h.length, ...rows.map((r) => r[i].length))
+    );
+    const pad = (s: string, w: number) => s.padEnd(w);
+    console.log("  " + headers.map((h, i) => pad(h, widths[i])).join("  "));
+    console.log("  " + widths.map((w) => "-".repeat(w)).join("  "));
+    for (const row of rows) {
+      console.log("  " + row.map((c, i) => pad(c, widths[i])).join("  "));
+    }
+    return;
+  }
+
   const agentNames = teamConfig.agents.map((a) => a.name);
 
   // Use YAML name field as canonical team name (overrides filename-derived name)
@@ -181,7 +212,7 @@ export function deployCommand(
     registryLock,
     deploymentsDir,
     extraObjective: opts.objective,
-    deployMode: opts.routeDecisions ? "route-decisions" : opts.direct ? "direct" : undefined,
+    deployMode: opts.mode ?? (opts.routeDecisions ? "route-decisions" : opts.direct ? "direct" : undefined),
     cwd,
     repoRoot,
     resolveFile,
