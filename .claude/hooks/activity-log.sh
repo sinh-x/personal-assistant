@@ -22,8 +22,9 @@ INPUT=$(cat)
 
 case "${EVENT_TYPE}" in
     SubagentStart)
-        AGENT=$(echo "${INPUT}" | jq -r '.agent_name // .agent_id // "unknown"')
-        AGENT_TYPE=$(echo "${INPUT}" | jq -r '.subagent_type // "unknown"')
+        # agent_type = human-readable name for custom agents, or built-in type (Explore, Plan, etc.)
+        AGENT=$(echo "${INPUT}" | jq -r '.agent_type // .agent_id // "unknown"')
+        AGENT_TYPE=$(echo "${INPUT}" | jq -r '.agent_type // "unknown"')
         DESC=$(echo "${INPUT}" | jq -r '.prompt // "" | .[0:200]')
         MODEL=$(echo "${INPUT}" | jq -r '.model // "unknown"')
         jq -c -n \
@@ -39,7 +40,7 @@ case "${EVENT_TYPE}" in
         ;;
 
     SubagentStop)
-        AGENT=$(echo "${INPUT}" | jq -r '.agent_name // .agent_id // "unknown"')
+        AGENT=$(echo "${INPUT}" | jq -r '.agent_type // .agent_id // "unknown"')
         MSG=$(echo "${INPUT}" | jq -r '.last_assistant_message // "" | .[0:500]')
         jq -c -n \
             --arg ts "${TS}" \
@@ -53,7 +54,7 @@ case "${EVENT_TYPE}" in
 
     TaskCompleted)
         AGENT=$(echo "${INPUT}" | jq -r '.teammate_name // "unknown"')
-        SUBJECT=$(echo "${INPUT}" | jq -r '.subject // "unknown"')
+        SUBJECT=$(echo "${INPUT}" | jq -r '.task_subject // .subject // "unknown"')
         jq -c -n \
             --arg ts "${TS}" \
             --arg deploy_id "${DEPLOY_ID}" \
@@ -65,7 +66,7 @@ case "${EVENT_TYPE}" in
         ;;
 
     TeammateIdle)
-        AGENT=$(echo "${INPUT}" | jq -r '.agent_name // "unknown"')
+        AGENT=$(echo "${INPUT}" | jq -r '.teammate_name // "unknown"')
         jq -c -n \
             --arg ts "${TS}" \
             --arg deploy_id "${DEPLOY_ID}" \

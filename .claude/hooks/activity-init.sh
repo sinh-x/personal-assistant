@@ -15,7 +15,9 @@ else
     LOG_PATH="${FALLBACK_LOG}"
 fi
 
-# Propagate log path to all subsequent hooks via CLAUDE_ENV_FILE
+# Note: CLAUDE_ENV_FILE only propagates to Bash tool calls (not other hooks).
+# PA_ACTIVITY_LOG must be set directly by pa deploy for hooks to use it.
+# Write to CLAUDE_ENV_FILE anyway so Claude's own bash commands can access it.
 if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
     echo "PA_ACTIVITY_LOG=${LOG_PATH}" >> "${CLAUDE_ENV_FILE}"
 fi

@@ -201,11 +201,15 @@ export function deployCommand(
   });
   const modelFlag = tmModel ? `--model ${tmModel}` : "";
 
-  // Deployment env vars passed to claude so hooks can locate the activity log
+  // Deployment env vars passed to claude so hooks can locate the activity log.
+  // PA_ACTIVITY_LOG must be set here directly — CLAUDE_ENV_FILE only propagates
+  // to Bash tool calls, not to hook scripts.
+  const activityLog = resolve(deployDir, "activity.jsonl");
   const deployEnv = {
     ...process.env,
     PA_DEPLOYMENT_ID: deployId,
     PA_DEPLOYMENT_DIR: deployDir,
+    PA_ACTIVITY_LOG: activityLog,
   };
 
   // Generate primer
@@ -314,6 +318,7 @@ Agents:     ${agentNames.join(" ")}
     const bgScript = `
 export PA_DEPLOYMENT_ID='${deployId}'
 export PA_DEPLOYMENT_DIR='${deployDir}'
+export PA_ACTIVITY_LOG='${activityLog}'
 echo '[$(date -Iseconds)] claude starting...' >> '${logFile}'
 stdbuf -oL timeout '${maxRuntime}' claude ${modelFlag ? modelFlag + " " : ""}--dangerously-skip-permissions --print '${claudePrompt.replace(/'/g, "'\\''")}' >> '${logFile}' 2>'${logFile}.err'
 exit_code=$?
