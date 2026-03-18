@@ -263,13 +263,23 @@ function showReport(did: string): void {
 
   for (const dir of searchDirs) {
     if (!existsSync(dir)) continue;
-    const entries = readdirSync(dir);
-    const match = entries.find((f) => f.includes(did));
-    if (match) {
-      const filePath = resolve(dir, match);
-      const content = readFileSync(filePath, "utf-8");
-      console.log(content);
+    const entries = readdirSync(dir).filter((f) => f.endsWith(".md"));
+
+    // Fast path: deploy ID in filename
+    const filenameMatch = entries.find((f) => f.includes(did));
+    if (filenameMatch) {
+      console.log(readFileSync(resolve(dir, filenameMatch), "utf-8"));
       return;
+    }
+
+    // Slow path: deploy ID in file content
+    for (const entry of entries) {
+      const filePath = resolve(dir, entry);
+      const content = readFileSync(filePath, "utf-8");
+      if (content.includes(did)) {
+        console.log(content);
+        return;
+      }
     }
   }
 
