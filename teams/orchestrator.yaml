@@ -15,6 +15,7 @@ deploy_modes:
     phone_visible: true
     mode_type: work
     agents: []  # solo TM — no sub-agents
+    objective: teams/orchestrator/modes/orchestration.md
 
 context:
   organization: sinh-x
