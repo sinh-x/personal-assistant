@@ -28,10 +28,12 @@ deploy_modes:
       - skills/requirements/review-security.md
       - skills/requirements/review-ops.md
       - skills/requirements/review-ui-uat.md
-  - id: background
-    label: Background
+  - id: spike
+    label: Spike Research
     phone_visible: true
     mode_type: work
+    agents: [researcher]
+    objective: skills/requirements/spike-objective.md
 context:
   organization: sinh-x
   notes: "Solo agent (team manager does the work directly). Always run with --interactive."
@@ -42,6 +44,9 @@ agents:
   - name: reviewer
     role: "Review existing system against structured checklist, produce severity-rated findings report"
     skill: skills/requirements/review.md
+  - name: researcher
+    role: "Autonomous spike researcher — run non-interactive research on a topic, explore the codebase and web, produce a spike report or full requirements doc"
+    skill: skills/requirements/spike.md
 # Objective is passed at deploy time, e.g.:
 #   ./deploy.sh requirements --interactive
 # Then tell it what you want to plan.
