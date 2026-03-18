@@ -255,10 +255,24 @@ function waitForDeployment(did: string): void {
  */
 function showReport(did: string): void {
   const base = resolve(homedir(), "Documents/ai-usage");
+
+  // Collect all agent-team done/ and ongoing/ dirs dynamically
+  const agentTeamDirs: string[] = [];
+  const agentTeamsBase = resolve(base, "agent-teams");
+  if (existsSync(agentTeamsBase)) {
+    for (const team of readdirSync(agentTeamsBase, { withFileTypes: true })) {
+      if (!team.isDirectory()) continue;
+      for (const sub of ["done", "ongoing"]) {
+        agentTeamDirs.push(resolve(agentTeamsBase, team.name, sub));
+      }
+    }
+  }
+
   const searchDirs = [
     resolve(base, "sinh-inputs/inbox"),
-    resolve(base, "agent-teams/builder/done"),
-    resolve(base, "agent-teams/builder/ongoing"),
+    resolve(base, "sinh-inputs/done"),
+    resolve(base, "sinh-inputs/archives"),
+    ...agentTeamDirs,
   ];
 
   for (const dir of searchDirs) {
