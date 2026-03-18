@@ -70,7 +70,11 @@ program
   .argument("[deploy-id]", "Show details for a specific deployment")
   .option("--running", "Show only running deployments")
   .option("--team <name>", "Filter by team name")
-  .action((deployId: string | undefined, opts: { running?: boolean; team?: string }) => {
+  .option("--wait", "Block until deployment reaches a terminal state")
+  .option("--report", "Show the work report for a deployment")
+  .option("--artifacts", "List artifact files for a deployment")
+  .option("--activity", "Show agent activity timeline for a deployment")
+  .action((deployId: string | undefined, opts: { running?: boolean; team?: string; wait?: boolean; report?: boolean; artifacts?: boolean; activity?: boolean }) => {
     const args: string[] = [];
     if (opts.running) {
       args.push("--running");
@@ -78,6 +82,10 @@ program
       args.push("--team", opts.team);
     } else if (deployId) {
       args.push(deployId);
+      if (opts.wait) args.push("--wait");
+      else if (opts.report) args.push("--report");
+      else if (opts.artifacts) args.push("--artifacts");
+      else if (opts.activity) args.push("--activity");
     }
     statusCommand(args);
   });
