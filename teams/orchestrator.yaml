@@ -1,0 +1,34 @@
+name: orchestrator
+model: opus  # PM needs strong judgment
+description: "Cross-team pipeline manager — coordinates requirements, builder, and other teams"
+default_mode: orchestration
+
+deploy_modes:
+  - id: housekeeping
+    label: Housekeeping
+    phone_visible: false
+    mode_type: housekeeping
+    agents: []
+    objective: skills/global/housekeeping-objective.md
+  - id: orchestration
+    label: Orchestration
+    phone_visible: true
+    mode_type: work
+    agents: []  # solo TM — no sub-agents
+    objective: teams/orchestrator/modes/orchestration.md
+
+context:
+  organization: sinh-x
+  notes: >
+    Solo TM that acts as a Project Manager. Launches other teams
+    (builder, requirements, knowledge-hub) via `pa deploy` CLI.
+    Set PA_MAX_RUNTIME=10800 for orchestrator deployments.
+    CLI default: foreground. Phone/API: explicit --background.
+
+agents: []  # No agents — TM does everything via pa deploy
+
+objective: |
+  You are a SOLO project manager — do ALL coordination yourself.
+  Do NOT spawn sub-agents. Instead, launch other teams via `pa deploy` CLI.
+
+  See the orchestration skill for the full workflow.

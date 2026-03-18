@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
+import { execSync } from "node:child_process";
 import { readRegistry } from "../lib/registry.js";
 import { getDataDir } from "../lib/paths.js";
 import { isProcessAlive } from "../utils/process.js";
@@ -205,6 +206,108 @@ function showList(
   }
 }
 
+/** Terminal states that indicate a deployment is done */
+const TERMINAL_STATES = new Set(["success", "partial", "failed", "crashed", "dead"]);
+
+/**
+ * Block until deployment reaches a terminal state.
+ * Polls registry.jsonl every 5 seconds. Exits with code 0 for
+ * success/partial, code 1 for failed/crashed/dead or timeout.
+ */
+function waitForDeployment(did: string): void {
+  const TIMEOUT_S = 10800; // 3 hours
+  const startTime = Date.now();
+
+  while (true) {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    if (elapsed >= TIMEOUT_S) {
+      console.log(`Timeout after ${TIMEOUT_S}s waiting for deployment: ${did}`);
+      process.exit(1);
+    }
+
+    const events = readRegistry();
+    const deployments = buildDeployments(events);
+    checkLiveness(deployments);
+
+    const rec = deployments.get(did);
+    if (!rec) {
+      console.log(`Deployment not found: ${did}`);
+      process.exit(1);
+    }
+
+    if (TERMINAL_STATES.has(rec.status)) {
+      const si = statusIcon(rec.status);
+      const summary = rec.summary ?? rec.status;
+      console.log(`[${si}] ${rec.status} - ${summary}`);
+      const isSuccess = rec.status === "success" || rec.status === "partial";
+      process.exit(isSuccess ? 0 : 1);
+    }
+
+    // Not yet terminal — sleep and poll again
+    execSync("sleep 5");
+  }
+}
+
+/**
+ * Find and print the work report for a deployment.
+ * Searches inbox and builder agent-team folders for a file whose name
+ * contains the deploy-id.
+ */
+function showReport(did: string): void {
+  const base = resolve(homedir(), "Documents/ai-usage");
+  const searchDirs = [
+    resolve(base, "sinh-inputs/inbox"),
+    resolve(base, "agent-teams/builder/done"),
+    resolve(base, "agent-teams/builder/ongoing"),
+  ];
+
+  for (const dir of searchDirs) {
+    if (!existsSync(dir)) continue;
+    const entries = readdirSync(dir);
+    const match = entries.find((f) => f.includes(did));
+    if (match) {
+      const filePath = resolve(dir, match);
+      const content = readFileSync(filePath, "utf-8");
+      console.log(content);
+      return;
+    }
+  }
+
+  console.log(`No work report found for deployment: ${did}`);
+}
+
+/**
+ * Recursively list all files under a directory.
+ */
+function listFilesRecursive(dir: string): string[] {
+  const results: string[] = [];
+  const entries = readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = resolve(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...listFilesRecursive(fullPath));
+    } else {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
+/**
+ * List all artifact files for a deployment workspace.
+ */
+function showArtifacts(did: string): void {
+  const workspaceDir = resolve(homedir(), "Documents/ai-usage/deployments", did);
+  if (!existsSync(workspaceDir)) {
+    console.log(`No workspace found for deployment: ${did}`);
+    return;
+  }
+  const files = listFilesRecursive(workspaceDir);
+  for (const f of files) {
+    console.log(f);
+  }
+}
+
 /**
  * Show deployment status from the registry.
  * Replaces status.sh (200 lines).
@@ -218,12 +321,26 @@ export function statusCommand(args: string[]): void {
     return;
   }
 
+  const filterMode = args[0] ?? "all";
+  const filterValue = args[1] ?? "";
+
+  // Check for new flags: <deploy-id> --wait | --report | --artifacts
+  if (filterValue === "--wait") {
+    waitForDeployment(filterMode);
+    return;
+  }
+  if (filterValue === "--report") {
+    showReport(filterMode);
+    return;
+  }
+  if (filterValue === "--artifacts") {
+    showArtifacts(filterMode);
+    return;
+  }
+
   const events = readRegistry();
   const deployments = buildDeployments(events);
   checkLiveness(deployments);
-
-  const filterMode = args[0] ?? "all";
-  const filterValue = args[1] ?? "";
 
   // Detail view for a specific deployment ID
   if (filterMode !== "all" && filterMode !== "--running" && filterMode !== "--team") {
