@@ -29,6 +29,15 @@ Collect all items from:
 
 Skip items already present in `sinh-inputs/done/` (idempotent).
 
+**routed_by check (F12):** For each item collected, read its frontmatter before processing.
+If the `routed_by` field is present in the frontmatter:
+1. Log: "Skipping <filename> — already routed by <routed_by> at <routed_at>"
+2. Move the file from its current folder (`approved/`, `rejected/`, or `deferred/`) to `sinh-inputs/done/<filename>`
+3. Do NOT generate a decision notification, do NOT forward the doc, do NOT add it to unroutable
+4. Continue to the next item
+
+If `routed_by` is absent: proceed to Phase R4 processing as normal (existing behavior unchanged).
+
 ## Phase R4: Route Each Item
 
 For each item, read the frontmatter `From:` and `To:` fields.
