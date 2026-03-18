@@ -16,11 +16,11 @@ deploy_modes:
     mode_type: work
   - id: foreground
     label: Foreground
-    phone_visible: true
+    phone_visible: false
     mode_type: work
   - id: worker
     label: Worker
-    phone_visible: true
+    phone_visible: false
     mode_type: interactive
     objective: skills/builder-worker-objective.md
   - id: interactive
