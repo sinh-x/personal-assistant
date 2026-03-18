@@ -359,6 +359,20 @@ function formatActivityLine(evt: ActivityEvent): string {
       if (subject) detail = `"${subject}"`;
       break;
     }
+    case "tool_call": {
+      const tool = typeof evt.data.tool === "string" ? evt.data.tool : "";
+      const summary = typeof evt.data.summary === "string" ? evt.data.summary.slice(0, 80) : "";
+      detail = tool;
+      if (summary) detail += ` — ${summary}`;
+      break;
+    }
+    case "child_deployment": {
+      const childId = typeof evt.data.child_deploy_id === "string" ? evt.data.child_deploy_id : "";
+      const team = typeof evt.data.team === "string" ? evt.data.team : "";
+      detail = childId;
+      if (team) detail += ` (${team})`;
+      break;
+    }
   }
 
   return `${time}  ${agentCol} ${eventCol} ${detail}`.trimEnd();

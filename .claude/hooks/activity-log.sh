@@ -4,6 +4,7 @@
 # Reads hook input JSON from stdin, appends a JSONL event to the activity log.
 #
 # Supported event_type values:
+#   PreToolUse      — tool call (only fires when PA_ACTIVITY_LOG is set)
 #   SubagentStart   — agent spawned
 #   SubagentStop    — agent finished
 #   TaskCompleted   — task marked complete
@@ -21,6 +22,50 @@ TS=$(date -Iseconds)
 INPUT=$(cat)
 
 case "${EVENT_TYPE}" in
+    PreToolUse)
+        # Only log tool calls for PA deployments — silent no-op for all other sessions
+        [[ -z "${PA_ACTIVITY_LOG:-}" ]] && exit 0
+        TOOL=$(echo "${INPUT}" | jq -r '.tool_name // "unknown"')
+        # Agent tool is already captured by SubagentStart — skip to avoid duplication
+        [[ "${TOOL}" == "Agent" ]] && exit 0
+        SESSION=$(echo "${INPUT}" | jq -r '.session_id // ""' | cut -c1-8)
+        # Extract the most useful summary field per tool type
+        case "${TOOL}" in
+            Bash)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input.command // "" | .[0:200]')
+                ;;
+            Read)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input.file_path // ""')
+                ;;
+            Write|Edit)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input.file_path // ""')
+                ;;
+            Grep)
+                SUMMARY=$(echo "${INPUT}" | jq -r '(.tool_input.pattern // "") + " → " + (.tool_input.path // ".")')
+                ;;
+            Glob)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input.pattern // ""')
+                ;;
+            WebFetch)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input.url // "" | .[0:150]')
+                ;;
+            WebSearch)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input.query // ""')
+                ;;
+            *)
+                SUMMARY=$(echo "${INPUT}" | jq -r '.tool_input | to_entries | .[0] | "\(.key)=\(.value | tostring | .[0:80])"' 2>/dev/null || echo "")
+                ;;
+        esac
+        jq -c -n \
+            --arg ts "${TS}" \
+            --arg deploy_id "${DEPLOY_ID}" \
+            --arg session "${SESSION}" \
+            --arg tool "${TOOL}" \
+            --arg summary "${SUMMARY}" \
+            '{ts: $ts, deploy_id: $deploy_id, agent: $session, event: "tool_call", data: {tool: $tool, summary: $summary}}' \
+            >> "${LOG_PATH}"
+        ;;
+
     SubagentStart)
         # agent_type = human-readable name for custom agents, or built-in type (Explore, Plan, etc.)
         AGENT=$(echo "${INPUT}" | jq -r '.agent_type // .agent_id // "unknown"')

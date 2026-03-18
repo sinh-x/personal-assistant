@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from "node:fs";
 import { resolve, basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
@@ -148,6 +148,19 @@ export function deployCommand(
   // Create workspace base
   const deployDir = resolve(deploymentsDir, deployId);
   mkdirSync(deployDir, { recursive: true });
+
+  // If running inside a parent PA deployment, write child_deployment event to parent's log
+  const parentActivityLog = process.env["PA_ACTIVITY_LOG"];
+  if (parentActivityLog) {
+    const childEvent = JSON.stringify({
+      ts: new Date().toISOString(),
+      deploy_id: process.env["PA_DEPLOYMENT_ID"] ?? "unknown",
+      agent: "main",
+      event: "child_deployment",
+      data: { child_deploy_id: deployId, team: teamName },
+    });
+    appendFileSync(parentActivityLog, childEvent + "\n");
+  }
 
   // Parse team YAML
   const teamConfig = parseTeamYaml(teamFile);
