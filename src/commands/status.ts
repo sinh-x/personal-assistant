@@ -293,6 +293,96 @@ function listFilesRecursive(dir: string): string[] {
   return results;
 }
 
+interface ActivityEvent {
+  ts: string;
+  deploy_id: string;
+  agent: string;
+  agent_type?: string;
+  event: string;
+  data: Record<string, unknown>;
+}
+
+/** Format a single activity event line for timeline display */
+function formatActivityLine(evt: ActivityEvent): string {
+  // Extract HH:MM:SS from ISO timestamp (handles both Z and +HH:MM offsets)
+  const time = evt.ts.slice(11, 19);
+  const agentCol = `[${evt.agent}]`.padEnd(20);
+  const eventCol = evt.event.padEnd(18);
+
+  let detail = "";
+  switch (evt.event) {
+    case "agent_spawned": {
+      const type = evt.agent_type ?? "";
+      const desc =
+        typeof evt.data.description === "string"
+          ? evt.data.description.slice(0, 80)
+          : "";
+      detail = type ? `${type}` : "";
+      if (desc) detail += ` — "${desc}"`;
+      break;
+    }
+    case "agent_stopped": {
+      const msg =
+        typeof evt.data.last_message === "string"
+          ? evt.data.last_message.slice(0, 100)
+          : "";
+      if (msg) detail = `"${msg}"`;
+      break;
+    }
+    case "task_completed": {
+      const subject =
+        typeof evt.data.subject === "string" ? evt.data.subject : "";
+      if (subject) detail = `"${subject}"`;
+      break;
+    }
+  }
+
+  return `${time}  ${agentCol} ${eventCol} ${detail}`.trimEnd();
+}
+
+/**
+ * Read and display the activity timeline for a deployment.
+ * Reads <deploy-workspace>/activity.jsonl and prints formatted events.
+ */
+function showActivity(did: string): void {
+  const activityFile = resolve(
+    homedir(),
+    "Documents/ai-usage/deployments",
+    did,
+    "activity.jsonl"
+  );
+
+  if (!existsSync(activityFile)) {
+    console.log(`No activity log found for deployment: ${did}`);
+    console.log(`Expected: ${activityFile}`);
+    return;
+  }
+
+  const raw = readFileSync(activityFile, "utf-8").trim();
+  if (!raw) {
+    console.log(`Activity log is empty: ${activityFile}`);
+    return;
+  }
+
+  const lines = raw.split("\n").filter((l) => l.trim());
+  console.log(`Activity timeline — ${did} (${lines.length} events)\n`);
+  console.log(
+    `${"TIME".padEnd(10)} ${"AGENT".padEnd(20)} ${"EVENT".padEnd(18)} DETAIL`
+  );
+  console.log(
+    `${"---------".padEnd(10)} ${"-------------------".padEnd(20)} ${"------------------".padEnd(18)} ------`
+  );
+
+  for (const line of lines) {
+    try {
+      const evt = JSON.parse(line) as ActivityEvent;
+      console.log(formatActivityLine(evt));
+    } catch {
+      // Skip malformed lines silently
+    }
+  }
+}
+
 /**
  * List all artifact files for a deployment workspace.
  */
@@ -335,6 +425,10 @@ export function statusCommand(args: string[]): void {
   }
   if (filterValue === "--artifacts") {
     showArtifacts(filterMode);
+    return;
+  }
+  if (filterValue === "--activity") {
+    showActivity(filterMode);
     return;
   }
 
