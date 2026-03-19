@@ -9,6 +9,7 @@ import { removeTimerCommand } from "./commands/remove-timer.js";
 import { ideaCommand } from "./commands/idea.js";
 import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
+import { reposCommand } from "./commands/repos.js";
 
 declare const __PA_VERSION__: string;
 
@@ -41,7 +42,8 @@ program
   .option("--agent-model <model>", "Model for all named agents, overrides per-agent YAML (haiku|sonnet|opus)")
   .option("--mode <mode-id>", "Deploy using a specific mode (reads mode file as objective)")
   .option("--list-modes", "List available modes for the team and exit")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; routeDecisions?: boolean; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean }) => {
+  .option("--repo <name>", "Target repo name from repos.yaml (overrides CWD-based detection)")
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; routeDecisions?: boolean; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string }) => {
     deployCommand(team, opts);
   });
 
@@ -144,6 +146,14 @@ program
   .description("Submit a bug report, feature request, agent self-report, or feedback")
   .action(async () => {
     await reportCommand();
+  });
+
+program
+  .command("repos")
+  .description("Manage repository roots registry")
+  .argument("<subcommand>", "Subcommand: list")
+  .action((sub: string) => {
+    reposCommand(sub);
   });
 
 program.parse();
