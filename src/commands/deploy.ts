@@ -8,6 +8,7 @@ import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent } from "../lib/registry.js";
 import { generatePrimer } from "../lib/primer.js";
 import { spawnDetached } from "../utils/process.js";
+import { resolveRepo } from "../lib/repos.js";
 import type { RegistryEvent, TeamConfig } from "../lib/types.js";
 
 const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
@@ -89,6 +90,7 @@ export function deployCommand(
     agentModel?: string;
     mode?: string;
     listModes?: boolean;
+    repo?: string;
   }
 ): void {
   const config = loadConfig();
@@ -199,12 +201,19 @@ export function deployCommand(
   if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
 
   // Detect git repo root from cwd (for repo-aware agents)
-  const cwd = process.cwd();
+  let cwd = process.cwd();
   let repoRoot: string | undefined;
   try {
     repoRoot = execSync("git rev-parse --show-toplevel", { cwd, encoding: "utf-8" }).trim();
   } catch {
     repoRoot = undefined;
+  }
+
+  // Override cwd/repoRoot if --repo is specified
+  if (opts.repo) {
+    const resolved = resolveRepo(opts.repo);
+    cwd = resolved.path;
+    repoRoot = resolved.path;
   }
 
   // Resolve effective models
