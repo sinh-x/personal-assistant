@@ -311,23 +311,44 @@ export function deployCommand(
 
   if (mode === "direct") {
     console.log(`Deploying team (direct): ${teamConfig.name} [${deployId}]`);
-    execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
-      stdio: "inherit",
-      env: deployEnv,
-    });
+    appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    try {
+      execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+        stdio: "inherit",
+        env: deployEnv,
+      });
+    } catch (err) {
+      const exitCode = (err as { status?: number }).status ?? 1;
+      appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+      process.exit(exitCode);
+    }
   } else if (mode === "interactive") {
     console.log(`Deploying team (interactive): ${teamConfig.name} [${deployId}]`);
     console.log("  You will be prompted to approve tool calls.");
-    execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
-      stdio: "inherit",
-      env: deployEnv,
-    });
+    appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    try {
+      execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+        stdio: "inherit",
+        env: deployEnv,
+      });
+    } catch (err) {
+      const exitCode = (err as { status?: number }).status ?? 1;
+      appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+      process.exit(exitCode);
+    }
   } else if (mode === "foreground") {
     console.log(`Deploying team (foreground): ${teamConfig.name} [${deployId}]`);
-    execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
-      stdio: "inherit",
-      env: deployEnv,
-    });
+    appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    try {
+      execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+        stdio: "inherit",
+        env: deployEnv,
+      });
+    } catch (err) {
+      const exitCode = (err as { status?: number }).status ?? 1;
+      appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+      process.exit(exitCode);
+    }
   } else {
     // Background mode
     const logFile = resolve(logsDir, `${teamName}-${deployId}.log`);
