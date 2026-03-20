@@ -16,7 +16,9 @@
     "bump:major": "bash scripts/version_bump.sh major"
   },
   "dependencies": {
+    "@hono/node-server": "^1.13.7",
     "commander": "^13.1.0",
+    "hono": "^4.7.5",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
