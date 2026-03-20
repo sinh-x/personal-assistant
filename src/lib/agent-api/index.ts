@@ -2,6 +2,9 @@ import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { cors } from "hono/cors";
 import { isInsideSandbox } from "./utils/sandbox.js";
+import { inboxRoutes } from "./routes/inbox.js";
+import { foldersRoutes } from "./routes/folders.js";
+import { configRoutes } from "./routes/config.js";
 
 export interface AgentApiOptions {
   enableCors: boolean;
@@ -34,6 +37,11 @@ export function createApp(opts: AgentApiOptions): Hono {
   app.get("/api/health", (c: Context) => {
     return c.json({ status: "ok" });
   });
+
+  // Route modules
+  app.route("/", inboxRoutes());
+  app.route("/", foldersRoutes());
+  app.route("/", configRoutes());
 
   return app;
 }
