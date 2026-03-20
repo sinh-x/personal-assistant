@@ -28,11 +28,11 @@ export async function serveCommand(opts: ServeOptions): Promise<void> {
     console.log(`[pa serve] Background mode — PID ${process.pid} written to ${PID_FILE}`);
   }
 
-  const app = createApp({ enableCors });
+  const { app, injectWebSocket } = createApp({ enableCors });
 
   console.log(`[pa serve] Starting agent API on http://${host}:${port}`);
 
-  serve(
+  const server = serve(
     {
       fetch: app.fetch,
       port,
@@ -42,6 +42,8 @@ export async function serveCommand(opts: ServeOptions): Promise<void> {
       console.log(`[pa serve] Listening on http://${info.address}:${info.port}`);
     },
   );
+
+  injectWebSocket(server);
 }
 
 export { DEFAULT_PORT, DEFAULT_HOST };
