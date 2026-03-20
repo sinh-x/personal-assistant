@@ -11,6 +11,8 @@ export interface DeployMode {
   skills?: string[];
   /** Determines which standards modules are included in the primer; defaults to 'work' */
   mode_type?: 'housekeeping' | 'work' | 'interactive';
+  /** Solo operator mode — team-manager does all work, no sub-agents; omits multi-agent deployment instructions */
+  solo?: boolean;
 }
 
 /** Hierarchy member entry (team-manager or an agent in the hierarchy block) */

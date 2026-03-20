@@ -13,14 +13,17 @@ deploy_modes:
     label: Background
     phone_visible: true
     mode_type: work
+    solo: true
   - id: foreground
     label: Foreground
     phone_visible: true
     mode_type: work
+    solo: true
   - id: interactive
     label: Interactive
     phone_visible: false
     mode_type: interactive
+    solo: true
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."

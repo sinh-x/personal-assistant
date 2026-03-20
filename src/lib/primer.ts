@@ -276,8 +276,18 @@ When spawning unplanned sub-agents, use this policy:
     primer += `\n## Additional Instructions\n\n${extraObjective}\n`;
   }
 
-  // Deployment instructions
-  primer += `
+  // Deployment instructions — simplified for solo modes
+  const isSolo = modeConfig?.solo === true || agentNames.length === 0;
+  if (isSolo) {
+    primer += `
+## Deployment Instructions
+
+1. **Read the global standards** in the Global Skills section — especially \`standards.md\`
+2. **Work on the objective** — you are a SOLO operator, do all work yourself, no sub-agents
+3. **Shutdown sequence** — follow standards §6: write session log → write completion marker → exit
+`;
+  } else {
+    primer += `
 ## Deployment Instructions
 
 1. **Read the global standards** in the Global Skills section — especially \`standards.md\`
@@ -287,6 +297,7 @@ When spawning unplanned sub-agents, use this policy:
 5. **Coordinate** — monitor via TaskList, unblock as needed
 6. **Shutdown sequence** — follow standards §6: sub-agents log → agents log → you log → write completion marker → exit
 `;
+  }
 
   return primer;
 }
