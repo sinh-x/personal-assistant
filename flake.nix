@@ -110,6 +110,11 @@
             fi
             exec "$RESULT/bin/pa" "$@"
           '';
+          dev-pa-serve = pkgs.writeShellScriptBin "dev-pa-serve" ''
+            set -euo pipefail
+            PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+            exec node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors "$@"
+          '';
         in {
           default = pkgs.mkShell {
             packages = with pkgs; [
@@ -121,10 +126,64 @@
               # TypeScript
               nodejs_22
               pnpm
-              # Dev wrapper
+              # Dev wrappers
               dev-pa
+              dev-pa-serve
             ];
           };
         });
+
+      # Systemd user service for pa serve
+      # Install with: install -Dm644 <(nix build .#pa-serve-unit --print-out-paths) ~/.config/systemd/user/pa-serve.service
+      # Or reference from home-manager: systemd.user.services.pa-serve = import (inputs.pa + "/service.nix") { inherit pkgs; };
+      nixosModules = {
+        pa-serve = { config, lib, pkgs, ... }: {
+          options.services.pa-serve = {
+            enable = lib.mkEnableOption "personal-assistant serve daemon";
+            port = lib.mkOption {
+              type = lib.types.port;
+              default = 9848;
+              description = "Port for pa serve to listen on";
+            };
+          };
+          config = lib.mkIf config.services.pa-serve.enable {
+            systemd.user.services.pa-serve = {
+              Unit = {
+                Description = "personal-assistant agent API server";
+                After = [ "network.target" ];
+              };
+              Service = {
+                Type = "simple";
+                ExecStart = "${self.packages.${pkgs.system}.personal-assistant}/bin/pa serve --port ${toString config.services.pa-serve.port}";
+                Restart = "on-failure";
+                RestartSec = 5;
+                Environment = [ "PA_DATA=%h/.local/share/personal-assistant" ];
+              };
+              Install = {
+                WantedBy = [ "default.target" ];
+              };
+            };
+          };
+        };
+      };
+
+      # Standalone systemd user service unit file (for manual installation)
+      paServeUnit = forAllSystems (system:
+        let pkgs = pkgsFor system; in
+        pkgs.writeText "pa-serve.service" ''
+          [Unit]
+          Description=personal-assistant agent API server
+          After=network.target
+
+          [Service]
+          Type=simple
+          ExecStart=${self.packages.${system}.personal-assistant}/bin/pa serve --port 9848
+          Restart=on-failure
+          RestartSec=5
+          Environment=PA_DATA=%h/.local/share/personal-assistant
+
+          [Install]
+          WantedBy=default.target
+        '');
     };
 }
