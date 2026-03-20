@@ -10,6 +10,7 @@ import { ideaCommand } from "./commands/idea.js";
 import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
+import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
 
 declare const __PA_VERSION__: string;
 
@@ -154,6 +155,22 @@ program
   .argument("<subcommand>", "Subcommand: list")
   .action((sub: string) => {
     reposCommand(sub);
+  });
+
+program
+  .command("serve")
+  .description("Start the agent API server (Hono)")
+  .option("--port <number>", "Port to listen on", String(DEFAULT_PORT))
+  .option("--host <address>", "Host address to bind to", DEFAULT_HOST)
+  .option("--background", "Run in background mode (writes PID file)")
+  .option("--cors", "Enable CORS headers")
+  .action(async (opts: { port: string; host: string; background?: boolean; cors?: boolean }) => {
+    await serveCommand({
+      port: parseInt(opts.port, 10),
+      host: opts.host,
+      background: opts.background ?? false,
+      cors: opts.cors ?? false,
+    });
   });
 
 program.parse();
