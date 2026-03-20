@@ -38,7 +38,7 @@
 
           pnpmDeps = pkgs.fetchPnpmDeps {
             inherit (finalAttrs) pname src;
-            hash = "sha256-HNVDr+78qUbSCm6w2gAFoGaQdJxV9sTbvYCD5k86IrM=";
+            hash = "sha256-bxRmUppyZcepn6wypBVNrhZSlA2nGtv0Kw9/Mx/lDQY=";
             fetcherVersion = 3;
           };
 
@@ -94,7 +94,7 @@
       });
 
       overlays.default = final: prev: {
-        personal-assistant = self.packages.${prev.system}.personal-assistant;
+        personal-assistant = self.packages.${prev.stdenv.hostPlatform.system}.personal-assistant;
       };
 
       devShells = forAllSystems (system:
@@ -154,7 +154,7 @@
               };
               Service = {
                 Type = "simple";
-                ExecStart = "${self.packages.${pkgs.system}.personal-assistant}/bin/pa serve --port ${toString config.services.pa-serve.port}";
+                ExecStart = "${self.packages.${pkgs.stdenv.hostPlatform.system}.personal-assistant}/bin/pa serve --port ${toString config.services.pa-serve.port}";
                 Restart = "on-failure";
                 RestartSec = 5;
                 Environment = [ "PA_DATA=%h/.local/share/personal-assistant" ];
