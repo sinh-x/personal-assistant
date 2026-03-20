@@ -1,8 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { homedir, tmpdir } from "node:os";
-import { loadConfig } from "../lib/config.js";
-import { getHomeDir } from "../lib/paths.js";
+import { homedir } from "node:os";
 import { deployCommand } from "./deploy.js";
 
 /** Build the ideas triage objective */
@@ -32,17 +29,13 @@ ${flagLines.length > 0 ? flagLines.join("\n") : "No special flags set. Triage on
 }
 
 /**
- * Requirements lifecycle wrapper — sets the mode and deploys the requirements team.
- * Follows the daily.ts pattern: builds mode-specific objective, injects into team YAML,
- * delegates to deployCommand().
+ * Requirements lifecycle wrapper — validates mode and deploys the requirements team.
+ * Delegates to deployCommand(); no YAML manipulation or temp file creation.
  */
 export function requirementsCommand(
   mode: string,
   args: string[]
 ): void {
-  const config = loadConfig();
-  const paHome = getHomeDir();
-
   // Validate mode
   if (!["ideas"].includes(mode)) {
     console.error(`Error: Unknown mode '${mode}'. Use: ideas`);
@@ -63,62 +56,18 @@ export function requirementsCommand(
     }
   }
 
-  // Build mode-specific objective
-  let objective: string;
-  switch (mode) {
-    case "ideas":
-      objective = ideasObjective({ force, dryRun });
-      break;
-    default:
-      console.error(`Error: Unknown mode '${mode}'`);
-      process.exit(1);
-  }
-
-  // Resolve requirements.yaml: PA_CONFIG first, then PA_HOME
-  let teamsDir: string;
-  if (config.configDir && existsSync(resolve(config.configDir, "teams/requirements.yaml"))) {
-    teamsDir = resolve(config.configDir, "teams");
-  } else {
-    teamsDir = resolve(paHome, "teams");
-  }
-
-  const requirementsYaml = resolve(teamsDir, "requirements.yaml");
-  if (!existsSync(requirementsYaml)) {
-    console.error(`Error: requirements.yaml not found in ${teamsDir}`);
-    process.exit(1);
-  }
-
-  // Build temp team file with injected objective
-  const content = readFileSync(requirementsYaml, "utf-8");
-  // Strip everything from "objective:" onwards
-  const lines = content.split("\n");
-  const objectiveIdx = lines.findIndex((l) => l.startsWith("objective:"));
-  const beforeObjective = objectiveIdx >= 0 ? lines.slice(0, objectiveIdx) : lines;
-
-  const tempContent =
-    beforeObjective.join("\n") +
-    "\nobjective: |\n" +
-    objective
-      .split("\n")
-      .map((l) => `  ${l}`)
-      .join("\n") +
-    "\n";
-
-  // Write to temp file
-  const tempDir = resolve(tmpdir(), "pa-requirements");
-  mkdirSync(tempDir, { recursive: true });
-  const tmpFile = resolve(tempDir, `requirements-${mode}-${Date.now()}.yaml`);
-  writeFileSync(tmpFile, tempContent);
-
   // Build deploy opts — ideas mode defaults to background
   const deployOpts: {
     dryRun?: boolean;
     background?: boolean;
     interactive?: boolean;
-  } = {};
-
-  // Ideas triage is automated — default to background
-  deployOpts.background = true;
+    mode?: string;
+    objective?: string;
+  } = {
+    mode,
+    objective: ideasObjective({ force, dryRun }),
+    background: true,
+  };
 
   if (deployFlag === "--dry-run" || dryRun) {
     deployOpts.dryRun = true;
@@ -130,12 +79,5 @@ export function requirementsCommand(
     deployOpts.background = false;
   }
 
-  deployCommand(tmpFile, deployOpts);
-
-  // Clean up temp file (non-critical)
-  try {
-    unlinkSync(tmpFile);
-  } catch {
-    // Best effort cleanup
-  }
+  deployCommand("requirements", deployOpts);
 }

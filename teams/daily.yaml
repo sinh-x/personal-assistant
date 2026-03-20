@@ -29,24 +29,29 @@ deploy_modes:
     phone_visible: true
     mode_type: work
     agents: []  # solo, no sub-agents
+    objective: teams/daily/modes/plan.md
   - id: plan-review
     label: Plan Review
     phone_visible: false
     mode_type: work
     agents: []  # solo, no sub-agents
+    objective: teams/daily/modes/plan-review.md
   - id: progress
     label: Progress
     phone_visible: true
     mode_type: work
+    objective: teams/daily/modes/progress.md
   - id: end
     label: End
     phone_visible: true
     mode_type: work
+    objective: teams/daily/modes/end.md
   - id: end-review
     label: End Review
     phone_visible: false
     mode_type: work
     agents: []  # TM spawns synthesizer interactively after Sinh confirms
+    objective: teams/daily/modes/end-review.md
 
 context:
   organization: sinh-x

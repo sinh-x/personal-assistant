@@ -1,8 +1,5 @@
-import { readFileSync, writeFileSync, mkdirSync, unlinkSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { homedir, tmpdir } from "node:os";
-import { loadConfig } from "../lib/config.js";
-import { getHomeDir } from "../lib/paths.js";
+import { homedir } from "node:os";
 import { deployCommand } from "./deploy.js";
 
 /** Format date as YYYY-MM-DD */
@@ -14,36 +11,14 @@ function formatDate(d: Date): string {
 }
 
 /**
- * Read a mode file from teams/daily/modes/<modeId>.md and substitute
- * {{PLACEHOLDER}} variables with runtime values.
- */
-function readModeFile(
-  modeId: string,
-  vars: Record<string, string>,
-  teamsDir: string
-): string {
-  const modePath = resolve(teamsDir, `daily/modes/${modeId}.md`);
-  if (!existsSync(modePath)) {
-    throw new Error(`Mode file not found: ${modePath}`);
-  }
-  let content = readFileSync(modePath, "utf-8");
-  for (const [key, value] of Object.entries(vars)) {
-    content = content.replaceAll(`{{${key}}}`, value);
-  }
-  return content;
-}
-
-/**
- * Daily lifecycle wrapper — sets the mode and deploys the daily team.
- * Replaces daily.sh (237 lines).
+ * Daily lifecycle wrapper — validates mode and deploys the daily team.
+ * Mode files are read by primer.ts via the objective: field in daily.yaml deploy_modes.
+ * Template variable substitution is handled by primer.ts.
  */
 export function dailyCommand(
   mode: string,
   args: string[]
 ): void {
-  const config = loadConfig();
-  const paHome = getHomeDir();
-
   // Validate mode
   if (!["plan", "progress", "end"].includes(mode)) {
     console.error(`Error: Unknown mode '${mode}'. Use: plan | progress | end`);
@@ -67,69 +42,27 @@ export function dailyCommand(
   const today = targetDate || formatDate(new Date());
   const year = today.slice(0, 4);
   const month = today.slice(5, 7);
-  const outputDir = resolve(homedir(), `Documents/ai-usage/daily/${year}/${month}`);
-  const dailyInbox = `${homedir()}/Documents/ai-usage/agent-teams/daily/inbox`;
+  const home = homedir();
+  const outputDir = resolve(home, `Documents/ai-usage/daily/${year}/${month}`);
+  const dailyInbox = `${home}/Documents/ai-usage/agent-teams/daily/inbox`;
 
-  // Resolve daily.yaml: PA_CONFIG first, then PA_HOME
-  let teamsDir: string;
-  if (config.configDir && existsSync(resolve(config.configDir, "teams/daily.yaml"))) {
-    teamsDir = resolve(config.configDir, "teams");
-  } else {
-    teamsDir = resolve(paHome, "teams");
-  }
-
-  const dailyYaml = resolve(teamsDir, "daily.yaml");
-  if (!existsSync(dailyYaml)) {
-    console.error(`Error: daily.yaml not found in ${teamsDir}`);
-    process.exit(1);
-  }
-
-  // Build mode file ID and template variables
+  // Mode file ID (plan, progress, end, plan-review, end-review)
   const modeFileId = isReview ? `${mode}-review` : mode;
-  const vars: Record<string, string> = {
+
+  // Template variables for mode file substitution (passed to primer.ts)
+  const templateVars: Record<string, string> = {
     TODAY: today,
     YEAR: year,
     MONTH: month,
     OUTPUT_DIR: outputDir,
-    HOME: homedir(),
-    INPUT_NOTES: resolve(homedir(), `Documents/ai-usage/sinh-inputs/daily-plan/${today}`),
-    RPM_BLOCKS: resolve(homedir(), `Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml`),
+    HOME: home,
+    INPUT_NOTES: resolve(home, `Documents/ai-usage/sinh-inputs/daily-plan/${today}`),
+    RPM_BLOCKS: resolve(home, `Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml`),
     DAILY_INBOX: dailyInbox,
     GATHER_REPORT: `${dailyInbox}/${today}-end-gather.md`,
     READY_MARKER: `${dailyInbox}/${today}-end-ready.md`,
-    DRAFT_PATH: `${homedir()}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md`,
+    DRAFT_PATH: `${home}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md`,
   };
-
-  // Read mode file and substitute variables
-  let objective: string;
-  try {
-    objective = readModeFile(modeFileId, vars, teamsDir);
-  } catch (err) {
-    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    process.exit(1);
-  }
-
-  // Build temp team file with injected objective
-  const content = readFileSync(dailyYaml, "utf-8");
-  // Strip everything from "objective:" onwards
-  const lines = content.split("\n");
-  const objectiveIdx = lines.findIndex((l) => l.startsWith("objective:"));
-  const beforeObjective = objectiveIdx >= 0 ? lines.slice(0, objectiveIdx) : lines;
-
-  const tempContent =
-    beforeObjective.join("\n") +
-    "\nobjective: |\n" +
-    objective
-      .split("\n")
-      .map((l) => `  ${l}`)
-      .join("\n") +
-    "\n";
-
-  // Write to temp file
-  const tempDir = resolve(tmpdir(), "pa-daily");
-  mkdirSync(tempDir, { recursive: true });
-  const tmpFile = resolve(tempDir, `daily-${mode}-${Date.now()}.yaml`);
-  writeFileSync(tmpFile, tempContent);
 
   // Build deploy opts
   // Review modes default to foreground; gather/plan/progress default to background
@@ -138,8 +71,10 @@ export function dailyCommand(
     background?: boolean;
     interactive?: boolean;
     mode?: string;
+    templateVars?: Record<string, string>;
   } = {
     mode: modeFileId,
+    templateVars,
   };
 
   if (!isReview && mode !== "progress") {
@@ -158,12 +93,5 @@ export function dailyCommand(
       break;
   }
 
-  deployCommand(tmpFile, deployOpts);
-
-  // Clean up temp file (non-critical)
-  try {
-    unlinkSync(tmpFile);
-  } catch {
-    // Best effort cleanup
-  }
+  deployCommand("daily", deployOpts);
 }

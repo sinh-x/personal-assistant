@@ -22,6 +22,28 @@ interface PrimerOptions {
     tmModel: string | undefined;
     agentModels: Record<string, string | undefined>;
   };
+  /** Caller-provided template variables to substitute in mode objective files. Overrides standard vars. */
+  templateVars?: Record<string, string>;
+}
+
+/** Format a Date as YYYY-MM-DD */
+function formatDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Apply {{KEY}} template variable substitution to content.
+ * Backward compatible — files without {{VAR}} placeholders pass through unchanged.
+ */
+function applyTemplateVars(content: string, vars: Record<string, string>): string {
+  let result = content;
+  for (const [key, value] of Object.entries(vars)) {
+    result = result.replaceAll(`{{${key}}}`, value);
+  }
+  return result;
 }
 
 /**
@@ -59,6 +81,28 @@ export function generatePrimer(opts: PrimerOptions): string {
     homeDir,
     effectiveModels,
   } = opts;
+
+  // Compute standard template variables from deploy context
+  const now = new Date();
+  const todayStr = formatDate(now);
+  const yearStr = todayStr.slice(0, 4);
+  const monthStr = todayStr.slice(5, 7);
+  const rawOutputDir = teamConfig.variables?.output_dir;
+  const expandedOutputDir = rawOutputDir
+    ? rawOutputDir.replace(/^~/, homeDir)
+    : undefined;
+  const standardVars: Record<string, string> = {
+    TODAY: todayStr,
+    YEAR: yearStr,
+    MONTH: monthStr,
+    HOME: homeDir,
+    TEAM_NAME: teamName,
+    MODE_ID: deployMode ?? "",
+    DEPLOY_ID: deployId,
+    ...(expandedOutputDir ? { OUTPUT_DIR: `${expandedOutputDir}/${yearStr}/${monthStr}` } : {}),
+  };
+  // Caller-provided vars override standard vars (e.g. daily.ts sets TODAY to a custom date)
+  const allTemplateVars: Record<string, string> = { ...standardVars, ...(opts.templateVars ?? {}) };
 
   // Resolve active mode config (explicit > default_mode > none)
   const effectiveMode = deployMode ?? teamConfig.default_mode;
@@ -268,6 +312,8 @@ When spawning unplanned sub-agents, use this policy:
       objectiveContent = readFileSync(objectivePath, "utf-8");
     }
   }
+  // Apply template variable substitution (backward compatible — files without {{VAR}} pass through unchanged)
+  objectiveContent = applyTemplateVars(objectiveContent, allTemplateVars);
   // objectiveContent typically ends with \n
   primer += `\n## Objective\n\n${objectiveContent}`;
 
@@ -276,8 +322,18 @@ When spawning unplanned sub-agents, use this policy:
     primer += `\n## Additional Instructions\n\n${extraObjective}\n`;
   }
 
-  // Deployment instructions
-  primer += `
+  // Deployment instructions — simplified for solo modes
+  const isSolo = modeConfig?.solo === true || agentNames.length === 0;
+  if (isSolo) {
+    primer += `
+## Deployment Instructions
+
+1. **Read the global standards** in the Global Skills section — especially \`standards.md\`
+2. **Work on the objective** — you are a SOLO operator, do all work yourself, no sub-agents
+3. **Shutdown sequence** — follow standards §6: write session log → write completion marker → exit
+`;
+  } else {
+    primer += `
 ## Deployment Instructions
 
 1. **Read the global standards** in the Global Skills section — especially \`standards.md\`
@@ -287,6 +343,7 @@ When spawning unplanned sub-agents, use this policy:
 5. **Coordinate** — monitor via TaskList, unblock as needed
 6. **Shutdown sequence** — follow standards §6: sub-agents log → agents log → you log → write completion marker → exit
 `;
+  }
 
   return primer;
 }
