@@ -117,6 +117,8 @@ export function deployCommand(
     mode?: string;
     listModes?: boolean;
     repo?: string;
+    /** Template variables to substitute in mode objective files */
+    templateVars?: Record<string, string>;
   }
 ): void {
   const config = loadConfig();
@@ -272,6 +274,7 @@ export function deployCommand(
     configDir: config.configDir,
     homeDir: paHome,
     effectiveModels: { tmModel, agentModels },
+    templateVars: opts.templateVars,
   });
   writeFileSync(primerFile, primerContent);
   console.log(`Primer generated: ${primerFile}`);

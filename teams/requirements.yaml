@@ -17,6 +17,7 @@ deploy_modes:
     label: Ideas Triage
     phone_visible: true
     mode_type: work
+    agents: []  # solo, team-manager executes directly
   - id: review
     label: Review
     phone_visible: false
