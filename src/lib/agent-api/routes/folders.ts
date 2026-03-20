@@ -1,15 +1,18 @@
 /**
  * Folder browsing routes.
  *
- * GET /api/folders/:source/:folder         — list items in a folder
- * GET /api/folders/:source/:folder/:file   — read individual file content
+ * Source path patterns vary by depth:
+ *   GET /api/folders/inbox[/:file]                     — inbox (no subfolder)
+ *   GET /api/folders/for-later[/:file]                 — for-later (no subfolder)
+ *   GET /api/folders/sinh-inputs/:folder[/:file]       — sinh-inputs with subfolder
+ *   GET /api/folders/teams/:teamName/:folder[/:file]   — teams with team + subfolder
  *
  * Sources:
  *   inbox       → ~/Documents/ai-usage/sinh-inputs/inbox/
+ *   for-later   → ~/Documents/ai-usage/sinh-inputs/for-later/
  *   sinh-inputs → ~/Documents/ai-usage/sinh-inputs/<folder>/
  *                 allowed subfolders: approved, rejected, deferred, done, ideas, for-later
  *   teams/:name → ~/Documents/ai-usage/agent-teams/:name/<folder>/
- *   for-later   → ~/Documents/ai-usage/sinh-inputs/for-later/
  *
  * All paths are validated to stay inside ~/Documents/ai-usage/.
  */
@@ -123,11 +126,12 @@ async function listFolder(dirPath: string): Promise<FolderItem[]> {
 export function foldersRoutes(): Hono {
   const app = new Hono();
 
-  // GET /api/folders/:source/:folder        (list)
-  // GET /api/folders/:source/:folder/:file  (read)
-  // For teams source: /api/folders/teams/:teamName/:folder[/:file]
+  // Path depth varies by source type:
+  //   /api/folders/inbox[/:file]                    (1-2 segments)
+  //   /api/folders/for-later[/:file]                (1-2 segments)
+  //   /api/folders/sinh-inputs/:folder[/:file]      (2-3 segments)
+  //   /api/folders/teams/:teamName/:folder[/:file]  (3-4 segments)
   app.get("/api/folders/*", async (c: Context) => {
-    // Parse path manually — Hono wildcard gives us everything after /api/folders/
     const rawPath = c.req.path;
     const prefix = "/api/folders/";
     if (!rawPath.startsWith(prefix)) {
@@ -135,16 +139,19 @@ export function foldersRoutes(): Hono {
     }
 
     const rest = rawPath.substring(prefix.length);
-    const segments = rest.split("/").filter((s) => s.length > 0);
+    const segments = rest
+      .split("/")
+      .filter((s) => s.length > 0)
+      .map((s) => decodeURIComponent(s));
 
-    if (segments.length < 2) {
+    if (segments.length < 1) {
       return c.json(
-        { error: "source and folder are required", code: "BAD_REQUEST" },
+        { error: "source is required", code: "BAD_REQUEST" },
         400
       );
     }
 
-    let source = segments[0];
+    const source = segments[0];
     let folder: string;
     let teamName: string | undefined;
     let filename: string | undefined;
@@ -160,9 +167,27 @@ export function foldersRoutes(): Hono {
       teamName = segments[1];
       folder = segments[2];
       filename = segments.length >= 4 ? segments[3] : undefined;
-    } else {
+    } else if (source === "inbox" || source === "for-later") {
+      // /api/folders/inbox[/:filename]
+      // /api/folders/for-later[/:filename]
+      // These sources have no subfolder — next segment (if any) is the filename
+      folder = source; // placeholder — resolveSourcePath ignores it for these
+      filename = segments.length >= 2 ? segments[1] : undefined;
+    } else if (source === "sinh-inputs") {
+      // /api/folders/sinh-inputs/:folder[/:filename]
+      if (segments.length < 2) {
+        return c.json(
+          { error: "folder is required for sinh-inputs", code: "BAD_REQUEST" },
+          400
+        );
+      }
       folder = segments[1];
       filename = segments.length >= 3 ? segments[2] : undefined;
+    } else {
+      return c.json(
+        { error: "Unknown source", code: "NOT_FOUND" },
+        404
+      );
     }
 
     // Validate segments

@@ -156,7 +156,7 @@ After verification passes:
 
 ## Rules
 
-- **One phase per deployment.** Complete and verify one phase, then stop. Next phase = next deployment.
+- **One phase per deployment.** Complete and verify one phase, then stop. Next phase = next deployment. **Exception:** When the Additional Instructions explicitly list multiple steps to execute in one session, complete all of them — the one-phase rule applies only when falling back to inbox/ongoing scanning without explicit instructions.
 - **Feature branch.** Always work on a `feature/<topic>` branch derived from the task. Run pre-flight checks (§Pre-flight Checks) before touching any code. Never work directly on `main` or `develop`. Never merge — commit and report only.
 - **Bash stays working.** During migration phases 1-4, existing bash scripts must continue to function. The `pa` dispatcher calls TS when available, bash as fallback.
 - **Read before writing.** Always read a file before modifying it. Understand existing code before changing it.
