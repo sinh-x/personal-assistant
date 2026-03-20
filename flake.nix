@@ -103,16 +103,15 @@
           dev-pa = pkgs.writeShellScriptBin "dev-pa" ''
             set -euo pipefail
             PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
-            RESULT="$PROJECT_ROOT/result"
-            if [ ! -x "$RESULT/bin/pa" ]; then
-              echo "No result/bin/pa found. Run: nix build" >&2
-              exit 1
-            fi
-            exec "$RESULT/bin/pa" "$@"
+            cd "$PROJECT_ROOT"
+            pnpm build
+            exec node "$PROJECT_ROOT/dist/cli.mjs" "$@"
           '';
           dev-pa-serve = pkgs.writeShellScriptBin "dev-pa-serve" ''
             set -euo pipefail
             PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
+            cd "$PROJECT_ROOT"
+            pnpm build
             exec node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors "$@"
           '';
         in {
