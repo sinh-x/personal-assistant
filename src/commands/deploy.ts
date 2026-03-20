@@ -9,7 +9,7 @@ import { appendRegistryEvent } from "../lib/registry.js";
 import { generatePrimer } from "../lib/primer.js";
 import { spawnDetached } from "../utils/process.js";
 import { resolveRepo } from "../lib/repos.js";
-import type { RegistryEvent, TeamConfig } from "../lib/types.js";
+import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
 
 const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
 
@@ -71,6 +71,32 @@ function makeResolver(configDir: string, homeDir: string) {
     if (existsSync(homePath)) return homePath;
     return undefined;
   };
+}
+
+/** Print a formatted modes table. Used by --list-modes and invalid-mode error output. */
+function printModesTable(teamName: string, modes: DeployMode[] | undefined): void {
+  if (!modes || modes.length === 0) {
+    console.log(`No modes configured for team: ${teamName}`);
+    return;
+  }
+  console.log(`Modes for team: ${teamName}\n`);
+  const rows = modes.map((m) => [
+    m.id,
+    m.label,
+    m.phone_visible ? "yes" : "no",
+    m.agents === undefined ? "all" : m.agents.length === 0 ? "(tm only)" : m.agents.join(", "),
+    m.skills?.join(", ") ?? "—",
+  ]);
+  const headers = ["ID", "LABEL", "PHONE", "AGENTS", "SKILLS"];
+  const widths = headers.map((h, i) =>
+    Math.max(h.length, ...rows.map((r) => r[i].length))
+  );
+  const pad = (s: string, w: number) => s.padEnd(w);
+  console.log("  " + headers.map((h, i) => pad(h, widths[i])).join("  "));
+  console.log("  " + widths.map((w) => "-".repeat(w)).join("  "));
+  for (const row of rows) {
+    console.log("  " + row.map((c, i) => pad(c, widths[i])).join("  "));
+  }
 }
 
 /**
@@ -139,6 +165,33 @@ export function deployCommand(
     process.exit(1);
   }
 
+  // Parse team YAML early — needed for mode validation before workspace creation
+  const teamConfig = parseTeamYaml(teamFile);
+
+  // Use YAML name field as canonical team name (overrides filename-derived name)
+  if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
+
+  // Handle --list-modes: print modes table and exit
+  if (opts.listModes) {
+    printModesTable(teamConfig.name, teamConfig.deploy_modes);
+    return;
+  }
+
+  // Validate --mode before workspace creation, primer generation, or registry write
+  if (opts.mode !== undefined) {
+    const modes = teamConfig.deploy_modes;
+    if (!modes || modes.length === 0) {
+      console.error(`Error: No modes configured for team: ${teamConfig.name}`);
+      process.exit(1);
+    }
+    const validMode = modes.find((m) => m.id === opts.mode);
+    if (!validMode) {
+      console.error(`Error: Invalid mode "${opts.mode}" for team: ${teamConfig.name}`);
+      printModesTable(teamConfig.name, modes);
+      process.exit(1);
+    }
+  }
+
   mkdirSync(primersDir, { recursive: true });
   mkdirSync(logsDir, { recursive: true });
   mkdirSync(deploymentsDir, { recursive: true });
@@ -164,41 +217,7 @@ export function deployCommand(
     appendFileSync(parentActivityLog, childEvent + "\n");
   }
 
-  // Parse team YAML
-  const teamConfig = parseTeamYaml(teamFile);
-
-  // Handle --list-modes: print modes table and exit
-  if (opts.listModes) {
-    const modes = teamConfig.deploy_modes;
-    if (!modes || modes.length === 0) {
-      console.log(`No modes configured for team: ${teamConfig.name}`);
-      return;
-    }
-    console.log(`Modes for team: ${teamConfig.name}\n`);
-    const rows = modes.map((m) => [
-      m.id,
-      m.label,
-      m.phone_visible ? "yes" : "no",
-      m.agents === undefined ? "all" : m.agents.length === 0 ? "(tm only)" : m.agents.join(", "),
-      m.skills?.join(", ") ?? "—",
-    ]);
-    const headers = ["ID", "LABEL", "PHONE", "AGENTS", "SKILLS"];
-    const widths = headers.map((h, i) =>
-      Math.max(h.length, ...rows.map((r) => r[i].length))
-    );
-    const pad = (s: string, w: number) => s.padEnd(w);
-    console.log("  " + headers.map((h, i) => pad(h, widths[i])).join("  "));
-    console.log("  " + widths.map((w) => "-".repeat(w)).join("  "));
-    for (const row of rows) {
-      console.log("  " + row.map((c, i) => pad(c, widths[i])).join("  "));
-    }
-    return;
-  }
-
   const agentNames = teamConfig.agents.map((a) => a.name);
-
-  // Use YAML name field as canonical team name (overrides filename-derived name)
-  if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
 
   // Detect git repo root from cwd (for repo-aware agents)
   let cwd = process.cwd();
