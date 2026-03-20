@@ -5,6 +5,12 @@ import { isInsideSandbox } from "./utils/sandbox.js";
 import { inboxRoutes } from "./routes/inbox.js";
 import { foldersRoutes } from "./routes/folders.js";
 import { configRoutes } from "./routes/config.js";
+import { deploymentsRoutes } from "./routes/deployments.js";
+import { teamsRoutes } from "./routes/teams.js";
+import { deployRoutes } from "./routes/deploy.js";
+import { ideasRoutes } from "./routes/ideas.js";
+import { timersRoutes } from "./routes/timers.js";
+import { sinhInputsRoutes } from "./routes/sinh-inputs.js";
 
 export interface AgentApiOptions {
   enableCors: boolean;
@@ -42,6 +48,12 @@ export function createApp(opts: AgentApiOptions): Hono {
   app.route("/", inboxRoutes());
   app.route("/", foldersRoutes());
   app.route("/", configRoutes());
+  app.route("/", deploymentsRoutes());
+  app.route("/", teamsRoutes());
+  app.route("/", deployRoutes());
+  app.route("/", ideasRoutes());
+  app.route("/", timersRoutes());
+  app.route("/", sinhInputsRoutes());
 
   return app;
 }
