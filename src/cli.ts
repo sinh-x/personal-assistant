@@ -39,14 +39,13 @@ program
   .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
   .option("--objective <text>", "Append extra instructions to the team objective")
-  .option("--route-decisions", "Inject mode: route-decisions into the deployment primer")
   .option("--direct", "Lightweight direct mode — no sub-agents, skip-permissions")
   .option("--team-model <model>", "Model for the team-manager process (haiku|sonnet|opus)")
   .option("--agent-model <model>", "Model for all named agents, overrides per-agent YAML (haiku|sonnet|opus)")
   .option("--mode <mode-id>", "Deploy using a specific mode (reads mode file as objective)")
   .option("--list-modes", "List available modes for the team and exit")
   .option("--repo <name>", "Target repo name from repos.yaml (overrides CWD-based detection)")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; routeDecisions?: boolean; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string }) => {
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string }) => {
     deployCommand(team, opts);
   });
 

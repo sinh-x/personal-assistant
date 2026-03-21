@@ -13,7 +13,7 @@ Workflow (you do all steps directly):
    - Extract 'Open Items (Carried Forward)' as carryover todos
    - If no daily summary exists, check for recent session logs in ~/Documents/ai-usage/sessions/{{YEAR}}/{{MONTH}}/
 3. Check your team inbox at ~/Documents/ai-usage/agent-teams/daily/inbox/
-   - Read any files — these are context documents routed by the secretary
+   - Read any files — these are context documents routed by sprint-master
    - Incorporate relevant context into the plan
    - After processing, move each file to inbox/processed/
 4. [RPM CONTEXT — opt-in] Check for RPM blocks at {{RPM_BLOCKS}}

@@ -111,7 +111,6 @@ export function deployCommand(
     background?: boolean;
     interactive?: boolean;
     objective?: string;
-    routeDecisions?: boolean;
     direct?: boolean;
     teamModel?: string;
     agentModel?: string;
@@ -284,7 +283,7 @@ export function deployCommand(
     registryLock,
     deploymentsDir,
     extraObjective: opts.objective,
-    deployMode: opts.mode ?? (opts.routeDecisions ? "route-decisions" : opts.direct ? "direct" : undefined),
+    deployMode: opts.mode ?? (opts.direct ? "direct" : undefined),
     cwd,
     repoRoot,
     resolveFile,

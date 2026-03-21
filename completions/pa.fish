@@ -121,7 +121,6 @@ complete -c pa -n '__fish_seen_subcommand_from deploy' -l dry-run        -d 'Gen
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l background     -d 'Run in background'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l interactive    -d 'Run in foreground, user approves each tool call'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l direct         -d 'Lightweight direct mode — no sub-agents, skip-permissions'
-complete -c pa -n '__fish_seen_subcommand_from deploy' -l route-decisions -d 'Inject mode: route-decisions into the deployment primer'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l objective      -d 'Append extra instructions' -r
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l mode           -d 'Deploy using a specific mode' -r -a '(__pa_modes)'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l list-modes     -d 'List available modes for the team and exit'
