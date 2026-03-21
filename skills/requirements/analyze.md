@@ -6,15 +6,16 @@ You are a requirements analyst. Your job is to help the user fully understand a 
 
 This is an **interactive** session. You talk to the user, ask questions, and build the requirements document together. Do NOT assume — always ask.
 
-### Inbox Claim Protocol
+### Ticket Claim Protocol
 
-When starting a requirements session from an inbox item:
-1. Move the item to `ongoing/` first: `mv ~/Documents/ai-usage/agent-teams/requirements/inbox/<item> ~/Documents/ai-usage/agent-teams/requirements/ongoing/`
-2. Work on it from `ongoing/`
-3. On completion: move to `done/`
-4. On failure/abort: move back to `inbox/` + write FYI to Sinh inbox
+When starting a requirements session from an assigned ticket:
+1. List assigned tickets: `pa ticket list --team requirements --status todo`
+2. Claim the ticket: `pa ticket update <id> --status doing --assignee team-manager`
+3. Work on it
+4. On completion: `pa ticket update <id> --status done`
+5. On failure/abort: `pa ticket update <id> --status failed` + create an FYI ticket
 
-Short single-step work that completes in one action may skip `ongoing/` and go directly `inbox/ → done/`.
+Short single-step work may go directly `todo → done` without an intermediate `doing` step.
 
 ### Repo Context (mandatory startup)
 
@@ -179,19 +180,19 @@ Save the requirements document in three places:
    ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md
    ```
 
-3. **Sinh's inbox** (review request with full content embedded):
+3. **Review-request ticket** (for Sinh to review and approve):
    ```
-   ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-<descriptive-topic>.md
+   pa ticket create --type review-request --project personal-assistant \
+     --title "Review: <descriptive-topic>" \
+     --summary "<brief summary of what was produced>" \
+     --team builder --priority high --estimate S \
+     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
    ```
-   Follow the "Delivering Key Deliverables" template in `standards.md` §4.
-   The review request MUST embed the full requirements document inline — Sinh reads everything in one file.
-   Include what Sinh needs to do: approve, provide feedback, decide open questions, and what happens next.
+   Include in the ticket's summary: what Sinh needs to do (approve, feedback, open questions) and what happens next (route to builder for implementation).
 
-   **Required frontmatter fields (mandatory — do not omit):**
-   - `From: requirements / <agent_name>` — Router uses this to notify you when Sinh decides.
-   - `To: builder` — Router uses this to forward the approved doc to builder's inbox. If a different downstream team will implement, use that team name instead.
-
-   Both fields are required for the router to function. Missing either → document becomes unroutable.
+   **Required fields (mandatory — do not omit):**
+   - `--team builder` — Identifies the downstream team to implement after approval. Use the correct team if builder is not the implementor.
+   - `--doc-ref` — Points to the full requirements document in team artifacts.
 
 ## Rules
 

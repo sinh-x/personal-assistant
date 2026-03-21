@@ -4,26 +4,26 @@ Your job is to process all inbox and workflow state for your team. Follow the st
 
 ## Steps
 
-1. **Create workspaces** — `mkdir -p` team workspace with all subfolders (inbox, ongoing, waiting-for-response, done, archives, artifacts) + per-deployment workspace
+1. **Create workspaces** — `mkdir -p` team workspace with subfolders (artifacts, archives) + per-deployment workspace
 
-2. **Check inbox** — Scan `~/Documents/ai-usage/agent-teams/<team_name>/inbox/` for pending items. For each item:
-   - Single-step items: process immediately, move to `done/`
-   - Multi-step items: move to `ongoing/` before starting work
+2. **Check assigned tickets** — `pa ticket list --team <team_name> --status todo`. For each ticket:
+   - Single-step tickets: claim and process immediately (`pa ticket update <id> --status done`)
+   - Multi-step tickets: claim with `pa ticket update <id> --status doing` before starting work
 
-3. **WFR self-resolution** — Scan `waiting-for-response/` against Sinh's outcome folders (`sinh-inputs/approved/`, `rejected/`, `deferred/`):
-   - Match by topic slug (strip date prefix from filename)
-   - If matched: append outcome note to WFR file, move to `done/`
-   - If no match AND >3 days old: create reminder in `sinh-inputs/inbox/` (skip if reminder already exists)
+3. **Review-request resolution** — `pa ticket list --team <team_name> --status review`:
+   - Check if Sinh has updated the status (approved → todo for downstream, or rejected/closed)
+   - If resolved: note the outcome and close or forward the ticket
+   - If unresolved AND >3 days old: create a follow-up FYI ticket for Sinh (skip if already exists)
 
-4. **Ongoing review** — Scan `ongoing/` for stale or blocked items:
-   - Items that can be completed now: complete and move to `done/`
-   - Items blocked externally: document blocking reason, create inbox item for whoever can unblock
+4. **In-progress review** — `pa ticket list --team <team_name> --status doing` for stale or blocked tickets:
+   - Tickets that can be completed now: complete work and `pa ticket update <id> --status done`
+   - Tickets blocked externally: add a comment with blocking reason, create FYI ticket for whoever can unblock
 
-5. **Produce summary** — Write a work report to `~/Documents/ai-usage/sinh-inputs/inbox/` summarizing:
-   - Items processed from inbox
-   - WFR items resolved or still waiting
-   - Ongoing items status
-   - Any items requiring Sinh's attention
+5. **Produce summary** — `pa ticket create --type work-report --project personal-assistant --title "Housekeeping: <team_name>" --summary "..." --estimate XS` summarizing:
+   - Tickets processed from todo queue
+   - Review-request tickets resolved or still waiting
+   - In-progress tickets status
+   - Any tickets requiring Sinh's attention
 
 ## Rules
 

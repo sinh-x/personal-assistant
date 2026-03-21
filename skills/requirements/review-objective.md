@@ -13,5 +13,5 @@ Follow the **reviewer skill** (embedded above in `## Agents`) exactly — it def
 The area skill files (Code Quality, Security, Ops, UI/UAT) are listed in `## Mode Skills`.
 Read the selected area files at runtime during Phase 3.
 
-When you pick up an inbox item for multi-step work, move it to
-`agent-teams/requirements/ongoing/` BEFORE starting. Move to `done/` when complete.
+When you pick up a ticket for work, claim it with `pa ticket update <id> --status doing` BEFORE starting.
+Mark it done with `pa ticket update <id> --status done` when complete.

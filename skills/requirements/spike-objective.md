@@ -12,5 +12,5 @@ Follow the **researcher skill** (embedded above in `## Agents`) exactly — it d
 
 This is a **non-interactive** skill. Do NOT use `AskUserQuestion`. Decide and act autonomously.
 
-When you pick up an inbox item for multi-step work, move it to
-`agent-teams/requirements/ongoing/` BEFORE starting. Move to `done/` when complete.
+When you pick up a ticket for work, claim it with `pa ticket update <id> --status doing` BEFORE starting.
+Mark it done with `pa ticket update <id> --status done` when complete.
