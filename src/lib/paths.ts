@@ -84,3 +84,8 @@ export function getLogsDir(): string {
 export function getAgentTeamsDir(): string {
   return expandHome("~/Documents/ai-usage/agent-teams");
 }
+
+/** Flat ticket storage directory */
+export function getTicketsDir(): string {
+  return expandHome("~/Documents/ai-usage/tickets");
+}
