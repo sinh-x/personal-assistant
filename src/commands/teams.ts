@@ -5,6 +5,7 @@ import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { readRegistry } from "../lib/registry.js";
 import { isProcessAlive } from "../utils/process.js";
 import type { RegistryEvent } from "../lib/types.js";
+import { getTeamStatusSummaries } from "../lib/tickets/board.js";
 
 /** Count .md files in a directory (returns 0 if dir missing) */
 function countMdFiles(dir: string): number {
@@ -120,9 +121,27 @@ function showAllTeams(): void {
     return;
   }
 
+  // Build ticket counts map: team → { todo, doing, done }
+  const ticketMap = new Map<string, { todo: number; doing: number; done: number }>();
+  try {
+    const summaries = getTeamStatusSummaries();
+    for (const s of summaries) {
+      ticketMap.set(s.team, {
+        todo: s.counts.todo ?? 0,
+        doing: s.counts.doing ?? 0,
+        done: s.counts.done ?? 0,
+      });
+    }
+  } catch {
+    /* ticket system may not be initialized yet */
+  }
+
   console.log(
     "TEAM".padEnd(20) +
       "MODEL".padEnd(9) +
+      "TODO".padEnd(6) +
+      "DOING".padEnd(7) +
+      "DONE".padEnd(6) +
       "INBOX".padEnd(8) +
       "ONGOING".padEnd(9) +
       "WFR".padEnd(7) +
@@ -132,6 +151,10 @@ function showAllTeams(): void {
   for (const team of entries.sort()) {
     const teamDir = resolve(agentTeamsDir, team);
     const model = getTeamModel(team);
+    const tickets = ticketMap.get(team);
+    const todo = tickets ? tickets.todo : 0;
+    const doing = tickets ? tickets.doing : 0;
+    const done = tickets ? tickets.done : 0;
     const inbox = countMdFiles(resolve(teamDir, "inbox"));
     const ongoing = countMdFiles(resolve(teamDir, "ongoing"));
     const wfr = countMdFiles(resolve(teamDir, "waiting-for-response"));
@@ -141,6 +164,9 @@ function showAllTeams(): void {
     console.log(
       team.padEnd(20) +
         model.padEnd(9) +
+        String(todo).padEnd(6) +
+        String(doing).padEnd(7) +
+        String(done).padEnd(6) +
         String(inbox).padEnd(8) +
         String(ongoing).padEnd(9) +
         String(wfr).padEnd(7) +

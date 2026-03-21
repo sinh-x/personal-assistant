@@ -14,6 +14,7 @@ const AI_USAGE = join(homedir(), "Documents", "ai-usage");
 const INBOX_DIR = join(AI_USAGE, "sinh-inputs", "inbox");
 const REGISTRY_FILE = join(AI_USAGE, "deployments", "registry.jsonl");
 const TICKETS_DIR = join(AI_USAGE, "tickets");
+const BULLETINS_ACTIVE_DIR = join(AI_USAGE, "bulletins", "active");
 
 function debounce<T extends unknown[]>(
   fn: (...args: T) => void,
@@ -174,6 +175,33 @@ export function startWatchers(hub: WsHub): FileWatchers {
   try {
     if (existsSync(TICKETS_DIR)) {
       const w = watch(TICKETS_DIR, (_evt, filename) => scanTickets(filename));
+      w.on("error", () => {
+        /* ignore */
+      });
+      fsWatchers.push(w);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // --- Bulletins watcher ---
+  const scanBulletins = debounce((filename: string | null) => {
+    try {
+      if (!filename || !filename.endsWith(".md")) return;
+      const bulletinId = basename(filename, ".md");
+      hub.broadcast({
+        type: "bulletin-update",
+        data: { bulletinId },
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      /* ignore */
+    }
+  }, 100);
+
+  try {
+    if (existsSync(BULLETINS_ACTIVE_DIR)) {
+      const w = watch(BULLETINS_ACTIVE_DIR, (_evt, filename) => scanBulletins(filename));
       w.on("error", () => {
         /* ignore */
       });
