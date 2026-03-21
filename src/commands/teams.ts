@@ -121,15 +121,24 @@ function showAllTeams(): void {
     return;
   }
 
-  // Build ticket counts map: team → { todo, doing, done }
-  const ticketMap = new Map<string, { todo: number; doing: number; done: number }>();
+  // Build ticket counts map: team → { pending, active, done }
+  // pending = idea + requirement-review + pending-approval + pending-implementation
+  // active  = implementing + review-uat
+  // done    = done + rejected + cancelled
+  const ticketMap = new Map<string, { pending: number; active: number; done: number; hold: number }>();
   try {
     const summaries = getTeamStatusSummaries();
     for (const s of summaries) {
+      const c = s.counts;
       ticketMap.set(s.team, {
-        todo: s.counts.todo ?? 0,
-        doing: s.counts.doing ?? 0,
-        done: s.counts.done ?? 0,
+        pending:
+          (c["idea"] ?? 0) +
+          (c["requirement-review"] ?? 0) +
+          (c["pending-approval"] ?? 0) +
+          (c["pending-implementation"] ?? 0),
+        active: (c["implementing"] ?? 0) + (c["review-uat"] ?? 0),
+        done: (c["done"] ?? 0) + (c["rejected"] ?? 0) + (c["cancelled"] ?? 0),
+        hold: c["on-hold"] ?? 0,
       });
     }
   } catch {
@@ -139,9 +148,10 @@ function showAllTeams(): void {
   console.log(
     "TEAM".padEnd(20) +
       "MODEL".padEnd(9) +
-      "TODO".padEnd(6) +
-      "DOING".padEnd(7) +
+      "PEND".padEnd(6) +
+      "ACTV".padEnd(6) +
       "DONE".padEnd(6) +
+      "HOLD".padEnd(6) +
       "INBOX".padEnd(8) +
       "ONGOING".padEnd(9) +
       "WFR".padEnd(7) +
@@ -152,9 +162,10 @@ function showAllTeams(): void {
     const teamDir = resolve(agentTeamsDir, team);
     const model = getTeamModel(team);
     const tickets = ticketMap.get(team);
-    const todo = tickets ? tickets.todo : 0;
-    const doing = tickets ? tickets.doing : 0;
+    const pending = tickets ? tickets.pending : 0;
+    const active = tickets ? tickets.active : 0;
     const done = tickets ? tickets.done : 0;
+    const hold = tickets ? tickets.hold : 0;
     const inbox = countMdFiles(resolve(teamDir, "inbox"));
     const ongoing = countMdFiles(resolve(teamDir, "ongoing"));
     const wfr = countMdFiles(resolve(teamDir, "waiting-for-response"));
@@ -164,9 +175,10 @@ function showAllTeams(): void {
     console.log(
       team.padEnd(20) +
         model.padEnd(9) +
-        String(todo).padEnd(6) +
-        String(doing).padEnd(7) +
+        String(pending).padEnd(6) +
+        String(active).padEnd(6) +
         String(done).padEnd(6) +
+        String(hold).padEnd(6) +
         String(inbox).padEnd(8) +
         String(ongoing).padEnd(9) +
         String(wfr).padEnd(7) +

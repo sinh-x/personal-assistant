@@ -3,12 +3,16 @@ import { TicketStore } from "./store.js";
 
 /** All valid status columns in board order */
 export const BOARD_COLUMNS: TicketStatus[] = [
-  "backlog",
-  "todo",
-  "doing",
-  "review",
+  "idea",
+  "requirement-review",
+  "pending-approval",
+  "pending-implementation",
+  "implementing",
+  "review-uat",
   "done",
-  "failed",
+  "rejected",
+  "on-hold",
+  "cancelled",
 ];
 
 /** A single column in the board view */
@@ -63,8 +67,8 @@ export function buildBoardView(
     if (col) {
       col.push(ticket);
     } else {
-      // Unknown status — add to backlog as fallback
-      grouped.get("backlog")!.push(ticket);
+      // Unknown status — add to idea as fallback
+      grouped.get("idea")!.push(ticket);
     }
     teamCounts[ticket.team] = (teamCounts[ticket.team] ?? 0) + 1;
   }
@@ -100,14 +104,9 @@ export function getTeamStatusSummaries(project?: string): TeamStatusSummary[] {
 
   for (const ticket of tickets) {
     if (!byTeam.has(ticket.team)) {
-      byTeam.set(ticket.team, {
-        backlog: 0,
-        todo: 0,
-        doing: 0,
-        review: 0,
-        done: 0,
-        failed: 0,
-      });
+      const zeroCounts: Record<TicketStatus, number> = {} as Record<TicketStatus, number>;
+      for (const s of BOARD_COLUMNS) zeroCounts[s] = 0;
+      byTeam.set(ticket.team, zeroCounts);
     }
     const counts = byTeam.get(ticket.team)!;
     counts[ticket.status] = (counts[ticket.status] ?? 0) + 1;
@@ -137,7 +136,7 @@ export function getTeamBoard(
 
   for (const ticket of tickets) {
     const col = grouped.get(ticket.status);
-    (col ?? grouped.get("backlog")!).push(ticket);
+    (col ?? grouped.get("idea")!).push(ticket);
   }
 
   const columns: BoardColumn[] = BOARD_COLUMNS.map((status) => {

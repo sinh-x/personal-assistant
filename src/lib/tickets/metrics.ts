@@ -1,4 +1,5 @@
 import type { AuditEntry, Ticket, Estimate } from "./types.js";
+import { TERMINAL_STATUSES, ACTIVE_STATUSES } from "./types.js";
 import { TicketStore } from "./store.js";
 
 /** Effort sizes mapped to notional story points for velocity calculation */
@@ -16,10 +17,10 @@ export interface SprintMetrics {
   startDate: string;
   endDate: string;
 
-  /** Total tickets completed (done | failed) */
+  /** Total tickets completed (terminal statuses) */
   throughput: number;
 
-  /** Average time from todo → done (in hours) */
+  /** Average time from pending-implementation → done (in hours) */
   avgCycleTimeHours: number;
 
   /** Total story points completed (estimate-based) */
@@ -135,17 +136,12 @@ export function computeSprintMetrics(
   const activeAtEnd: Ticket[] = [];
 
   for (const ticket of allTickets) {
-    const isTerminal = ticket.status === "done" || ticket.status === "failed";
+    const isTerminal = TERMINAL_STATUSES.includes(ticket.status);
     const resolvedAt = ticket.resolvedAt ? new Date(ticket.resolvedAt) : null;
 
     if (isTerminal && resolvedAt && resolvedAt >= start && resolvedAt <= end) {
       completed.push(ticket);
-    } else if (
-      !isTerminal &&
-      (ticket.status === "todo" ||
-        ticket.status === "doing" ||
-        ticket.status === "review")
-    ) {
+    } else if (!isTerminal && ACTIVE_STATUSES.includes(ticket.status)) {
       const createdAt = new Date(ticket.createdAt);
       if (createdAt <= end) {
         activeAtEnd.push(ticket);
@@ -153,12 +149,12 @@ export function computeSprintMetrics(
     }
   }
 
-  // Cycle time: time from first entering "todo" to resolution
+  // Cycle time: time from first entering "pending-implementation" to resolution
   const cycleTimes: number[] = [];
   let accurateEstimates = 0;
 
   for (const ticket of completed) {
-    const todoTime = findStatusEntryTime(ticket.id, "todo", audit);
+    const todoTime = findStatusEntryTime(ticket.id, "pending-implementation", audit);
     const resolvedAt = ticket.resolvedAt ? parseTs(ticket.resolvedAt) : null;
 
     if (todoTime && resolvedAt) {
@@ -199,10 +195,10 @@ export function computeSprintMetrics(
     teamMap.get(ticket.team)!.tickets.push(ticket);
   }
   for (const ticket of completed) {
-    const todoTime = findStatusEntryTime(ticket.id, "todo", audit);
+    const implTime = findStatusEntryTime(ticket.id, "pending-implementation", audit);
     const resolvedAt = ticket.resolvedAt ? parseTs(ticket.resolvedAt) : null;
-    if (todoTime && resolvedAt) {
-      const h = msToHours(resolvedAt.getTime() - todoTime.getTime());
+    if (implTime && resolvedAt) {
+      const h = msToHours(resolvedAt.getTime() - implTime.getTime());
       teamMap.get(ticket.team)?.cycleTimes.push(h);
     }
   }
@@ -234,11 +230,11 @@ export function computeSprintMetrics(
     }
     const entry = estimateMap.get(ticket.estimate)!;
     entry.count++;
-    const todoTime = findStatusEntryTime(ticket.id, "todo", audit);
+    const implTime = findStatusEntryTime(ticket.id, "pending-implementation", audit);
     const resolvedAt = ticket.resolvedAt ? parseTs(ticket.resolvedAt) : null;
-    if (todoTime && resolvedAt) {
+    if (implTime && resolvedAt) {
       entry.cycleTimes.push(
-        msToHours(resolvedAt.getTime() - todoTime.getTime())
+        msToHours(resolvedAt.getTime() - implTime.getTime())
       );
     }
   }
@@ -297,7 +293,7 @@ export function computeWeeklyThroughput(
     weekStart.setDate(weekStart.getDate() - 7);
 
     const completed = tickets.filter((t) => {
-      if (t.status !== "done" && t.status !== "failed") return false;
+      if (!TERMINAL_STATUSES.includes(t.status)) return false;
       const resolvedAt = t.resolvedAt ? new Date(t.resolvedAt) : null;
       return resolvedAt && resolvedAt >= weekStart && resolvedAt <= weekEnd;
     });

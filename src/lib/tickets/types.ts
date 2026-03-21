@@ -1,11 +1,34 @@
-/** Ticket status lifecycle: backlog → todo → doing → review → done | failed */
+/**
+ * Ticket status lifecycle:
+ *   idea → requirement-review → pending-approval → pending-implementation → implementing → review-uat → done
+ *
+ * Terminal statuses: done, rejected, cancelled
+ * Parking status:   on-hold (can resume to any active status)
+ */
 export type TicketStatus =
-  | "backlog"
-  | "todo"
-  | "doing"
-  | "review"
+  | "idea"
+  | "requirement-review"
+  | "pending-approval"
+  | "pending-implementation"
+  | "implementing"
+  | "review-uat"
   | "done"
-  | "failed";
+  | "rejected"
+  | "on-hold"
+  | "cancelled";
+
+/** Terminal statuses — tickets here are considered resolved */
+export const TERMINAL_STATUSES: TicketStatus[] = ["done", "rejected", "cancelled"];
+
+/** Active statuses — tickets currently in the pipeline (not parked or terminal) */
+export const ACTIVE_STATUSES: TicketStatus[] = [
+  "idea",
+  "requirement-review",
+  "pending-approval",
+  "pending-implementation",
+  "implementing",
+  "review-uat",
+];
 
 export type TicketPriority = "critical" | "high" | "medium" | "low";
 

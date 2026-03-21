@@ -203,7 +203,8 @@ export class TicketStore {
     const newStatus = input.status;
     if (
       newStatus === "done" ||
-      newStatus === "failed"
+      newStatus === "rejected" ||
+      newStatus === "cancelled"
     ) {
       if (!ticket.resolvedAt) {
         changes["resolvedAt"] = [null, now];

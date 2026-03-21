@@ -22,7 +22,7 @@ function validateEstimate(value: string): Estimate {
 function formatRow(id: string, status: string, priority: string, estimate: string, team: string, title: string): string {
   return (
     id.padEnd(9) +
-    status.padEnd(11) +
+    status.padEnd(25) +
     priority.padEnd(11) +
     estimate.padEnd(6) +
     team.padEnd(16) +
@@ -80,7 +80,7 @@ export function createTicketCommand(): Command {
             team: opts.team,
             priority: opts.priority as TicketPriority,
             estimate,
-            status: "backlog",
+            status: "idea",
             summary: opts.summary,
             description: "",
             assignee: opts.assignee,
@@ -105,7 +105,7 @@ export function createTicketCommand(): Command {
     .command("update")
     .description("Update fields on a ticket")
     .argument("<id>", "Ticket ID (e.g. PA-001)")
-    .option("--status <status>", "New status (backlog|todo|doing|review|done|failed)")
+    .option("--status <status>", "New status (idea|requirement-review|pending-approval|pending-implementation|implementing|review-uat|done|rejected|on-hold|cancelled)")
     .option("--assignee <name>", "New assignee")
     .option("--priority <priority>", "New priority (critical|high|medium|low)")
     .option("--team <team>", "New team")
