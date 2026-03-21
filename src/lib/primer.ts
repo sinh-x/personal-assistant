@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import type { TeamConfig, DeployMode } from "./types.js";
+import { BulletinStore } from "./bulletins/index.js";
 
 interface PrimerOptions {
   deployId: string;
@@ -302,6 +303,32 @@ When spawning unplanned sub-agents, use this policy:
       if (!content.endsWith("\n")) primer += "\n";
       primer += "\n</global-skill>\n\n";
     }
+  }
+
+  // Inject active bulletins so running/sub-agents are aware of system-wide blocks
+  try {
+    const bulletinStore = new BulletinStore();
+    const activeBulletins = bulletinStore.readActive();
+    if (activeBulletins.length > 0) {
+      primer += "\n## Active Bulletins\n\n";
+      primer +=
+        "> **WARNING:** The following bulletins are currently active. Read before starting work.\n\n";
+      for (const b of activeBulletins) {
+        const blockStr = b.block === "all" ? "ALL TEAMS" : b.block.join(", ");
+        primer += `### [${b.id}] ${b.title}\n`;
+        primer += `- **Blocks:** ${blockStr}\n`;
+        if (b.except.length > 0) {
+          primer += `- **Exempt:** ${b.except.join(", ")}\n`;
+        }
+        primer += `- **Created:** ${b.created}\n`;
+        if (b.body) {
+          primer += `\n${b.body}\n`;
+        }
+        primer += "\n";
+      }
+    }
+  } catch {
+    // Bulletins dir not yet created — skip injection silently
   }
 
   // Objective — use mode file content if available, else fall back to YAML objective

@@ -89,3 +89,8 @@ export function getAgentTeamsDir(): string {
 export function getTicketsDir(): string {
   return expandHome("~/Documents/ai-usage/tickets");
 }
+
+/** Bulletins directory (contains active/ and resolved/ subdirs) */
+export function getBulletinsDir(): string {
+  return expandHome("~/Documents/ai-usage/bulletins");
+}

@@ -12,6 +12,7 @@ import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
 import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
 import { createTicketCommand } from "./commands/ticket.js";
+import { createBulletinCommand } from "./commands/bulletin.js";
 
 declare const __PA_VERSION__: string;
 
@@ -175,5 +176,6 @@ program
   });
 
 program.addCommand(createTicketCommand());
+program.addCommand(createBulletinCommand());
 
 program.parse();
