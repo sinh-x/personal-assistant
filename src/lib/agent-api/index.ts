@@ -14,6 +14,7 @@ import { deployRoutes } from "./routes/deploy.js";
 import { ideasRoutes } from "./routes/ideas.js";
 import { timersRoutes } from "./routes/timers.js";
 import { sinhInputsRoutes } from "./routes/sinh-inputs.js";
+import { ticketRoutes } from "./routes/tickets.js";
 import { hub } from "./ws/hub.js";
 import { startWatchers } from "./ws/watchers.js";
 
@@ -94,6 +95,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", ideasRoutes());
   app.route("/", timersRoutes());
   app.route("/", sinhInputsRoutes());
+  app.route("/", ticketRoutes());
 
   // Start hub ping and file watchers
   hub.startPing();

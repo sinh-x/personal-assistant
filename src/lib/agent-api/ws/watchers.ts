@@ -13,6 +13,7 @@ import type { WsHub } from "./hub.js";
 const AI_USAGE = join(homedir(), "Documents", "ai-usage");
 const INBOX_DIR = join(AI_USAGE, "sinh-inputs", "inbox");
 const REGISTRY_FILE = join(AI_USAGE, "deployments", "registry.jsonl");
+const TICKETS_DIR = join(AI_USAGE, "tickets");
 
 function debounce<T extends unknown[]>(
   fn: (...args: T) => void,
@@ -146,6 +147,33 @@ export function startWatchers(hub: WsHub): FileWatchers {
   try {
     if (existsSync(REGISTRY_FILE)) {
       const w = watch(REGISTRY_FILE, () => scanRegistry());
+      w.on("error", () => {
+        /* ignore */
+      });
+      fsWatchers.push(w);
+    }
+  } catch {
+    /* ignore */
+  }
+
+  // --- Tickets watcher ---
+  const scanTickets = debounce((filename: string | null) => {
+    try {
+      if (!filename || !filename.endsWith(".json") || filename === "counter.json") return;
+      const ticketId = basename(filename, ".json");
+      hub.broadcast({
+        type: "ticket-changed",
+        data: { ticketId },
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      /* ignore */
+    }
+  }, 100);
+
+  try {
+    if (existsSync(TICKETS_DIR)) {
+      const w = watch(TICKETS_DIR, (_evt, filename) => scanTickets(filename));
       w.on("error", () => {
         /* ignore */
       });
