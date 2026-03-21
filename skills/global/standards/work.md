@@ -192,32 +192,45 @@ mcp__ai-usage-log__save_session_bundle(
 | Agent | After all tasks done, before shutdown |
 | Team manager | After all agents done + completion marker, last thing before exit |
 
-### Work Report (via ticket)
+### Work Report (centralized, file-based)
 
-After logging your session, **every team manager** MUST create a work-report ticket to inform Sinh:
+After logging your session, **every team manager** MUST write a work-report file to the centralized inbox:
 
-```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "Work Report: <descriptive-topic>" \
-  --type work-report \
-  --team sinh \
-  --priority low \
-  --estimate XS \
-  --summary "<one-line summary of what was done and current status>"
+```
+~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team_name>-<descriptive-topic>.md
 ```
 
-If there are detailed outputs or artifacts, attach them:
+**Do NOT create a ticket for routine work reports.** Work reports are centralized files — sprint-master aggregates them. Only create tickets for items that require action (review-request, fyi, or blocked notifications).
 
-```bash
-pa ticket attach <ticket-id> \
-  --doc-ref "agent-teams/<team_name>/artifacts/YYYY-MM-DD-<topic>.md"
+**Work report file format:**
+
+```markdown
+# Work Report: <descriptive-topic>
+
+> **Date:** YYYY-MM-DD
+> **From:** <team_name> / team-manager
+> **To:** sinh
+> **Deployment:** <deployment_id>
+> **Type:** work-report
+> **Status:** success | partial | failed
+
+## What Was Done
+- <bullet points>
+
+## Results
+- <outputs, files, ticket IDs>
+
+## Needs Attention
+- <items requiring Sinh input, or "None">
+
+## Suggested Next Steps
+- <follow-up actions>
 ```
 
 **Descriptive topic examples:**
-- `Work Report: builder global-standards ticket migration`
-- `Work Report: maintenance health check`
-- `Work Report: requirements pa-review-dashboard`
+- `builder-global-standards-migration`
+- `maintenance-health-check`
+- `requirements-pa-review-dashboard`
 
 ### Delivering Key Deliverables (Review Requests)
 
@@ -354,17 +367,11 @@ Active bulletins are also injected into your primer under `## Active Bulletins` 
 
 If a bulletin blocks your team (`block: all` or your team name in `block:`) and you are NOT listed in `except:`:
 1. **Do not proceed with the main objective**
-2. Create a work-report ticket noting the block:
-   ```bash
-   pa ticket create \
-     --project personal-assistant \
-     --title "Work Report: deployment blocked by bulletin" \
-     --type work-report \
-     --team sinh \
-     --priority normal \
-     --estimate XS \
-     --summary "Deployment d-<id> blocked by active bulletin: <bulletin title>. No work performed."
+2. Write a work-report file noting the block:
    ```
+   ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team_name>-deployment-blocked.md
+   ```
+   Content: deployment ID, bulletin title, reason blocked, no work performed.
 3. Write the completion marker (failed status) and exit.
 
 ---
@@ -373,8 +380,9 @@ If a bulletin blocks your team (`block: all` or your team name in `block:`) and 
 
 - **Agents → Team manager:** Report results via SendMessage or task completion
 - **Agents → Agents:** Only if the team objective requires direct coordination
-- **Team manager → Sinh:** Create work-report or review-request ticket — not inbox files
-- **All cross-team communication:** Via tickets (FYI, work-report, review-request types) — not inbox files
+- **Team manager → Sinh (routine):** Write work-report file to `sinh-inputs/inbox/` — NOT a ticket
+- **Team manager → Sinh (deliverable):** Create review-request ticket pointing to artifact in `agent-teams/<team>/artifacts/`
+- **All cross-team communication:** Via tickets (FYI, review-request types) — not inbox files; work-reports are files not tickets
 - Always include your `agent_name` and `team_name` in ticket titles, summaries, and comments
 
 ---

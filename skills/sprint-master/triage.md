@@ -6,26 +6,47 @@ ensure all tickets have valid effort estimates.
 
 ## Objectives
 
-1. Find all unassigned or unestimated tickets
-2. Apply priority rules (see §Priority Rules)
-3. Assign to the correct team based on ticket type and content
-4. Validate or set effort estimates (XS/S/M/L/XL)
-5. Write a triage summary report
+1. **Aggregate work reports** from all teams (first priority)
+2. Find all unassigned or unestimated tickets
+3. Apply priority rules (see §Priority Rules)
+4. Assign to the correct team based on ticket type and content
+5. Validate or set effort estimates (XS/S/M/L/XL)
+6. Write a combined triage + work-report summary
 
 ## Workflow
 
-### Step 1 — Scan for tickets needing triage
+### Step 0 — Aggregate work reports from all teams (FIRST)
+
+Scan `~/Documents/ai-usage/sinh-inputs/inbox/` for work-report files written since the last triage run:
 
 ```bash
-# List backlog/todo tickets with no assignee
-pa ticket list --status backlog
-pa ticket list --status todo --assignee ""
+ls -lt ~/Documents/ai-usage/sinh-inputs/inbox/ | head -20
+```
+
+For each new work-report file:
+1. Read it: note the team, status (success/partial/failed), key outputs, and any "Needs Attention" items
+2. Include a summary row in the triage report (see Step 9)
+3. Move reviewed files to `done/` after including in summary:
+   ```bash
+   mv ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team>-<topic>.md \
+      ~/Documents/ai-usage/sinh-inputs/done/
+   ```
+
+> **Why first?** Sprint-master is the single point of aggregation for all team work reports. Surfacing team activity before ticket triage gives context for prioritization decisions.
+
+### Step 1 — Scan all tickets
+
+```bash
+# Scan all tickets — the system uses an extended status vocabulary
+pa ticket list
 ```
 
 Also check for tickets missing estimates:
 ```bash
 pa ticket list --project personal-assistant | grep '"estimate": ""'
 ```
+
+Focus triage on tickets with no assignee, no estimate, or in early-stage statuses (`idea`, `backlog`, `todo`, `requirement-review`). Do NOT re-triage tickets already `implementing`, `doing`, or `done`.
 
 ### Step 2 — Read each ticket
 
@@ -128,15 +149,22 @@ Report format:
 > **Type:** work-report
 > **Status:** success | partial
 
-## What Was Done
+## Team Activity (Work Reports)
+
+| Team | Date | Status | Key Output | Needs Attention |
+|------|------|--------|------------|-----------------|
+| builder | YYYY-MM-DD | success | <one-line> | None |
+| requirements | YYYY-MM-DD | partial | <one-line> | <item> |
+
+_N work reports reviewed and moved to done/_
+
+## Triage Summary
 
 - Scanned N tickets across M projects
 - Assigned priority to X tickets
 - Assigned team to Y tickets
 - Set estimates on Z tickets
 - Escalated W tickets as stale or blocked
-
-## Triage Summary
 
 | Ticket | Title | Priority | Team | Estimate | Action |
 |--------|-------|----------|------|----------|--------|
@@ -145,12 +173,13 @@ Report format:
 
 ## Needs Attention
 
-- <tickets requiring Sinh's input — e.g., unclear requirements, conflicting priorities>
+- <from work reports: items teams flagged for Sinh>
+- <from ticket triage: tickets requiring Sinh's input>
 - <or "None">
 
 ## Suggested Next Steps
 
-- Deploy sprint-master --triage again in 24-48h after new tickets accumulate
+- Deploy sprint-master triage again in 24-48h after new tickets accumulate
 - <any specific follow-up>
 ```
 

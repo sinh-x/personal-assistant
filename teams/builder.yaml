@@ -14,19 +14,31 @@ deploy_modes:
     label: Background
     phone_visible: true
     mode_type: work
+    global_docs:
+      - skills/global/standards/kanban-workflow.md
+      - skills/global/policy/workflow-policy.md
   - id: foreground
     label: Foreground
     phone_visible: false
     mode_type: work
+    global_docs:
+      - skills/global/standards/kanban-workflow.md
+      - skills/global/policy/workflow-policy.md
   - id: worker
     label: Worker
     phone_visible: false
     mode_type: interactive
     objective: skills/builder-worker-objective.md
+    global_docs:
+      - skills/global/standards/kanban-workflow.md
+      - skills/global/policy/workflow-policy.md
   - id: interactive
     label: Interactive
     phone_visible: false
     mode_type: interactive
+    global_docs:
+      - skills/global/standards/kanban-workflow.md
+      - skills/global/policy/workflow-policy.md
 
 context:
   organization: sinh-x
