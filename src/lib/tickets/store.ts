@@ -7,15 +7,16 @@ import {
   mkdirSync,
 } from "node:fs";
 import { resolve } from "node:path";
+import { tmpdir } from "node:os";
 import { getTicketsDir } from "../paths.js";
 import type {
   Ticket,
   AuditEntry,
   CounterStore,
-  ProjectConfig,
   CreateTicketInput,
   UpdateTicketInput,
 } from "./types.js";
+import { getRepoPrefix } from "../repos.js";
 
 /**
  * TicketStore — manages all ticket CRUD operations with flock locking.
@@ -23,9 +24,9 @@ import type {
  * Storage layout (flat — all tickets in one directory, project is a field):
  *   ~/Documents/ai-usage/tickets/
  *     counter.json       — {"PA": 3, "NX": 1} (next number per prefix)
- *     projects.json      — {"personal-assistant": "PA"} (name → prefix map)
  *     audit.jsonl        — append-only mutation log
  *     .tickets.lock      — flock lock file
+ *   Prefixes come from repos.yaml (prefix: field on each repo entry)
  *     PA-001.json        — ticket files
  *     NX-001.json
  */
@@ -48,10 +49,6 @@ export class TicketStore {
     return resolve(this.dir, "counter.json");
   }
 
-  private projectsPath(): string {
-    return resolve(this.dir, "projects.json");
-  }
-
   private auditPath(): string {
     return resolve(this.dir, "audit.jsonl");
   }
@@ -61,54 +58,46 @@ export class TicketStore {
   /**
    * Allocate the next ticket ID for a prefix atomically under flock.
    * Reads counter.json, increments the prefix counter, writes back, returns the new ID.
+   * Uses a temp file to avoid newline escaping issues with node -e on Node.js 22.
    */
   private allocateId(prefix: string): string {
     const counterPath = this.counterPath();
     const lockPath = this.lockPath;
 
-    // Build a node script as a string — JSON.stringify handles all quoting
-    const script = `
-const fs = require('fs');
-const cp = ${JSON.stringify(counterPath)};
-const pfx = ${JSON.stringify(prefix)};
-const counters = fs.existsSync(cp) ? JSON.parse(fs.readFileSync(cp, 'utf8')) : {};
-const next = (counters[pfx] || 0) + 1;
-counters[pfx] = next;
-fs.writeFileSync(cp, JSON.stringify(counters, null, 2));
-process.stdout.write(String(next));
-`.trim();
+    // Write script to a temp file so newlines are preserved correctly
+    const script = [
+      "const fs = require('fs');",
+      `const cp = ${JSON.stringify(counterPath)};`,
+      `const pfx = ${JSON.stringify(prefix)};`,
+      "const counters = fs.existsSync(cp) ? JSON.parse(fs.readFileSync(cp, 'utf8')) : {};",
+      "const next = (counters[pfx] || 0) + 1;",
+      "counters[pfx] = next;",
+      "fs.writeFileSync(cp, JSON.stringify(counters, null, 2));",
+      "process.stdout.write(String(next));",
+    ].join("\n");
 
-    const result = execSync(
-      `flock -w 5 ${JSON.stringify(lockPath)} node -e ${JSON.stringify(script)}`
-    )
-      .toString()
-      .trim();
+    const tmpFile = resolve(tmpdir(), `pa-counter-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+    writeFileSync(tmpFile, script);
 
-    const num = parseInt(result, 10);
-    return `${prefix}-${String(num).padStart(3, "0")}`;
+    try {
+      const result = execSync(
+        `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+      )
+        .toString()
+        .trim();
+
+      const num = parseInt(result, 10);
+      return `${prefix}-${String(num).padStart(3, "0")}`;
+    } finally {
+      try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+    }
   }
 
-  // ── Project registry ──────────────────────────────────────────────────────
+  // ── Project prefix (from repos.yaml) ───────────────────────────────────────
 
-  /** Read the project name → prefix mapping. */
-  getProjects(): ProjectConfig {
-    const path = this.projectsPath();
-    return existsSync(path)
-      ? (JSON.parse(readFileSync(path, "utf-8")) as ProjectConfig)
-      : {};
-  }
-
-  /** Get the prefix for a project name, or undefined if not registered. */
+  /** Get the ticket prefix for a project name from repos.yaml. */
   getPrefix(projectName: string): string | undefined {
-    return this.getProjects()[projectName];
-  }
-
-  /** Register a project name → prefix mapping. */
-  registerProject(projectName: string, prefix: string): void {
-    const path = this.projectsPath();
-    const projects = this.getProjects();
-    projects[projectName] = prefix;
-    writeFileSync(path, JSON.stringify(projects, null, 2));
+    return getRepoPrefix(projectName);
   }
 
   // ── Audit log ─────────────────────────────────────────────────────────────
@@ -308,7 +297,7 @@ process.stdout.write(String(next));
     tags?: string[];
   } = {}): Ticket[] {
     const files = readdirSync(this.dir).filter(
-      (f) => f.endsWith(".json") && f !== "counter.json" && f !== "projects.json"
+      (f) => f.endsWith(".json") && f !== "counter.json"
     );
 
     const tickets = files

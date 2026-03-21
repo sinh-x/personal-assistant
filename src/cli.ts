@@ -11,6 +11,7 @@ import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
 import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
+import { createTicketCommand } from "./commands/ticket.js";
 
 declare const __PA_VERSION__: string;
 
@@ -172,5 +173,7 @@ program
       cors: opts.cors ?? false,
     });
   });
+
+program.addCommand(createTicketCommand());
 
 program.parse();

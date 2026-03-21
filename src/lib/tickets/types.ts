@@ -75,8 +75,3 @@ export type UpdateTicketInput = Partial<
 
 /** counter.json structure — one entry per project prefix */
 export type CounterStore = Record<string, number>;
-
-/** projects.json structure — maps project name to prefix */
-export interface ProjectConfig {
-  [projectName: string]: string;
-}

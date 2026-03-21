@@ -9,7 +9,6 @@ export type {
   CreateTicketInput,
   UpdateTicketInput,
   CounterStore,
-  ProjectConfig,
 } from "./types.js";
 
 export { TicketStore } from "./store.js";

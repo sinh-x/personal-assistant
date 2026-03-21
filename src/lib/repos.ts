@@ -8,6 +8,7 @@ import { loadConfig } from "./config.js";
 export interface RepoEntry {
   path: string;
   description?: string;
+  prefix?: string;
 }
 
 /** Expand ~ to home directory */
@@ -37,10 +38,11 @@ function loadReposYaml(): Record<string, RepoEntry> {
       const raw = yaml.load(content) as { repos?: Record<string, unknown> };
       const repos: Record<string, RepoEntry> = {};
       for (const [name, entry] of Object.entries(raw.repos ?? {})) {
-        const e = entry as { path: string; description?: string };
+        const e = entry as { path: string; description?: string; prefix?: string };
         repos[name] = {
           path: expandHome(e.path),
           description: e.description,
+          prefix: e.prefix,
         };
       }
       return repos;
@@ -71,4 +73,28 @@ export function resolveRepo(name: string): { name: string } & RepoEntry {
     process.exit(1);
   }
   return { name, ...entry };
+}
+
+/** Look up the ticket prefix for a project name from repos.yaml. */
+export function getRepoPrefix(projectName: string): string | undefined {
+  const repos = loadReposYaml();
+  // Try exact match on repo key first
+  if (repos[projectName]?.prefix) return repos[projectName].prefix;
+  // Try matching by description or path basename
+  for (const entry of Object.values(repos)) {
+    if (entry.prefix && entry.path.endsWith(`/${projectName}`)) {
+      return entry.prefix;
+    }
+  }
+  return undefined;
+}
+
+/** Get all project name → prefix mappings from repos.yaml. */
+export function getAllRepoPrefixes(): Record<string, string> {
+  const repos = loadReposYaml();
+  const result: Record<string, string> = {};
+  for (const [name, entry] of Object.entries(repos)) {
+    if (entry.prefix) result[name] = entry.prefix;
+  }
+  return result;
 }
