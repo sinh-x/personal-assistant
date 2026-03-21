@@ -29,6 +29,8 @@ export function parseTeamYaml(filePath: string): TeamConfig {
       agents: m["agents"] as string[] | undefined,
       skills: m["skills"] as string[] | undefined,
       mode_type: m["mode_type"] as DeployMode["mode_type"] | undefined,
+      solo: m["solo"] as boolean | undefined,
+      global_docs: m["global_docs"] as string[] | undefined,
     }));
   }
 
@@ -68,5 +70,6 @@ export function parseTeamYaml(filePath: string): TeamConfig {
     ...(raw["default_mode"] ? { default_mode: raw["default_mode"] as string } : {}),
     ...(deployModes ? { deploy_modes: deployModes } : {}),
     ...(hierarchy ? { hierarchy } : {}),
+    ...(raw["global_docs"] ? { global_docs: raw["global_docs"] as string[] } : {}),
   };
 }

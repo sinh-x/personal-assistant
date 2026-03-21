@@ -305,6 +305,23 @@ When spawning unplanned sub-agents, use this policy:
     }
   }
 
+  // Inject team/mode-scoped global docs (e.g. kanban-workflow, workflow-policy)
+  // Team-level global_docs are the baseline; mode-level global_docs extend them. Deduplicated.
+  const teamGlobalDocs = teamConfig.global_docs ?? [];
+  const modeGlobalDocs = modeConfig?.global_docs ?? [];
+  const allGlobalDocs = [...new Set([...teamGlobalDocs, ...modeGlobalDocs])];
+
+  for (const docRelPath of allGlobalDocs) {
+    const docPath = resolveFile(docRelPath);
+    if (!docPath || !existsSync(docPath)) continue;
+    const docName = docRelPath.split("/").pop()?.replace(/\.md$/, "") ?? docRelPath;
+    const docContent = readFileSync(docPath, "utf-8");
+    primer += `<global-skill name="${docName}">\n`;
+    primer += docContent;
+    if (!docContent.endsWith("\n")) primer += "\n";
+    primer += "\n</global-skill>\n\n";
+  }
+
   // Inject active bulletins so running/sub-agents are aware of system-wide blocks
   try {
     const bulletinStore = new BulletinStore();

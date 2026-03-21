@@ -13,6 +13,12 @@ export interface DeployMode {
   mode_type?: 'housekeeping' | 'work' | 'interactive';
   /** Solo operator mode — team-manager does all work, no sub-agents; omits multi-agent deployment instructions */
   solo?: boolean;
+  /**
+   * Additional global skill/policy docs to inject for this mode.
+   * Paths relative to PA_CONFIG or PA_HOME.
+   * Merged with TeamConfig.global_docs and injected after standards modules as <global-skill> blocks.
+   */
+  global_docs?: string[];
 }
 
 /** Hierarchy member entry (team-manager or an agent in the hierarchy block) */
@@ -45,6 +51,12 @@ export interface TeamConfig {
   default_mode?: string;
   /** Team hierarchy definition */
   hierarchy?: Hierarchy;
+  /**
+   * Global docs injected for all modes of this team (team-level default).
+   * Merged with per-mode global_docs. Useful for kanban-aware teams that need
+   * workflow/policy docs across all their work modes.
+   */
+  global_docs?: string[];
 }
 
 /** Agent definition within a team */
