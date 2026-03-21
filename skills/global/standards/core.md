@@ -15,11 +15,13 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 | **agent_name** | Your name (from team YAML), or `team-manager` if you are the manager |
 | **parent** | Who spawned you — `deploy.sh` for team-manager, `team-manager` for agents, agent name for sub-agents |
 | **role** | Your role description from the team definition |
+| **ticket_id** | The ticket assigned to this deployment (e.g., `PA-042`), or `none` if no ticket. Check on startup: `pa ticket list --team <team-name> --status doing` |
 
 **Rules:**
 - Never use generic names like "agent", "assistant", or "Claude"
 - Always identify yourself by agent_name + team_name in logs and messages
-- Pass your full identity chain when spawning sub-agents (see §3)
+- Pass your full identity chain when spawning sub-agents (see §3 in work.md)
+- Include `ticket_id` when passing identity to sub-agents — it provides work context
 
 ---
 

@@ -32,6 +32,29 @@ flock -w 5 ~/Documents/ai-usage/deployments/.registry.lock bash -c "echo '{\"dep
 
 **Individual agents do NOT write to the registry.** Only the team manager writes the completion marker.
 
+### Ticket Work Tracking
+
+In addition to the deployment registry, all work items are tracked as tickets.
+
+**On startup — check for assigned work:**
+
+```bash
+pa ticket list --team <team-name> --status todo
+pa ticket list --team <team-name> --status doing
+```
+
+**Claim a ticket before starting:**
+
+```bash
+pa ticket update <ticket-id> --status doing --assignee <agent-name>
+```
+
+**On completion — update ticket status:**
+
+```bash
+pa ticket update <ticket-id> --status done
+```
+
 ---
 
 ## 3. Spawning Sub-Agents
@@ -44,6 +67,8 @@ Your parent is: <your-agent-name>.
 Your workspace: ~/Documents/ai-usage/deployments/<deployment_id>/<your-agent-name>/<sub-agent-name>/
 You follow the global standards from skills/global/standards.md.
 
+Current ticket: <ticket-id> (or "none" if no assigned ticket for this deployment)
+
 Your task: <task description>
 ```
 
@@ -52,6 +77,7 @@ Your task: <task description>
 - `team_name`
 - `parent` (your own agent name)
 - `workspace` path for the sub-agent
+- `ticket_id` — the current ticket being worked on (if any)
 - A clear name for the sub-agent
 
 **Sub-agents inherit all global standards.** Remind them of the key ones:
@@ -166,161 +192,95 @@ mcp__ai-usage-log__save_session_bundle(
 | Agent | After all tasks done, before shutdown |
 | Team manager | After all agents done + completion marker, last thing before exit |
 
-### Work Report Submission
+### Work Report (via ticket)
 
-After logging your session, **every team manager** MUST also submit a brief work report to the review queue for Sinh:
+After logging your session, **every team manager** MUST create a work-report ticket to inform Sinh:
 
 ```bash
-mkdir -p ~/Documents/ai-usage/sinh-inputs/inbox
+pa ticket create \
+  --project personal-assistant \
+  --title "Work Report: <descriptive-topic>" \
+  --type work-report \
+  --team sinh \
+  --priority low \
+  --estimate XS \
+  --summary "<one-line summary of what was done and current status>"
 ```
 
-Write a summary file: `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team_name>-<descriptive-topic>.md`
+If there are detailed outputs or artifacts, attach them:
 
-**File naming:** Use a descriptive topic, not just team + deploy ID. Examples:
-- `2026-03-12-maintenance-health-check.md`
-- `2026-03-12-requirements-pa-review-dashboard.md`
-- `2026-03-12-builder-ts-migration-phase-2.md`
-
-```markdown
-# Work Report: <descriptive title>
-
-> **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>          ← Reporting team
-> **To:** sinh                                   ← Work reports always go to Sinh (do not change)
-> **Deployment:** <deploy_id>
-> **Type:** work-report
-> **Status:** success | partial | failed
-
-## What Was Done
-- <bullet summary of work completed>
-
-## Outputs
-- <file paths to key outputs>
-
-## Needs Attention
-- <anything requiring Sinh's review or decision>
-- <or "None">
-
-## Suggested Next Steps
-- <what should happen next — which agent/team, or action for Sinh>
+```bash
+pa ticket attach <ticket-id> \
+  --doc-ref "agent-teams/<team_name>/artifacts/YYYY-MM-DD-<topic>.md"
 ```
 
-This report is how Sinh stays informed. Place it in `~/Documents/ai-usage/sinh-inputs/inbox/` (the standardized inbox, not `for-sinh-review/`).
+**Descriptive topic examples:**
+- `Work Report: builder global-standards ticket migration`
+- `Work Report: maintenance health check`
+- `Work Report: requirements pa-review-dashboard`
 
-### Delivering Key Deliverables to Sinh
+### Delivering Key Deliverables (Review Requests)
 
-When your work produces a **deliverable** with lasting value (requirements doc, migration plan, analysis report, implementation result) — not just a routine work report — you MUST do three things:
+When your work produces a **deliverable** with lasting value (requirements doc, migration plan, analysis report) — not just a routine work report:
 
-#### 1. Preserve in team artifacts
+**Step 1 — Save deliverable to team artifacts:**
 
-Copy the deliverable from the ephemeral deployment workspace to your team's persistent `artifacts/` folder:
 ```bash
 cp ~/Documents/ai-usage/deployments/<deploy_id>/<agent_name>/<output>.md \
    ~/Documents/ai-usage/agent-teams/<team_name>/artifacts/YYYY-MM-DD-<descriptive-name>.md
 ```
 
-#### 2. Send a review request to Sinh's inbox
+**Step 2 — Create a review-request ticket:**
 
-Create a file in `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-<descriptive-topic>.md`.
-
-The review request **embeds the full deliverable content inline** — Sinh should be able to review everything by reading this one file, without navigating to other paths.
-
-```markdown
-# Review Request: <descriptive title>
-
-> **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>          ← Sender. Router uses this to notify you of the decision.
-> **To:** <target_team_name>                     ← Recipient after approval/rejection. Router uses this to forward the document.
-> **Deployment:** <deploy_id>
-> **Type:** review-request
-
-## What Was Done
-- <bullet summary of what was accomplished>
-
-## What Sinh Needs To Do
-- [ ] <specific action — e.g., "Review requirements doc and approve or request changes">
-- [ ] <specific decision — e.g., "Decide: web app vs TUI?">
-- [ ] <specific feedback — e.g., "Flag any missing requirements">
-
-## Suggested Next Steps
-- If approved: <what happens next — e.g., "Route to builder inbox for implementation">
-- If changes needed: <how to iterate — e.g., "Re-run with --interactive to refine">
-
-## Also Saved At
-- **Artifacts:** ~/Documents/ai-usage/agent-teams/<team_name>/artifacts/<filename>
-- **Deployment:** ~/Documents/ai-usage/deployments/<deploy_id>/<agent_name>/
-
----
-
-## Full Deliverable
-
-<paste the ENTIRE deliverable content here — requirements doc, plan, report, etc.>
-<Sinh reads everything in this one file — no need to navigate elsewhere>
-```
-
-#### 3. Track in waiting-for-response
-
-Place a tracking copy in your team's `waiting-for-response/`:
 ```bash
-~/Documents/ai-usage/agent-teams/<team_name>/waiting-for-response/YYYY-MM-DD-review-<topic>.md
+pa ticket create \
+  --project personal-assistant \
+  --title "Review: <descriptive-topic>" \
+  --type review-request \
+  --team <downstream-team-if-approved> \
+  --priority high \
+  --estimate M \
+  --doc-ref "agent-teams/<team_name>/artifacts/YYYY-MM-DD-<descriptive-name>.md" \
+  --summary "<what was built; what Sinh needs to review; what happens if approved>"
 ```
+
+The `--team` field is the downstream team that receives the work if Sinh approves. Sinh updates ticket status to route it.
+
+The `--doc-ref` points to the full deliverable in `artifacts/`. Sinh reads the ticket summary first, then opens the artifact for details.
 
 **Use this flow for:** requirements docs, implementation plans, analysis reports, any output needing human review.
-**Do NOT use for:** routine health checks, daily summaries, session logs — use the standard work report above for those.
+**Do NOT use for:** routine session logs — use work-report ticket above for those.
 
-### Plan Draft Template
+### FYI (informational notification)
+
+For non-actionable information that Sinh or another team should know:
+
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "FYI: <descriptive-topic>" \
+  --type fyi \
+  --team <recipient-team-or-sinh> \
+  --priority low \
+  --estimate XS \
+  --summary "<brief informational content — what happened, why it is relevant>"
+```
+
+### Plan Draft
 
 For daily/weekly plans emitted by the daily team:
 
-```markdown
-# Daily Plan — YYYY-MM-DD
-
-> **Type:** plan-draft
-> **Generated:** YYYY-MM-DD HH:MM
-> **By:** <agent>
-
-<plan content — goals, time budget, avo tasks>
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "Daily Plan: YYYY-MM-DD" \
+  --type plan-draft \
+  --team sinh \
+  --priority normal \
+  --estimate XS \
+  --doc-ref "daily/YYYY/MM/YYYY-MM-DD-plan.md" \
+  --summary "<goals and time budget summary>"
 ```
-
-### FYI Template
-
-For informational notifications requiring no action from Sinh:
-
-```markdown
-# FYI: <descriptive title>
-
-> **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>          ← Sender
-> **To:** <recipient_team_name>                  ← Who this is for (e.g., sinh, builder, secretary)
-> **Type:** fyi
-
-<brief informational content — what happened, why Sinh might want to know>
-```
-
-### Team-to-Team Message Template
-
-For messages between agent teams (routing notifications, decision notifications, coordination):
-
-```markdown
-# <Title>
-
-> **Date:** YYYY-MM-DD
-> **From:** <team_name> / <agent_name>          ← Who is sending
-> **To:** <recipient_team_name>                  ← Team inbox this is placed in
-> **Type:** fyi | routing-notification | decision-notification
-
-<content>
-```
-
-Both `From:` and `To:` are mandatory. Reference coordinate.md for secretary routing patterns.
-
-### Agent Self-Validation (mandatory before saving review-request or FYI)
-
-Before writing any review-request or FYI to an inbox, verify:
-1. `From:` is populated with your `<team_name> / <agent_name>`
-2. `To:` is populated with the intended recipient team or `sinh`
-
-**Missing either field = write error, not downstream concern.** Do not save a document without both fields — the router cannot notify you or forward the document if they are missing.
 
 ### On failure
 
@@ -328,12 +288,94 @@ Still log. Document what failed, what error occurred, and what was attempted. A 
 
 ---
 
+## 5. Ticket Workflow
+
+Agents interact with work exclusively through the ticket system — not inbox files.
+
+### Check for assigned work on startup
+
+```bash
+# High-priority work first
+pa ticket list --team <team-name> --status todo --priority high
+
+# All todo work
+pa ticket list --team <team-name> --status todo
+
+# Resume any in-progress work
+pa ticket list --team <team-name> --status doing
+```
+
+### Claim a ticket
+
+```bash
+pa ticket update <ticket-id> --status doing --assignee <agent-name>
+```
+
+### Update as you work
+
+```bash
+# When blocked
+pa ticket update <ticket-id> --status blocked
+pa ticket comment <ticket-id> --content "Blocked by: <reason>"
+
+# When sending for review
+pa ticket update <ticket-id> --status review
+
+# When complete
+pa ticket update <ticket-id> --status done
+```
+
+### Create tickets for discovered work
+
+When you identify follow-up work or issues during your task:
+
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "<title>" \
+  --type task \
+  --team <team> \
+  --priority normal \
+  --estimate <XS|S|M|L|XL> \
+  --summary "<description of the work needed>"
+```
+
+---
+
+## 6. Bulletin Awareness
+
+Before starting your main objective, check for active bulletins:
+
+```bash
+pa bulletin list
+```
+
+Active bulletins are also injected into your primer under `## Active Bulletins` — read that section on startup.
+
+If a bulletin blocks your team (`block: all` or your team name in `block:`) and you are NOT listed in `except:`:
+1. **Do not proceed with the main objective**
+2. Create a work-report ticket noting the block:
+   ```bash
+   pa ticket create \
+     --project personal-assistant \
+     --title "Work Report: deployment blocked by bulletin" \
+     --type work-report \
+     --team sinh \
+     --priority normal \
+     --estimate XS \
+     --summary "Deployment d-<id> blocked by active bulletin: <bulletin title>. No work performed."
+   ```
+3. Write the completion marker (failed status) and exit.
+
+---
+
 ## 7. Communication
 
 - **Agents → Team manager:** Report results via SendMessage or task completion
-- **Agents → Agents:** Only if the team objective requires coordination
-- **Team manager → User:** Final summary on completion
-- Always include your `agent_name` and `team_name` when communicating
+- **Agents → Agents:** Only if the team objective requires direct coordination
+- **Team manager → Sinh:** Create work-report or review-request ticket — not inbox files
+- **All cross-team communication:** Via tickets (FYI, work-report, review-request types) — not inbox files
+- Always include your `agent_name` and `team_name` in ticket titles, summaries, and comments
 
 ---
 
