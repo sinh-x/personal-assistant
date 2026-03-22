@@ -306,6 +306,12 @@ Save the document to 3 destinations:
 ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md
 ```
 
+**REQUIRED — attach doc_ref immediately after saving to artifacts:**
+```bash
+pa ticket update <ticket-id> --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
+```
+Do this **before** advancing ticket status. If you advance without setting `doc-ref`, the CLI will warn and add a `needs-doc-ref` tag automatically.
+
 **3. Ticket update (conditional):**
 
 ### If working on an existing ticket (ticket_id is set):

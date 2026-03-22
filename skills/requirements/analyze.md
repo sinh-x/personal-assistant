@@ -178,6 +178,12 @@ Save the requirements document in three places:
    ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md
    ```
 
+   **REQUIRED — attach doc_ref immediately after saving to artifacts:**
+   ```bash
+   pa ticket update <ticket-id> --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
+   ```
+   Do this **before** advancing ticket status. If you advance without setting `doc-ref`, the CLI will warn and add a `needs-doc-ref` tag automatically.
+
 3. **Ticket update (conditional):**
 
    ### If working on an existing ticket (ticket_id is set):

@@ -102,10 +102,21 @@ When you start working on an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee builder --status pending-implementation`
 2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
 3. Work on it
-4. On completion: `pa ticket update <id> --status review-uat --assignee sinh`
+4. On completion — **artifact finalization first, then advance:**
+   ```bash
+   # Step 1: save implementation artifact to persistent artifacts tier
+   # (e.g., the plan doc, migration guide, or implementation summary)
+   cp <output> ~/Documents/ai-usage/agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md
+
+   # Step 2: attach doc_ref BEFORE advancing status
+   pa ticket update <id> --doc-ref "agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"
+
+   # Step 3: advance to UAT
+   pa ticket update <id> --status review-uat --assignee sinh
+   ```
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
-Short single-step work may go directly `pending-implementation → review-uat --assignee sinh` without an intermediate `implementing` step.
+Short single-step work may go directly `pending-implementation → review-uat --assignee sinh` without an intermediate `implementing` step. Still attach `--doc-ref` before advancing.
 
 ### 2. Identify Next Phase
 
@@ -152,7 +163,7 @@ After verification passes:
 8. **Execute phase** — Create/modify files as the plan specifies
 9. **Verify** — Run all verification steps from the plan
 10. **Commit** — Conventional commit with phase number
-11. **Update ticket** — Check off completed phase in plan doc; if ALL phases done, `pa ticket update <id> --status review-uat --assignee sinh`. Otherwise leave as `implementing`.
+11. **Update ticket** — Check off completed phase in plan doc; if ALL phases done, attach artifact and advance: `pa ticket update <id> --doc-ref "agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"` then `pa ticket update <id> --status review-uat --assignee sinh`. Otherwise leave as `implementing`.
 12. **Report** — Add brief completion comment: `pa ticket comment <id> --author team-manager --content "Phase complete: <summary>"`
 
 ## Rules
@@ -179,7 +190,10 @@ Phase N committed successfully:
   → Update plan doc checklist: `- [ ] Phase N` → `- [x] Phase N`
   → Add comment: pa ticket comment <id> --content "Phase N complete: <brief summary>"
   → Are ALL phases in checklist now [x]?
-     YES → pa ticket update <id> --status review-uat --assignee sinh
+     YES → Artifact finalization (REQUIRED):
+             1. Save implementation artifact to agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md
+             2. Attach: pa ticket update <id> --doc-ref "agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"
+             3. Advance: pa ticket update <id> --status review-uat --assignee sinh
      NO  → leave ticket as "implementing", stop deployment
 ```
 
