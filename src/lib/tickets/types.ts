@@ -46,15 +46,17 @@ export type TicketType =
 export type Estimate = "XS" | "S" | "M" | "L" | "XL";
 
 export interface Comment {
+  id: string;
   author: string;
   content: string;
   timestamp: string;
+  editedAt?: string;
 }
 
 /** One entry in the JSONL audit log — records every mutation */
 export interface AuditEntry {
   ticket_id: string;
-  action: "created" | "updated" | "commented" | "attached";
+  action: "created" | "updated" | "commented" | "attached" | "comment_edited" | "comment_deleted";
   actor: string;
   timestamp: string;
   /** Map of field name → [old_value, new_value] */

@@ -249,7 +249,7 @@ export function createTicketCommand(): Command {
     .requiredOption("--content <text>", "Comment content")
     .action((id: string, opts: { author: string; content: string }) => {
       const store = new TicketStore();
-      const ticket = store.addComment(id, opts.author, opts.content);
+      const { ticket } = store.addComment(id, opts.author, opts.content);
       console.log(`Comment added to ${ticket.id}`);
     });
 

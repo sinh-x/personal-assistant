@@ -6,6 +6,14 @@
  * GET    /api/tickets/:id          — get a single ticket by ID
  * PATCH  /api/tickets/:id          — update ticket fields
  * GET    /api/board                — board view grouped by status (project required)
+ *
+ * Comment routes:
+ * POST   /api/tickets/:id/comments              — add a comment
+ * PATCH  /api/tickets/:id/comments/:commentId   — edit a comment
+ * DELETE /api/tickets/:id/comments/:commentId   — delete a comment (204)
+ *
+ * Attachment routes:
+ * POST   /api/tickets/:id/attachments           — add an attachment path
  */
 
 import { Hono } from "hono";
@@ -102,6 +110,110 @@ export function ticketRoutes(): Hono {
         return c.json({ error: message, code: "NOT_FOUND" }, 404);
       }
       return c.json({ error: message, code: "UPDATE_FAILED" }, 400);
+    }
+  });
+
+  // POST /api/tickets/:id/comments — add a comment
+  app.post("/api/tickets/:id/comments", async (c: Context) => {
+    const id = c.req.param("id") as string;
+    let body: { author: string; content: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body", code: "BAD_REQUEST" }, 400);
+    }
+    if (!body.author || !body.content) {
+      return c.json(
+        { error: "author and content are required", code: "BAD_REQUEST" },
+        400
+      );
+    }
+    try {
+      const { ticket, comment } = store.addComment(id, body.author, body.content);
+      return c.json({ ticket, comment }, 201);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("Ticket not found")) {
+        return c.json({ error: message, code: "NOT_FOUND" }, 404);
+      }
+      return c.json({ error: message, code: "COMMENT_FAILED" }, 400);
+    }
+  });
+
+  // PATCH /api/tickets/:id/comments/:commentId — edit a comment
+  app.patch("/api/tickets/:id/comments/:commentId", async (c: Context) => {
+    const id = c.req.param("id") as string;
+    const commentId = c.req.param("commentId") as string;
+    let body: { content: string; actor?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body", code: "BAD_REQUEST" }, 400);
+    }
+    if (!body.content) {
+      return c.json({ error: "content is required", code: "BAD_REQUEST" }, 400);
+    }
+    try {
+      const { comment } = store.editComment(id, commentId, body.content, body.actor);
+      return c.json({ comment });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stderr =
+        (err as { stderr?: Buffer }).stderr?.toString() ?? "";
+      if (message.includes("Ticket not found")) {
+        return c.json({ error: message, code: "NOT_FOUND" }, 404);
+      }
+      if (stderr.includes("Comment not found")) {
+        return c.json({ error: "Comment not found", code: "NOT_FOUND" }, 404);
+      }
+      return c.json({ error: message, code: "EDIT_FAILED" }, 400);
+    }
+  });
+
+  // DELETE /api/tickets/:id/comments/:commentId — delete a comment
+  app.delete("/api/tickets/:id/comments/:commentId", async (c: Context) => {
+    const id = c.req.param("id") as string;
+    const commentId = c.req.param("commentId") as string;
+    const actor = c.req.query("actor") ?? "api";
+    try {
+      store.deleteComment(id, commentId, actor);
+      return new Response(null, { status: 204 });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stderr =
+        (err as { stderr?: Buffer }).stderr?.toString() ?? "";
+      if (message.includes("Ticket not found")) {
+        return c.json({ error: message, code: "NOT_FOUND" }, 404);
+      }
+      if (stderr.includes("Comment not found")) {
+        return c.json({ error: "Comment not found", code: "NOT_FOUND" }, 404);
+      }
+      return c.json({ error: message, code: "DELETE_FAILED" }, 400);
+    }
+  });
+
+  // POST /api/tickets/:id/attachments — add an attachment path
+  app.post("/api/tickets/:id/attachments", async (c: Context) => {
+    const id = c.req.param("id") as string;
+    let body: { path: string; actor?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body", code: "BAD_REQUEST" }, 400);
+    }
+    if (!body.path) {
+      return c.json({ error: "path is required", code: "BAD_REQUEST" }, 400);
+    }
+    const actor = body.actor ?? "api";
+    try {
+      const ticket = store.attach(id, body.path, actor);
+      return c.json({ ticket });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes("Ticket not found")) {
+        return c.json({ error: message, code: "NOT_FOUND" }, 404);
+      }
+      return c.json({ error: message, code: "ATTACH_FAILED" }, 400);
     }
   });
 
