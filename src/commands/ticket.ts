@@ -1,5 +1,6 @@
 import { Command } from "commander";
 import { TicketStore } from "../lib/tickets/index.js";
+import { validateAuthor } from "../lib/tickets/validate.js";
 import type {
   Estimate,
   TicketStatus,
@@ -248,6 +249,12 @@ export function createTicketCommand(): Command {
     .requiredOption("--author <name>", "Comment author")
     .requiredOption("--content <text>", "Comment content")
     .action((id: string, opts: { author: string; content: string }) => {
+      try {
+        validateAuthor(opts.author);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
+      }
       const store = new TicketStore();
       const { ticket } = store.addComment(id, opts.author, opts.content);
       console.log(`Comment added to ${ticket.id}`);

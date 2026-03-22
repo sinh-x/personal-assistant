@@ -19,6 +19,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { TicketStore } from "../../tickets/index.js";
+import { validateAuthor } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
 import type { CreateTicketInput, UpdateTicketInput } from "../../tickets/types.js";
 
@@ -125,6 +126,14 @@ export function ticketRoutes(): Hono {
     if (!body.author || !body.content) {
       return c.json(
         { error: "author and content are required", code: "BAD_REQUEST" },
+        400
+      );
+    }
+    try {
+      validateAuthor(body.author);
+    } catch (err) {
+      return c.json(
+        { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
         400
       );
     }

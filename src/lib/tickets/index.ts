@@ -32,3 +32,5 @@ export type {
   TeamSprintMetrics,
   EstimateMetrics,
 } from "./metrics.js";
+
+export { validateAuthor } from "./validate.js";
