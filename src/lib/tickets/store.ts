@@ -5,9 +5,10 @@ import {
   writeFileSync,
   readdirSync,
   mkdirSync,
+  statSync,
 } from "node:fs";
-import { resolve } from "node:path";
-import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
+import { tmpdir, homedir } from "node:os";
 import { getTicketsDir } from "../paths.js";
 import type {
   Ticket,
@@ -69,6 +70,70 @@ export class TicketStore {
 
   private auditPath(): string {
     return resolve(this.dir, "audit.jsonl");
+  }
+
+  // ── Doc-ref helpers ───────────────────────────────────────────────────────
+
+  /** Format a relative date for display in artifact suggestions. */
+  private relativeDate(mtime: Date): string {
+    const diffDays = Math.floor((Date.now() - mtime.getTime()) / 86400000);
+    if (diffDays === 0) return "today";
+    if (diffDays === 1) return "yesterday";
+    return `${diffDays} days ago`;
+  }
+
+  /** Scan workspace for candidate artifact .md files, sorted by recency. */
+  private suggestArtifacts(assignee: string, limit = 3): Array<{ path: string; mtime: Date }> {
+    const aiUsageDir = join(homedir(), "Documents/ai-usage");
+    const candidates: Array<{ path: string; mtime: Date }> = [];
+
+    const scanDir = (dir: string) => {
+      try {
+        if (!existsSync(dir)) return;
+        for (const f of readdirSync(dir)) {
+          if (!f.endsWith(".md")) continue;
+          const full = join(dir, f);
+          try {
+            const stat = statSync(full);
+            if (stat.isFile()) {
+              candidates.push({ path: full.replace(aiUsageDir + "/", ""), mtime: stat.mtime });
+            }
+          } catch { /* ignore */ }
+        }
+      } catch { /* ignore */ }
+    };
+
+    // Scan agent-teams/*/artifacts/
+    const agentTeamsDir = join(aiUsageDir, "agent-teams");
+    try {
+      if (existsSync(agentTeamsDir)) {
+        for (const team of readdirSync(agentTeamsDir)) {
+          scanDir(join(agentTeamsDir, team, "artifacts"));
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Scan recent deployments/ for .md files
+    const deploymentsDir = join(aiUsageDir, "deployments");
+    try {
+      if (existsSync(deploymentsDir)) {
+        for (const d of readdirSync(deploymentsDir)) {
+          if (d.startsWith(".")) continue;
+          const dp = join(deploymentsDir, d);
+          try {
+            if (statSync(dp).isDirectory()) scanDir(dp);
+          } catch { /* ignore */ }
+        }
+      }
+    } catch { /* ignore */ }
+
+    // Deduplicate, sort by mtime desc, take top N
+    const seen = new Set<string>();
+    const unique: Array<{ path: string; mtime: Date }> = [];
+    for (const c of candidates) {
+      if (!seen.has(c.path)) { seen.add(c.path); unique.push(c); }
+    }
+    return unique.sort((a, b) => b.mtime.getTime() - a.mtime.getTime()).slice(0, limit);
   }
 
   // ── ID allocation ─────────────────────────────────────────────────────────
@@ -189,6 +254,12 @@ export class TicketStore {
       },
     });
 
+    // F1: Remind about doc_ref for types that benefit from review context
+    const typesNeedingDocRef = ["task", "feature", "review-request"];
+    if (typesNeedingDocRef.includes(ticket.type) && !ticket.doc_ref) {
+      process.stderr.write("Reminder: Consider attaching --doc-ref for review context\n");
+    }
+
     return ticket;
   }
 
@@ -240,6 +311,22 @@ export class TicketStore {
       const existingTags = input.tags ?? ticket.tags ?? [];
       if (!existingTags.includes("needs-doc-ref")) {
         input.tags = [...existingTags, "needs-doc-ref"];
+      }
+    }
+
+    // Step 0c: Remind + suggest artifacts for ANY status advancement without doc_ref (F2, F3)
+    if (input.status !== undefined) {
+      const oldPos = PIPELINE_ORDER[ticket.status] ?? -1;
+      const newPos = PIPELINE_ORDER[input.status] ?? -1;
+      if (newPos > oldPos && !input.doc_ref && !ticket.doc_ref) {
+        process.stderr.write("Reminder: doc_ref not set. Consider attaching a document for review context.\n");
+        const suggestions = this.suggestArtifacts(input.assignee ?? ticket.assignee);
+        if (suggestions.length > 0) {
+          let msg = "Suggested artifacts:\n";
+          suggestions.forEach((s, i) => { msg += `  ${i + 1}. ${s.path} (${this.relativeDate(s.mtime)})\n`; });
+          msg += `Attach with: pa ticket update ${id} --doc-ref <path>\n`;
+          process.stderr.write(msg);
+        }
       }
     }
 

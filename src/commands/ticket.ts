@@ -266,6 +266,14 @@ export function createTicketCommand(): Command {
       const store = new TicketStore();
       const { ticket } = store.addComment(id, opts.author, opts.content);
       console.log(`Comment added to ${ticket.id}`);
+      // F4: Hint if comment references an artifact path and doc_ref is not set
+      const artifactPattern = /agent-teams\/[^\s]+\/artifacts\/[^\s]+|deployments\/[^\s]+/;
+      const match = artifactPattern.exec(opts.content);
+      if (match && !ticket.doc_ref) {
+        process.stderr.write(
+          `Hint: This comment references an artifact path. Attach it? pa ticket update ${ticket.id} --doc-ref ${match[0]}\n`
+        );
+      }
     });
 
   return cmd;
