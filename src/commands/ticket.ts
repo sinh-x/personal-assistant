@@ -117,7 +117,7 @@ export function createTicketCommand(): Command {
             doc_ref: opts.docRef,
             from: opts.from,
             to: opts.to,
-            dependencies: [],
+            blockedBy: [],
             attachments: [],
             comments: [],
           },
@@ -134,10 +134,11 @@ export function createTicketCommand(): Command {
     .command("update")
     .description("Update fields on a ticket")
     .argument("<id>", "Ticket ID (e.g. PA-001)")
-    .option("--status <status>", "New status (idea|requirement-review|pending-approval|pending-implementation|implementing|review-uat|done|rejected|on-hold|cancelled)")
+    .option("--status <status>", "New status (idea|requirement-review|pending-approval|pending-implementation|implementing|review-uat|done|rejected|cancelled)")
     .option("--assignee <name>", "New assignee")
     .option("--priority <priority>", "New priority (critical|high|medium|low)")
     .option("--tags <tags>", "Comma-separated tags (replaces existing)")
+    .option("--blocked-by <ids>", "Comma-separated ticket IDs that block this ticket (replaces existing; empty string to clear)")
     .option("--estimate <size>", "New effort estimate (XS|S|M|L|XL)")
     .option("--doc-ref <path>", "Document reference path (plan doc, requirements doc, etc.)")
     .option("--actor <name>", "Actor for audit log", "cli-user")
@@ -149,6 +150,7 @@ export function createTicketCommand(): Command {
           assignee?: string;
           priority?: string;
           tags?: string;
+          blockedBy?: string;
           estimate?: string;
           docRef?: string;
           actor: string;
@@ -161,6 +163,9 @@ export function createTicketCommand(): Command {
         if (opts.priority) input.priority = opts.priority as TicketPriority;
         if (opts.tags !== undefined) {
           input.tags = opts.tags.split(",").map((t) => t.trim()).filter(Boolean);
+        }
+        if (opts.blockedBy !== undefined) {
+          input.blockedBy = opts.blockedBy ? opts.blockedBy.split(",").map((t) => t.trim()).filter(Boolean) : [];
         }
         if (opts.estimate) {
           input.estimate = validateEstimate(opts.estimate);

@@ -45,7 +45,6 @@ const STATUS_ABBREV: Record<string, string> = {
   "review-uat": "UAT",
   "done": "DONE",
   "rejected": "REJ",
-  "on-hold": "HOLD",
   "cancelled": "CNCL",
 };
 
@@ -59,7 +58,6 @@ const STATUS_WIDTH: Record<string, number> = {
   "review-uat": 5,
   "done": 6,
   "rejected": 5,
-  "on-hold": 6,
   "cancelled": 6,
 };
 

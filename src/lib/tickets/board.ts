@@ -11,7 +11,6 @@ export const BOARD_COLUMNS: TicketStatus[] = [
   "review-uat",
   "done",
   "rejected",
-  "on-hold",
   "cancelled",
 ];
 
@@ -49,6 +48,7 @@ export function buildBoardView(
   filters: {
     assignee?: string;
     priority?: string;
+    excludeTags?: string[];
   } = {}
 ): BoardView {
   const store = new TicketStore();
