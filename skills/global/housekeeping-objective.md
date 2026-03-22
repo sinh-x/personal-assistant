@@ -6,20 +6,20 @@ Your job is to process all inbox and workflow state for your team. Follow the st
 
 1. **Create workspaces** — `mkdir -p` team workspace with subfolders (artifacts, archives) + per-deployment workspace
 
-2. **Check assigned tickets** — `pa ticket list --team <team_name> --status todo`. For each ticket:
-   - Single-step tickets: claim and process immediately (`pa ticket update <id> --status done`)
-   - Multi-step tickets: claim with `pa ticket update <id> --status doing` before starting work
+2. **Check assigned tickets** — `pa ticket list --team <team_name> --status pending-implementation`. For each ticket:
+   - Single-step tickets: claim and complete immediately (`pa ticket update <id> --status review-uat --team sinh`)
+   - Multi-step tickets: claim with `pa ticket update <id> --status implementing --assignee team-manager` before starting work
 
-3. **Review-request resolution** — `pa ticket list --team <team_name> --status review`:
-   - Check if Sinh has updated the status (approved → todo for downstream, or rejected/closed)
-   - If resolved: note the outcome and close or forward the ticket
+3. **Review-request resolution** — `pa ticket list --team <team_name> --status pending-approval`:
+   - Check if Sinh has updated the status (approved → pending-implementation for downstream, or rejected)
+   - If resolved: note the outcome and add a comment
    - If unresolved AND >3 days old: create a follow-up FYI ticket for Sinh (skip if already exists)
 
-4. **In-progress review** — `pa ticket list --team <team_name> --status doing` for stale or blocked tickets:
-   - Tickets that can be completed now: complete work and `pa ticket update <id> --status done`
-   - Tickets blocked externally: add a comment with blocking reason, create FYI ticket for whoever can unblock
+4. **In-progress review** — `pa ticket list --team <team_name> --status implementing` for stale or blocked tickets:
+   - Tickets that can be completed now: complete work and `pa ticket update <id> --status review-uat --team sinh`
+   - Tickets blocked externally: add `--tags blocked` + comment, create FYI ticket for whoever can unblock
 
-5. **Produce summary** — `pa ticket create --type work-report --project personal-assistant --title "Housekeeping: <team_name>" --summary "..." --estimate XS` summarizing:
+5. **Produce summary** — Add a completion comment on the housekeeping ticket (if any), or create an FYI for Sinh summarizing:
    - Tickets processed from todo queue
    - Review-request tickets resolved or still waiting
    - In-progress tickets status

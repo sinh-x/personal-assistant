@@ -159,7 +159,7 @@ Set `on-hold` + comment explaining why. Sprint-master reviews on-hold tickets we
 
 ## Blocked Tag Protocol
 
-`blocked` is a **tag**, not a status. Agents must never set `--status blocked`.
+`blocked` is a **tag**, not a status. `blocked` must never appear as a status value — it belongs in `--tags` only.
 
 When an agent cannot proceed due to an external dependency or missing decision:
 

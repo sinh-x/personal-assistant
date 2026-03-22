@@ -12,10 +12,10 @@ On startup:
 
 When the user gives you a task:
 1. **Cross-reference with existing work** — Before starting, check for related tickets:
-   - `pa ticket list --team builder --status doing` (in-progress)
-   - `pa ticket list --team builder --status todo` (pending)
+   - `pa ticket list --team builder --status implementing` (in-progress)
+   - `pa ticket list --team builder --status pending-implementation` (pending)
    - `pa ticket list --team builder --status done` (completed)
-   If you find related tickets, inform the user (e.g., "There's a related ticket in doing..." or "This was completed in ticket PA-042...") and ask how they want to proceed — pick up the existing ticket, start fresh, or incorporate context from it.
+   If you find related tickets, inform the user (e.g., "There's a related ticket implementing..." or "This was completed in ticket PA-042...") and ask how they want to proceed — pick up the existing ticket, start fresh, or incorporate context from it.
 2. **Execute the task** following the standard execution steps below.
 3. After completing, return to idle — wait for the next instruction.
 
@@ -38,7 +38,7 @@ Once you have a work item (from user instruction):
 6. Verify (run tests, type checks, compare output)
 7. Commit with conventional commit message: `feat(<scope>): description`
 8. If working from a ticket, update its checklist in the plan doc (`- [ ]` → `- [x]`)
-9. If ALL phases are checked off: `pa ticket update <id> --status done`
+9. If ALL phases are checked off: `pa ticket update <id> --status review-uat --team sinh`
 
 ## Rules
 

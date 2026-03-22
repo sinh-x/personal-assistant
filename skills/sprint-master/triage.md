@@ -6,33 +6,34 @@ ensure all tickets have valid effort estimates.
 
 ## Objectives
 
-1. **Aggregate work reports** from all teams (first priority)
+1. **Aggregate team activity** from ticket comments (first priority)
 2. Find all unassigned or unestimated tickets
 3. Apply priority rules (see §Priority Rules)
 4. Assign to the correct team based on ticket type and content
 5. Validate or set effort estimates (XS/S/M/L/XL)
-6. Write a combined triage + work-report summary
+6. Write a daily digest document in `agent-teams/sprint-master/artifacts/`
 
 ## Workflow
 
-### Step 0 — Aggregate work reports from all teams (FIRST)
+### Step 0 — Aggregate team activity from ticket comments (FIRST)
 
-Scan `~/Documents/ai-usage/sinh-inputs/inbox/` for work-report files written since the last triage run:
+Read recent ticket comments to get a picture of what each team has been doing:
 
 ```bash
-ls -lt ~/Documents/ai-usage/sinh-inputs/inbox/ | head -20
+# Find tickets recently updated across all teams
+pa ticket list --project personal-assistant
 ```
 
-For each new work-report file:
-1. Read it: note the team, status (success/partial/failed), key outputs, and any "Needs Attention" items
-2. Include a summary row in the triage report (see Step 9)
-3. Move reviewed files to `done/` after including in summary:
-   ```bash
-   mv ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-<team>-<topic>.md \
-      ~/Documents/ai-usage/sinh-inputs/done/
-   ```
+For each ticket with `implementing` or recently-completed status, run `pa ticket show <id>` and read the comments. Note:
+- Team name (from `team` field)
+- What was completed (from completion comments)
+- Any "needs attention" or blocked items (look for BLOCKED comments or `blocked` tags)
 
-> **Why first?** Sprint-master is the single point of aggregation for all team work reports. Surfacing team activity before ticket triage gives context for prioritization decisions.
+Include a summary row per team in the daily digest (see Step 9).
+
+> **Why first?** Sprint-master is the single aggregation point for all team activity. Ticket comments replaced standalone work-report files. All team completion reports are now ticket comments.
+
+> **Legacy:** If you find work-report files in `sinh-inputs/inbox/`, move them to `done/` after reading. They are deprecated.
 
 ### Step 1 — Scan all tickets
 
@@ -46,7 +47,7 @@ Also check for tickets missing estimates:
 pa ticket list --project personal-assistant | grep '"estimate": ""'
 ```
 
-Focus triage on tickets with no assignee, no estimate, or in early-stage statuses (`idea`, `backlog`, `todo`, `requirement-review`). Do NOT re-triage tickets already `implementing`, `doing`, or `done`.
+Focus triage on tickets with no assignee, no estimate, or in early-stage statuses (`idea`, `requirement-review`, `pending-approval`). Do NOT re-triage tickets already `implementing`, `pending-implementation`, or in terminal states.
 
 ### Step 2 — Read each ticket
 
@@ -111,17 +112,17 @@ Only update fields that need changing. Do not overwrite correct values.
 
 ### Step 7 — Check for stale tickets
 
-Scan for tickets in `doing` status older than 3 days:
+Scan for tickets in `implementing` status older than 3 days:
 ```bash
-pa ticket list --status doing
+pa ticket list --status implementing
 ```
 
-For any stale `doing` ticket:
+For any stale `implementing` ticket:
 1. Add a comment noting it appears stale
-2. Reset status to `todo` if no recent audit activity
+2. Reset to `pending-implementation` if no recent audit activity or comments
 
 ```bash
-pa ticket update <TICKET-ID> --status todo
+pa ticket update <TICKET-ID> --status pending-implementation --team <original-team>
 ```
 
 ### Step 8 — Escalate blockers
@@ -130,33 +131,32 @@ If a ticket has `dependencies` that are still in `backlog`/`todo`, flag it:
 - Add a comment: "Blocked: waiting on dependency <DEP-ID>"
 - Set priority to `urgent` if the dependent ticket is `urgent`
 
-### Step 9 — Write triage report
+### Step 9 — Write daily digest
 
-Write a work report to `~/Documents/ai-usage/sinh-inputs/inbox/`:
+Write the daily digest as a document file to the sprint-master artifacts directory:
+
+```bash
+mkdir -p ~/Documents/ai-usage/agent-teams/sprint-master/artifacts
+```
 
 ```
-~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-sprint-master-triage.md
+~/Documents/ai-usage/agent-teams/sprint-master/artifacts/YYYY-MM-DD-daily-digest.md
 ```
 
-Report format:
+Daily digest format:
 ```markdown
-# Work Report: Sprint-Master Triage Run
+# Daily Digest — YYYY-MM-DD
 
 > **Date:** YYYY-MM-DD
 > **From:** sprint-master / team-manager
-> **To:** sinh
 > **Deployment:** <deployment_id>
-> **Type:** work-report
-> **Status:** success | partial
 
-## Team Activity (Work Reports)
+## Team Activity
 
-| Team | Date | Status | Key Output | Needs Attention |
-|------|------|--------|------------|-----------------|
-| builder | YYYY-MM-DD | success | <one-line> | None |
-| requirements | YYYY-MM-DD | partial | <one-line> | <item> |
-
-_N work reports reviewed and moved to done/_
+| Team | Ticket | Status | Key Output | Needs Attention |
+|------|--------|--------|------------|-----------------|
+| builder | PA-042 | implementing | Phase 3 of kanban doc updates | None |
+| requirements | PA-039 | pending-approval | Requirements doc for PA-039 | Awaiting Sinh review |
 
 ## Triage Summary
 
@@ -173,14 +173,28 @@ _N work reports reviewed and moved to done/_
 
 ## Needs Attention
 
-- <from work reports: items teams flagged for Sinh>
-- <from ticket triage: tickets requiring Sinh's input>
+- <items teams flagged in ticket comments — look for "needs attention" or "blocked" keywords>
+- <tickets requiring Sinh's input (pending-approval, review-uat stale)>
 - <or "None">
 
 ## Suggested Next Steps
 
-- Deploy sprint-master triage again in 24-48h after new tickets accumulate
+- Run triage again in 24-48h after new tickets accumulate
 - <any specific follow-up>
+```
+
+After writing the digest, create a FYI ticket linking to it:
+
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "FYI: Daily digest ready — YYYY-MM-DD" \
+  --type fyi \
+  --team sinh \
+  --priority normal \
+  --estimate XS \
+  --doc-ref "agent-teams/sprint-master/artifacts/YYYY-MM-DD-daily-digest.md" \
+  --summary "WHAT: Daily triage digest for YYYY-MM-DD. IMPACT: N tickets triaged, M teams active. ACTION: Review digest for items needing attention."
 ```
 
 ## Rules

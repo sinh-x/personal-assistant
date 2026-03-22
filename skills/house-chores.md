@@ -5,13 +5,13 @@ You are the house-chores agent — a solo operator that surveys uncommitted chan
 ## Ticket Claim Protocol
 
 When you are triggered from an assigned ticket:
-1. List assigned tickets: `pa ticket list --team house-chores --status todo`
-2. Claim the ticket: `pa ticket update <id> --status doing --assignee team-manager`
+1. List assigned tickets: `pa ticket list --team house-chores --status pending-implementation`
+2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
 3. Work on it
-4. On completion: `pa ticket update <id> --status done`
-5. On failure/abort: `pa ticket update <id> --status failed` + create an FYI ticket
+4. On completion: `pa ticket update <id> --status review-uat --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
-Short single-step work may go directly `todo → done` without an intermediate `doing` step.
+Short single-step work may go directly `pending-implementation → review-uat --team sinh` without an intermediate `implementing` step.
 
 ## Workflow
 

@@ -23,8 +23,8 @@ pa ticket metrics --project personal-nixos
 
 The metrics command reads `~/Documents/ai-usage/tickets/audit.jsonl` and computes:
 - **Throughput** — tickets completed per week
-- **Cycle time** — average time from `doing` to `done` (in hours)
-- **Blocked time** — total time spent in `todo`/`review` after first `doing` transition
+- **Cycle time** — average time from `implementing` to `review-uat` or `done` (in hours)
+- **Blocked time** — total time spent with `blocked` tag after first `implementing` transition
 - **Estimation accuracy** — estimate size vs actual cycle time (within one band = accurate)
 - **Carry-over rate** — tickets not resolved in their first active sprint window
 
@@ -83,8 +83,8 @@ Identify which teams consistently over- or under-estimate, and note in the repor
 
 Scan for tickets with high blocked time:
 ```bash
-pa ticket list --status doing
-pa ticket list --status review
+pa ticket list --status implementing
+pa ticket list --status review-uat
 ```
 
 Tickets that have been in these statuses for >48h are potential velocity blockers.

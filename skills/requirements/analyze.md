@@ -9,13 +9,11 @@ This is an **interactive** session. You talk to the user, ask questions, and bui
 ### Ticket Claim Protocol
 
 When starting a requirements session from an assigned ticket:
-1. List assigned tickets: `pa ticket list --team requirements --status todo`
-2. Claim the ticket: `pa ticket update <id> --status doing --assignee team-manager`
+1. List assigned tickets: `pa ticket list --team requirements --status requirement-review`
+2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status done`
-5. On failure/abort: `pa ticket update <id> --status failed` + create an FYI ticket
-
-Short single-step work may go directly `todo → done` without an intermediate `doing` step.
+4. On completion: `pa ticket update <id> --status pending-approval --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ### Repo Context (mandatory startup)
 

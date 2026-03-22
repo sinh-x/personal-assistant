@@ -94,18 +94,18 @@ Now you are on the correct branch. Proceed with the plan.
 
 ### 1. Read the Plan
 
-Each deployment starts by checking your assigned tickets with `pa ticket list --team builder --status todo`. The ticket's `doc_ref` field references the detailed plan document. Read the full plan before doing anything.
+Each deployment starts by checking your assigned tickets with `pa ticket list --team builder --status pending-implementation`. The ticket's `doc_ref` field references the detailed plan document. Read the full plan before doing anything.
 
 ### Ticket Claim Protocol
 
 When you start working on an assigned ticket:
-1. List assigned tickets: `pa ticket list --team builder --status todo`
-2. Claim the ticket: `pa ticket update <id> --status doing --assignee team-manager`
+1. List assigned tickets: `pa ticket list --team builder --status pending-implementation`
+2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
 3. Work on it
-4. On completion: `pa ticket update <id> --status done`
-5. On failure/abort: `pa ticket update <id> --status failed` + create an FYI ticket
+4. On completion: `pa ticket update <id> --status review-uat --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
-Short single-step work may go directly `todo → done` without an intermediate `doing` step.
+Short single-step work may go directly `pending-implementation → review-uat --team sinh` without an intermediate `implementing` step.
 
 ### 2. Identify Next Phase
 
@@ -136,15 +136,15 @@ After verification passes:
 - Commit with: `feat(<scope>): phase N - description`
 - **Update the item file checklist** — change `- [ ] Phase N` to `- [x] Phase N` for the phase just completed
 - **Check done condition** — see §Multi-Phase Completion Logic below
-- Create a work report ticket: `pa ticket create --type work-report --project personal-assistant --title "<descriptive title>" --summary "<brief summary>" --estimate XS`
+- Add a brief completion comment on the ticket: `pa ticket comment <id> --author team-manager --content "Completed phase N: <summary>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"`
 
 ## Workflow
 
 ### On Each Deployment
 
-1. **Check in-progress tickets first** — `pa ticket list --team builder --status doing`. If found, resume that ticket before picking up anything new.
-2. **Check new tickets** — If nothing in-progress, run `pa ticket list --team builder --status todo` to find the next work item.
-3. **Claim ticket** — `pa ticket update <id> --status doing --assignee team-manager` before starting any work (see §Ticket Claim Protocol)
+1. **Check in-progress tickets first** — `pa ticket list --team builder --status implementing`. If found, resume that ticket before picking up anything new.
+2. **Check new tickets** — If nothing in-progress, run `pa ticket list --team builder --status pending-implementation` to find the next work item.
+3. **Claim ticket** — `pa ticket update <id> --status implementing --assignee team-manager` before starting any work (see §Ticket Claim Protocol)
 4. **Read plan document** — Read `doc_ref` from the ticket to identify repo path, feature branch, and full scope
 5. **Pre-flight checks** — Switch to repo, check branch, create feature branch (§Pre-flight Checks). Stop here if check fails.
 6. **Check progress** — `git log --oneline | grep 'feat('` to find completed phases
@@ -152,8 +152,8 @@ After verification passes:
 8. **Execute phase** — Create/modify files as the plan specifies
 9. **Verify** — Run all verification steps from the plan
 10. **Commit** — Conventional commit with phase number
-11. **Update ticket** — Check off completed phase in plan doc; if ALL phases done, `pa ticket update <id> --status done`. Otherwise leave as `doing`.
-12. **Report** — `pa ticket create --type work-report --project personal-assistant --title "<topic>" --summary "<brief summary>" --estimate XS`
+11. **Update ticket** — Check off completed phase in plan doc; if ALL phases done, `pa ticket update <id> --status review-uat --team sinh`. Otherwise leave as `implementing`.
+12. **Report** — Add brief completion comment: `pa ticket comment <id> --author team-manager --content "Phase complete: <summary>"`
 
 ## Rules
 
@@ -165,7 +165,7 @@ After verification passes:
 - **No new features.** Port behavior exactly as-is. Improvements come after migration is complete.
 - **Type everything.** No `any` types in TypeScript. If a type is unclear, read the bash script to understand all possible values.
 - **Test each command.** Run the TS version and compare output to the bash equivalent.
-- **If verification fails, STOP.** Create a failed work-report ticket (`pa ticket create --type work-report`) and do not proceed to the next phase.
+- **If verification fails, STOP.** Add `--tags failed` to the ticket and a comment explaining the failure. Create a FYI ticket for Sinh. Do not proceed to the next phase.
 - **Respect .gitignore.** Never commit node_modules, dist, secrets, or ignored files.
 - **Atomic commits.** One commit per phase. Don't bundle unrelated changes.
 - **Document everything.** Your work report should explain what was built, what was verified, and any issues found.
@@ -177,16 +177,17 @@ After verification passes:
 ```
 Phase N committed successfully:
   → Update plan doc checklist: `- [ ] Phase N` → `- [x] Phase N`
+  → Add comment: pa ticket comment <id> --content "Phase N complete: <brief summary>"
   → Are ALL phases in checklist now [x]?
-     YES → pa ticket update <id> --status done
-     NO  → leave ticket as "doing", create progress work-report ticket, stop deployment
+     YES → pa ticket update <id> --status review-uat --team sinh
+     NO  → leave ticket as "implementing", stop deployment
 ```
 
-**Never update a multi-phase ticket to `done` unless every phase is checked off.** This is the single most important rule for multi-phase items.
+**Never update a multi-phase ticket to `review-uat` unless every phase is checked off.** This is the single most important rule for multi-phase items.
 
 ### Items without a checklist
 
-If the ticket has no phase checklist in its doc_ref, use git log only to detect completed phases. In this case, never update to `done` automatically — leave as `doing` and note in the work-report ticket that manual review is needed to determine completion.
+If the ticket has no phase checklist in its doc_ref, use git log only to detect completed phases. In this case, never update to `review-uat` automatically — leave as `implementing` and add a comment noting that manual review is needed to determine completion.
 
 ### Failure handling
 
@@ -194,8 +195,8 @@ If the ticket has no phase checklist in its doc_ref, use git log only to detect 
 Phase N fails verification:
   → Do NOT commit
   → Do NOT update checklist
-  → Ticket stays as "doing"
-  → Background mode: pa ticket update <id> --status failed; create failed work-report ticket; stop deployment
+  → Ticket stays as "implementing"
+  → Background mode: pa ticket update <id> --tags failed; add failure comment; create FYI ticket for Sinh; stop deployment
   → Foreground mode: pause and ask user for direction (retry, skip, or abort)
 ```
 

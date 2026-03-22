@@ -93,19 +93,19 @@ mkdir -p ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/
 **2. Check in-progress tickets (stale check)**
 
 ```bash
-pa ticket list --team <team-name> --status doing
+pa ticket list --team <team-name> --status implementing
 ```
 
-For each ticket in `doing` state that has not been updated in >3 days, add a stale comment:
+For each ticket in `implementing` state that has not been updated in >3 days, add a stale comment:
 
 ```bash
-pa ticket comment <ticket-id> --content "Stale check: this ticket has been in 'doing' for >3 days with no updates. Is work still active?"
+pa ticket comment <ticket-id> --content "Stale check: this ticket has been in 'implementing' for >3 days with no updates. Is work still active?"
 ```
 
 **3. Check pending review tickets**
 
 ```bash
-pa ticket list --team sinh --type review-request --status review
+pa ticket list --team sinh --type review-request --status review-uat
 ```
 
 For each review ticket >3 days old, create a reminder FYI:
@@ -121,10 +121,10 @@ pa ticket create \
   --summary "Ticket <ticket-id> has been waiting for Sinh's review for >3 days: <ticket-title>"
 ```
 
-**4. Check todo backlog for your team**
+**4. Check pending-implementation backlog for your team**
 
 ```bash
-pa ticket list --team <team-name> --status todo
+pa ticket list --team <team-name> --status pending-implementation
 ```
 
 Note: No action required. Awareness of pending work is passed to team manager for context.
@@ -144,32 +144,35 @@ Note any active bulletins in the housekeeping report, especially if they affect 
 When picking up a ticket for multi-step work:
 
 ```
-Ticket in 'todo' state
+Ticket in 'pending-implementation' state
   ↓
 Agent claims it
-  → pa ticket update <id> --status doing --assignee <agent>
+  → pa ticket update <id> --status implementing --assignee <agent>
   → begin work
 
 Agent work completes
-  → pa ticket update <id> --status done
-  → create work-report ticket for Sinh
+  → pa ticket update <id> --status review-uat --team sinh
+  → add completion comment on the ticket
 
 Agent work fails / aborts
-  → pa ticket update <id> --status blocked
-  → pa ticket comment <id> --content "Blocked/aborted: <reason>"
+  → keep current status; add blocked tag: pa ticket update <id> --tags blocked
+  → pa ticket comment <id> --content "BLOCKED: <reason>. Waiting on: <dependency>"
   → create FYI ticket for Sinh explaining the failure
 ```
 
 **Rules:**
-- Always claim (set to `doing`) before starting work — never work on a `todo` ticket without claiming
-- Never leave a ticket in `doing` state when you stop — set to `blocked` with a reason if interrupted
-- Short single-step work that completes in one action: `todo → done` directly, no `doing` needed
+- Always claim (set to `implementing`) before starting work — never work on a `pending-implementation` ticket without claiming
+- Never leave a ticket in `implementing` state without a comment when you stop — add a comment if interrupted
+- Short single-step work that completes in one action: `pending-implementation → review-uat --team sinh` directly, no `implementing` step needed
+- `blocked` is a tag, not a status — use `--tags blocked` + comment protocol instead
 
 ### When a task cannot be completed
 
-- Set ticket status to `blocked`: `pa ticket update <id> --status blocked`
-- Add a comment explaining what's blocking it: `pa ticket comment <id> --content "Blocked: <reason>"`
+- Keep the ticket's current status — do NOT change it to `blocked`
+- Add `blocked` tag: `pa ticket update <id> --tags blocked`
+- Add a comment explaining what's blocking it: `pa ticket comment <id> --content "BLOCKED: <reason>. Waiting on: <dependency or decision>"`
 - Create a separate task ticket for whoever can unblock you
+- When unblocked: remove `blocked` tag, add a comment noting what resolved the block
 
 ---
 
@@ -196,16 +199,16 @@ Identity:       deployment_id + team_name + agent_name + parent + ticket_id
 Registry:       ~/Documents/ai-usage/deployments/registry.jsonl (team manager only, flock)
 Team workspace: ~/Documents/ai-usage/agent-teams/<team-name>/  (persistent, cross-deployment)
 Run workspace:  ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/  (per-deployment)
-Bulletins:      pa bulletin list  (check on startup!)
-Ticket work:    pa ticket list --team <team> --status todo
-Ticket claim:   pa ticket update <id> --status doing --assignee <agent>
-Ticket done:    pa ticket update <id> --status done
-Work report:    pa ticket create --type work-report --team sinh --estimate XS
+Bulletins:      pa bulletin list  (check on startup — FIRST priority!)
+Ticket work:    pa ticket list --team <team> --status pending-implementation
+Ticket claim:   pa ticket update <id> --status implementing --assignee <agent>
+Ticket done:    pa ticket update <id> --status review-uat --team sinh
+Blocked:        pa ticket update <id> --tags blocked  (keep status, add tag + comment)
 Review request: pa ticket create --type review-request --team <downstream> --estimate M
 FYI:            pa ticket create --type fyi --team <recipient> --estimate XS
 Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
-File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<topic>.md
+File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<TICKET-ID>--<topic>.md
 Tags:           autonomous team:<X> agent:<Y> deployment:<Z>
-Startup HK:     1) create workspaces  2) stale doing-tickets check  3) pending review check  4) todo backlog awareness  5) bulletin check  6) main work
+Startup HK:     1) create workspaces  2) stale implementing-tickets check  3) pending review-uat check  4) pending-implementation backlog awareness  5) bulletin check  6) main work
 Shutdown:       sub-agents → agents → manager (each logs before stopping)
 ```

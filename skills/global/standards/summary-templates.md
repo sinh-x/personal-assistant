@@ -83,9 +83,9 @@ SEVERITY: <critical | major | minor>
 
 **Example:**
 ```
-WHAT: `pa ticket update PA-877 --status doing` succeeds silently with no error
-EXPECTED: Error "Invalid status 'doing'. Valid statuses: idea, requirement-review, ..."
-REPRO: pa ticket update PA-877 --status doing; pa ticket show PA-877 — status field is "doing"
+WHAT: `pa ticket update PA-900 --status review-uat` fails with "ticket not found" when ID is valid
+EXPECTED: Ticket status updates to review-uat successfully
+REPRO: pa ticket update PA-900 --status review-uat --team sinh — returns error despite PA-900 existing
 SEVERITY: major
 ```
 

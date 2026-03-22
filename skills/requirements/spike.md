@@ -7,13 +7,11 @@ This is a **non-interactive** skill. Do NOT use `AskUserQuestion`. Read, analyze
 ## Ticket Claim Protocol
 
 When starting from an assigned ticket:
-1. List assigned tickets: `pa ticket list --team requirements --status todo`
-2. Claim the ticket: `pa ticket update <id> --status doing --assignee team-manager`
+1. List assigned tickets: `pa ticket list --team requirements --status requirement-review`
+2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status done`
-5. On failure/abort: `pa ticket update <id> --status failed` + create an FYI ticket
-
-Short single-step work may go directly `todo → done` without an intermediate `doing` step.
+4. On completion: `pa ticket update <id> --status pending-approval --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ---
 
@@ -25,7 +23,7 @@ Resolve the topic and repo context using this fallback chain:
 
 **Topic (required):**
 1. Read `## Additional Instructions` from the primer — use the `--objective` text if present
-2. Check `pa ticket list --team requirements --status doing` for a claimed ticket — read the ticket and extract the topic
+2. Check `pa ticket list --team requirements --status requirement-review` for a claimed ticket — read the ticket and extract the topic
 3. If neither source yields a topic: create a failed FYI ticket for Sinh and stop
 
 **Repo context (optional override):**
@@ -371,6 +369,6 @@ Write session log to `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` followi
 - **Confidence per section.** Every section in the output document MUST include a confidence level (high/medium/low).
 - **Grounded findings.** Always anchor web research to codebase context.
 - **Graceful web fallback.** If web search fails, continue with codebase-only findings and note the fallback.
-- **Ticket claim.** Always claim tickets with `pa ticket update <id> --status doing` before working on them.
+- **Ticket claim.** Claim tickets by setting `--assignee team-manager` (keep status as `requirement-review`). Advance to `pending-approval --team sinh` when complete.
 - **Read before writing.** Always read files before modifying them.
 - **Self-validate before saving.** Verify `From:` and `To:` are populated before writing any document.

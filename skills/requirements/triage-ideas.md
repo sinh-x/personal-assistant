@@ -7,13 +7,11 @@ This is a **non-interactive** skill. Do not ask questions — read, analyze, and
 ## Ticket Claim Protocol
 
 When starting from an assigned ticket:
-1. List assigned tickets: `pa ticket list --team requirements --status todo`
-2. Claim the ticket: `pa ticket update <id> --status doing --assignee team-manager`
+1. List assigned tickets: `pa ticket list --team requirements --status requirement-review`
+2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status done`
-5. On failure/abort: `pa ticket update <id> --status failed` + create an FYI ticket
-
-Short single-step work may go directly `todo → done` without an intermediate `doing` step.
+4. On completion: `pa ticket update <id> --status pending-approval --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ## Flags
 
@@ -146,7 +144,7 @@ Triaged N ideas into M groups. N new ideas processed.
 
 ### Phase T6: Process Approved Proposals (post-approval flow)
 
-**When to run this phase:** Check `pa ticket list --team requirements --status todo --type implementation-request` for approved triage proposals.
+**When to run this phase:** Check `pa ticket list --team requirements --status pending-implementation --type implementation-request` for approved triage proposals.
 
 If an approved ticket is found:
 
@@ -159,13 +157,13 @@ If an approved ticket is found:
      --team requirements --priority medium --estimate M
    ```
 3. Update idea files: change `Status: triaged` → `Status: in-requirements`
-4. Mark the approved ticket as done: `pa ticket update <id> --status done`
+4. Mark the approved ticket complete: `pa ticket update <id> --status review-uat --team sinh`
 
 **If no approved proposals found:** Skip this phase silently.
 
 ## Idempotency Rules
 
-- **Never create duplicate proposals.** Before Phase T5, check `pa ticket list --team requirements --type review-request --status review` for an existing triage proposal ticket. If found, skip creating a new one and log: "Existing triage proposal pending review — skipping."
+- **Never create duplicate proposals.** Before Phase T5, check `pa ticket list --team requirements --type review-request --status pending-approval` for an existing triage proposal ticket. If found, skip creating a new one and log: "Existing triage proposal pending review — skipping."
 - **Never re-triage already-triaged ideas** (unless `--force`). Filter by `Status: new` only.
 - **Never move ideas that were already moved.** Check that the file exists in `ideas/` (not `ideas/triaged/`) before moving.
 
