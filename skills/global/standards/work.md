@@ -129,7 +129,27 @@ Your task: <task description>
 
 Every agent (including team manager and sub-agents) MUST log their session.
 
-### Storage
+### Workspace Storage Tiers
+
+The ai-usage system has three storage tiers. Use each for the right purpose:
+
+| Tier | Path | Lifetime | Purpose |
+|------|------|----------|---------|
+| **Ephemeral workspace** | `~/Documents/ai-usage/deployments/<deploy-id>/` | Per-run (cleaned up after deployment) | In-progress scratch space, intermediate files, draft outputs |
+| **Persistent artifacts** | `~/Documents/ai-usage/agent-teams/<team>/artifacts/` | Survives across deployments | Final deliverables: requirements docs, implementation plans, analysis reports |
+| **Historical logs** | `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` | Permanent archive | Session logs, timeline, self-improvement notes |
+
+**When to save to each tier:**
+
+- **Ephemeral workspace** (`deployments/<deploy-id>/`) — use during a single deployment for scratch files. Do NOT use for final deliverables — this path is cleaned up after the deployment ends.
+- **Persistent artifacts** (`agent-teams/<team>/artifacts/`) — save all final deliverables here **before** attaching via `--doc-ref`. This tier survives across deployments and is accessible to Sinh and downstream teams. Always use this path in `--doc-ref`.
+- **Historical logs** (`sessions/YYYY/MM/agent-team/`) — session logs written at the end of every deployment. Do NOT save deliverables or artifacts here.
+
+**Key rule — save then attach:** Save the final deliverable to `agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md` FIRST, then attach it to the ticket with `pa ticket update <id> --doc-ref "agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"`. Never use `deployments/` paths in `--doc-ref` — that workspace is ephemeral and will not survive.
+
+---
+
+### Storage (Session Logs)
 
 ```
 ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
