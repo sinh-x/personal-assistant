@@ -10,7 +10,7 @@ When starting from an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee requirements --status requirement-review`
 2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh`
+4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ---
@@ -382,3 +382,4 @@ Write session log to `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` followi
 - **Ticket claim.** Claim tickets by setting `--assignee team-manager` (keep status as `requirement-review`). Advance to `pending-approval --assignee sinh` when complete.
 - **Read before writing.** Always read files before modifying them.
 - **Self-validate before saving.** Verify `From:` and `To:` are populated before writing any document.
+- **Always set doc_ref on handoff.** When advancing to `pending-approval`, always include `--doc-ref` in the `pa ticket update` command pointing to the spike artifact. A ticket advancing without doc_ref will be automatically tagged `needs-doc-ref` by the CLI. Use `pa ticket update <id> --doc-ref <path>` to attach retroactively if needed.

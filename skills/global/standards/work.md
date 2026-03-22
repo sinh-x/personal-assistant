@@ -69,10 +69,28 @@ pa ticket update <ticket-id> --status implementing --assignee <agent-name>
 
 ```bash
 # Builder / maintenance / house-chores → advance to UAT review
-pa ticket update <ticket-id> --status review-uat --assignee sinh
+# Always include --doc-ref pointing to implementation artifact
+pa ticket update <ticket-id> --status review-uat --assignee sinh \
+  --doc-ref "agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"
 
 # Requirements team → advance to approval gate
-pa ticket update <ticket-id> --status pending-approval --assignee sinh
+# Always include --doc-ref pointing to requirements document
+pa ticket update <ticket-id> --status pending-approval --assignee sinh \
+  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"
+```
+
+### Doc-ref requirement on handoff (mandatory)
+
+**Always set `--doc-ref` when advancing to `pending-approval` or `review-uat`.** This ensures downstream teams and Sinh can access the full context — plan document, requirements doc, or implementation artifact — without searching.
+
+If you advance without `--doc-ref` and the ticket has no `doc_ref` already set:
+- The CLI prints a warning to stderr (transition still succeeds — soft enforcement)
+- The `needs-doc-ref` tag is automatically added to the ticket
+- Sprint-master monitors `needs-doc-ref` tickets during triage and escalates
+
+Attach the document retroactively if you forgot:
+```bash
+pa ticket update <ticket-id> --doc-ref "path/to/doc.md"
 ```
 
 ---
@@ -344,10 +362,14 @@ pa ticket comment <ticket-id> --content "BLOCKED: <reason>. Waiting on: <depende
 # When unblocked: update tags without blocked, add resolution comment
 
 # When implementation complete — builder / maintenance / house-chores → UAT
-pa ticket update <ticket-id> --status review-uat --assignee sinh
+# Always include --doc-ref (see §Doc-ref requirement on handoff)
+pa ticket update <ticket-id> --status review-uat --assignee sinh \
+  --doc-ref "agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"
 
 # When requirements complete — requirements team → approval gate
-pa ticket update <ticket-id> --status pending-approval --assignee sinh
+# Always include --doc-ref (see §Doc-ref requirement on handoff)
+pa ticket update <ticket-id> --status pending-approval --assignee sinh \
+  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"
 ```
 
 ### Create tickets for discovered work
