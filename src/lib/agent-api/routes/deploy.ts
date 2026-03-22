@@ -2,7 +2,7 @@
  * Deploy route — trigger a PA team deployment.
  *
  * POST /api/deploy — fire-and-forget deployment trigger.
- *   Body: {team: string, mode?: string, objective?: string, repo?: string}
+ *   Body: {team: string, mode?: string, objective?: string, repo?: string, ticket?: string}
  *   Returns: {deployment_id: string, status: "launched", team, mode}
  */
 
@@ -37,6 +37,7 @@ export function deployRoutes(): Hono {
     const mode = body["mode"] as string | undefined;
     const objective = body["objective"] as string | undefined;
     const repo = body["repo"] as string | undefined;
+    const ticket = body["ticket"] as string | undefined;
 
     if (!team || !team.trim()) {
       return c.json({ error: "team is required", code: "BAD_REQUEST" }, 400);
@@ -46,6 +47,9 @@ export function deployRoutes(): Hono {
     }
     if (repo && !isSafeIdentifier(repo)) {
       return c.json({ error: "Invalid repo name", code: "BAD_REQUEST" }, 400);
+    }
+    if (ticket && !/^[A-Z][A-Z0-9]+-[0-9]+$/.test(ticket)) {
+      return c.json({ error: "Invalid ticket ID", code: "BAD_REQUEST" }, 400);
     }
 
     // Validate objective: max 500 chars, safe ASCII only
@@ -75,6 +79,9 @@ export function deployRoutes(): Hono {
     }
     if (objective && objective.trim()) {
       args.push("--objective", objective.trim());
+    }
+    if (ticket && ticket.trim()) {
+      args.push("--ticket", ticket.trim());
     }
 
     // Spawn and read first line for deployment ID (with 5s timeout)

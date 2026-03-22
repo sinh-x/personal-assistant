@@ -58,7 +58,8 @@ program
   .option("--mode <mode-id>", "Deploy using a specific mode (reads mode file as objective)")
   .option("--list-modes", "List available modes for the team and exit")
   .option("--repo <name>", "Target repo name from repos.yaml (overrides CWD-based detection)")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string }) => {
+  .option("--ticket <id>", "Link deployment to a ticket")
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string }) => {
     deployCommand(team, opts);
   });
 

@@ -117,6 +117,7 @@ export function deployCommand(
     mode?: string;
     listModes?: boolean;
     repo?: string;
+    ticket?: string;
     /** Template variables to substitute in mode objective files */
     templateVars?: Record<string, string>;
   }
@@ -319,6 +320,7 @@ export function deployCommand(
     agents: agentNames,
     primer: primerFile,
     ...(anyModelSet ? { models: modelsMap } : {}),
+    ...(opts.ticket ? { ticket_id: opts.ticket } : {}),
   };
   appendRegistryEvent(startEvent);
 

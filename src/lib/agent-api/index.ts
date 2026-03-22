@@ -11,6 +11,7 @@ import { configRoutes } from "./routes/config.js";
 import { deploymentsRoutes } from "./routes/deployments.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { deployRoutes } from "./routes/deploy.js";
+import { deployRoutingRoutes } from "./routes/deploy-routing.js";
 import { ideasRoutes } from "./routes/ideas.js";
 import { timersRoutes } from "./routes/timers.js";
 import { sinhInputsRoutes } from "./routes/sinh-inputs.js";
@@ -95,6 +96,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", deploymentsRoutes());
   app.route("/", teamsRoutes());
   app.route("/", deployRoutes());
+  app.route("/", deployRoutingRoutes());
   app.route("/", ideasRoutes());
   app.route("/", timersRoutes());
   app.route("/", sinhInputsRoutes());
