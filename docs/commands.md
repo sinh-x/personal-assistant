@@ -95,7 +95,6 @@ pa schedule daily:plan daily 05:00          # Daily plan at 05:00
 pa schedule daily:progress daily 14:00      # Progress check at 14:00
 pa schedule daily:end daily 21:00           # End-of-day at 21:00
 pa schedule maintenance weekly 09:00        # Weekly health check
-pa schedule secretary daily 08:00 14:00     # Twice daily
 ```
 
 **Spec formats:**
