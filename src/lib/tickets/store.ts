@@ -12,6 +12,7 @@ import { getTicketsDir } from "../paths.js";
 import type {
   Ticket,
   AuditEntry,
+  Comment,
   CounterStore,
   CreateTicketInput,
   UpdateTicketInput,
@@ -265,21 +266,43 @@ export class TicketStore {
   }
 
   /**
-   * Add a comment to a ticket.
+   * Add a comment to a ticket atomically (flock-protected).
+   * Generates a UUID for the new comment.
+   * Returns the updated ticket and the created comment.
    */
-  addComment(id: string, author: string, content: string): Ticket {
-    const ticket = this.get(id);
-    if (!ticket) throw new Error(`Ticket not found: ${id}`);
+  addComment(id: string, author: string, content: string): { ticket: Ticket; comment: Comment } {
+    if (!this.get(id)) throw new Error(`Ticket not found: ${id}`);
 
+    const ticketPath = this.ticketPath(id);
+    const lockPath = this.lockPath;
     const now = new Date().toISOString();
-    const comment = { author, content, timestamp: now };
-    const updated: Ticket = {
-      ...ticket,
-      comments: [...ticket.comments, comment],
-      updatedAt: now,
-    };
+    const commentId = crypto.randomUUID();
+    const comment: Comment = { id: commentId, author, content, timestamp: now };
 
-    writeFileSync(this.ticketPath(id), JSON.stringify(updated, null, 2));
+    const script = [
+      "const fs = require('fs');",
+      `const tp = ${JSON.stringify(ticketPath)};`,
+      `const comment = ${JSON.stringify(comment)};`,
+      `const now = ${JSON.stringify(now)};`,
+      "const ticket = JSON.parse(fs.readFileSync(tp, 'utf8'));",
+      "ticket.comments = [...ticket.comments, comment];",
+      "ticket.updatedAt = now;",
+      "fs.writeFileSync(tp, JSON.stringify(ticket, null, 2));",
+      "process.stdout.write(JSON.stringify(ticket));",
+    ].join("\n");
+
+    const tmpFile = resolve(tmpdir(), `pa-comment-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+    writeFileSync(tmpFile, script);
+
+    let updatedTicket: Ticket;
+    try {
+      const result = execSync(
+        `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+      ).toString();
+      updatedTicket = JSON.parse(result) as Ticket;
+    } finally {
+      try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+    }
 
     this.appendAudit({
       ticket_id: id,
@@ -289,7 +312,108 @@ export class TicketStore {
       changes: { comment: [null, content] },
     });
 
-    return updated;
+    return { ticket: updatedTicket, comment };
+  }
+
+  /**
+   * Edit an existing comment on a ticket atomically (flock-protected).
+   * Updates content and sets editedAt timestamp.
+   * Returns the updated ticket and the edited comment.
+   */
+  editComment(id: string, commentId: string, content: string, actor?: string): { ticket: Ticket; comment: Comment } {
+    if (!this.get(id)) throw new Error(`Ticket not found: ${id}`);
+
+    const ticketPath = this.ticketPath(id);
+    const lockPath = this.lockPath;
+    const now = new Date().toISOString();
+
+    const script = [
+      "const fs = require('fs');",
+      `const tp = ${JSON.stringify(ticketPath)};`,
+      `const commentId = ${JSON.stringify(commentId)};`,
+      `const newContent = ${JSON.stringify(content)};`,
+      `const now = ${JSON.stringify(now)};`,
+      "const ticket = JSON.parse(fs.readFileSync(tp, 'utf8'));",
+      "const idx = ticket.comments.findIndex(c => c.id === commentId);",
+      "if (idx === -1) { process.stderr.write('Comment not found\\n'); process.exit(2); }",
+      "ticket.comments[idx].content = newContent;",
+      "ticket.comments[idx].editedAt = now;",
+      "ticket.updatedAt = now;",
+      "fs.writeFileSync(tp, JSON.stringify(ticket, null, 2));",
+      "process.stdout.write(JSON.stringify({ ticket, comment: ticket.comments[idx] }));",
+    ].join("\n");
+
+    const tmpFile = resolve(tmpdir(), `pa-edit-comment-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+    writeFileSync(tmpFile, script);
+
+    let result: { ticket: Ticket; comment: Comment };
+    try {
+      const raw = execSync(
+        `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+      ).toString();
+      result = JSON.parse(raw) as { ticket: Ticket; comment: Comment };
+    } finally {
+      try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+    }
+
+    this.appendAudit({
+      ticket_id: id,
+      action: "comment_edited",
+      actor: actor ?? "unknown",
+      timestamp: now,
+      changes: { commentId: [commentId, commentId], content: [null, content] },
+    });
+
+    return result;
+  }
+
+  /**
+   * Delete a comment from a ticket atomically (flock-protected).
+   * Returns the updated ticket.
+   */
+  deleteComment(id: string, commentId: string, actor?: string): Ticket {
+    if (!this.get(id)) throw new Error(`Ticket not found: ${id}`);
+
+    const ticketPath = this.ticketPath(id);
+    const lockPath = this.lockPath;
+    const now = new Date().toISOString();
+
+    const script = [
+      "const fs = require('fs');",
+      `const tp = ${JSON.stringify(ticketPath)};`,
+      `const commentId = ${JSON.stringify(commentId)};`,
+      `const now = ${JSON.stringify(now)};`,
+      "const ticket = JSON.parse(fs.readFileSync(tp, 'utf8'));",
+      "const exists = ticket.comments.some(c => c.id === commentId);",
+      "if (!exists) { process.stderr.write('Comment not found\\n'); process.exit(2); }",
+      "ticket.comments = ticket.comments.filter(c => c.id !== commentId);",
+      "ticket.updatedAt = now;",
+      "fs.writeFileSync(tp, JSON.stringify(ticket, null, 2));",
+      "process.stdout.write(JSON.stringify(ticket));",
+    ].join("\n");
+
+    const tmpFile = resolve(tmpdir(), `pa-del-comment-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+    writeFileSync(tmpFile, script);
+
+    let updatedTicket: Ticket;
+    try {
+      const raw = execSync(
+        `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+      ).toString();
+      updatedTicket = JSON.parse(raw) as Ticket;
+    } finally {
+      try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+    }
+
+    this.appendAudit({
+      ticket_id: id,
+      action: "comment_deleted",
+      actor: actor ?? "unknown",
+      timestamp: now,
+      changes: { commentId: [commentId, null] },
+    });
+
+    return updatedTicket;
   }
 
   /**
