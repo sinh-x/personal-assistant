@@ -10,6 +10,19 @@ import type {
 
 const ESTIMATES: Estimate[] = ["XS", "S", "M", "L", "XL"];
 
+/** Required fields per ticket type for summary conformance checks */
+const SUMMARY_TEMPLATES: Record<string, string[]> = {
+  task: ["WHAT", "WHY", "SCOPE"],
+  "review-request": ["WHAT", "DOC", "REVIEW", "NEXT"],
+  fyi: ["WHAT", "IMPACT", "ACTION"],
+  bug: ["WHAT", "EXPECTED", "REPRO", "SEVERITY"],
+  idea: ["WHAT", "WHY"],
+  feature: ["WHAT", "WHY", "SCOPE"],
+  "plan-draft": ["WHAT", "DOC", "BUDGET"],
+  "work-report": ["WHAT", "STATUS", "OUTPUTS"],
+  question: ["WHAT", "CONTEXT", "BLOCKING"],
+};
+
 function validateEstimate(value: string): Estimate {
   if (!ESTIMATES.includes(value as Estimate)) {
     console.error(`Error: Invalid estimate "${value}". Must be one of: XS, S, M, L, XL`);
@@ -71,6 +84,24 @@ export function createTicketCommand(): Command {
         actor: string;
       }) => {
         const estimate = validateEstimate(opts.estimate);
+
+        // Compute tags — may be augmented by summary template check
+        const tags: string[] = opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
+
+        // Soft enforcement: warn + tag if summary doesn't match type template
+        const templateFields = SUMMARY_TEMPLATES[opts.type];
+        if (templateFields) {
+          const hasAllFields = templateFields.every(
+            (f) => opts.summary.toUpperCase().includes(`${f}:`)
+          );
+          if (!hasAllFields) {
+            process.stderr.write(
+              `Warning: Summary does not match ${opts.type} template (expected ${templateFields.join("/")} fields)\n`
+            );
+            if (!tags.includes("needs-review")) tags.push("needs-review");
+          }
+        }
+
         const store = new TicketStore();
         const ticket = store.create(
           {
@@ -84,7 +115,7 @@ export function createTicketCommand(): Command {
             summary: opts.summary,
             description: "",
             assignee: opts.assignee,
-            tags: opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : [],
+            tags,
             doc_ref: opts.docRef,
             from: opts.from,
             to: opts.to,

@@ -16,7 +16,25 @@ import type {
   CreateTicketInput,
   UpdateTicketInput,
 } from "./types.js";
+import { ACTIVE_STATUSES } from "./types.js";
 import { getRepoPrefix } from "../repos.js";
+
+/** Pipeline stage order for handoff warning — higher index = later stage */
+const PIPELINE_ORDER: Record<string, number> = {
+  "idea": 0,
+  "requirement-review": 1,
+  "pending-approval": 2,
+  "pending-implementation": 3,
+  "implementing": 4,
+  "review-uat": 5,
+  "done": 6,
+  "rejected": 6,
+  "cancelled": 6,
+  // on-hold is intentionally omitted — parking is not a pipeline advance
+};
+
+/** All valid statuses in display order */
+const ALL_VALID_STATUSES = [...ACTIVE_STATUSES, "done", "rejected", "on-hold", "cancelled"];
 
 /**
  * TicketStore — manages all ticket CRUD operations with flock locking.
@@ -188,6 +206,24 @@ export class TicketStore {
   update(id: string, input: UpdateTicketInput, actor: string): Ticket {
     const ticket = this.get(id);
     if (!ticket) throw new Error(`Ticket not found: ${id}`);
+
+    // Step 1: Reject unknown statuses
+    if (input.status !== undefined && !ALL_VALID_STATUSES.includes(input.status)) {
+      throw new Error(
+        `Invalid status '${input.status}'. Valid statuses: ${ALL_VALID_STATUSES.join(", ")}`
+      );
+    }
+
+    // Step 0: Warn when advancing pipeline stage without setting team/assignee
+    if (input.status !== undefined && !input.team && !input.assignee) {
+      const oldPos = PIPELINE_ORDER[ticket.status] ?? -1;
+      const newPos = PIPELINE_ORDER[input.status] ?? -1;
+      if (newPos > oldPos) {
+        process.stderr.write(
+          "Warning: Status advanced without setting team/assignee — ticket may be orphaned\n"
+        );
+      }
+    }
 
     const now = new Date().toISOString();
     const changes: Record<string, [unknown, unknown]> = {};
