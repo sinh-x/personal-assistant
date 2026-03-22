@@ -19,11 +19,11 @@ No team may skip to `done` except Sinh (via UAT sign-off). The correct advanceme
 
 | Role | From | To | Must also set |
 |------|------|----|---------------|
-| Sprint-master | `idea` | `requirement-review` | `--team requirements` |
-| Requirements team | `requirement-review` | `pending-approval` | `--team sinh` |
-| Sinh | `pending-approval` | `pending-implementation` | `--team builder` or `--team orchestrator` |
+| Sprint-master | `idea` | `requirement-review` | `--assignee requirements` |
+| Requirements team | `requirement-review` | `pending-approval` | `--assignee sinh` |
+| Sinh | `pending-approval` | `pending-implementation` | `--assignee builder` or `--assignee orchestrator` |
 | Builder / Orchestrator | `pending-implementation` | `implementing` | `--assignee <agent-name>` |
-| Builder / Orchestrator | `implementing` | `review-uat` | `--team sinh` |
+| Builder / Orchestrator | `implementing` | `review-uat` | `--assignee sinh` |
 | Sinh | `review-uat` | `done` | — (terminal) |
 
 ### Rule 2 — Status change = handoff
@@ -42,7 +42,7 @@ When Sinh (or any gate owner) rejects or requests changes, the actor **MUST**:
 
 **Example — Sinh sends back for rework:**
 ```bash
-pa ticket update PA-042 --status implementing --team builder --assignee team-manager
+pa ticket update PA-042 --status implementing --assignee builder --assignee team-manager
 pa ticket comment PA-042 --author sinh --content "REWORK: API response schema is wrong. Expected { data: [] }, got { results: [] }. Fix before re-submitting for UAT."
 ```
 
@@ -107,7 +107,7 @@ Approved and ready to build. The `team` field determines the executor:
 - `team: builder` — single builder deployment, sequential work
 - `team: orchestrator` — full-auto, multiple builders in parallel, orchestrator aggregates
 
-Executor scans `pa ticket list --team <team> --status pending-implementation` on startup and claims the ticket.
+Executor scans `pa ticket list --assignee <team> --status pending-implementation` on startup and claims the ticket.
 
 **Out:** → `implementing` (work starts) | `on-hold`
 

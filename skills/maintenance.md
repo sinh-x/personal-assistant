@@ -50,25 +50,25 @@ Run a diagnostic pass on the system:
 - **Flake**: Does `nix build` work? (only if flake.nix or source was modified)
 - **Skills/Teams**: Are all referenced skills accessible? Do team YAMLs parse correctly?
 
-**NOTE:** Folder structure is managed by the **secretary** agent, NOT by maintenance. If expected folders are missing or `STRUCTURE.md` doesn't exist, **stop and report** — do not create folders yourself.
+**NOTE:** Folder structure is NOT maintenance's domain. If expected folders are missing or `STRUCTURE.md` doesn't exist, **stop and report** — do not create folders yourself.
 
 ## Workflow
 
 ### Ticket Claim Protocol
 
 When you start working on an assigned ticket:
-1. List assigned tickets: `pa ticket list --team maintenance --status pending-implementation`
+1. List assigned tickets: `pa ticket list --assignee maintenance --status pending-implementation`
 2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
 3. Work on it
-4. On completion: `pa ticket update <id> --status review-uat --team sinh`
+4. On completion: `pa ticket update <id> --status review-uat --assignee sinh`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
-Short single-step work may go directly `pending-implementation → review-uat --team sinh` without an intermediate `implementing` step.
+Short single-step work may go directly `pending-implementation → review-uat --assignee sinh` without an intermediate `implementing` step.
 
 ### On Each Run
 
-1. **Check in-progress tickets first** — `pa ticket list --team maintenance --status implementing`. Resume if found.
-2. **Claim new ticket** — If nothing in-progress, run `pa ticket list --team maintenance --status pending-implementation` and claim the next item (see §Ticket Claim Protocol).
+1. **Check in-progress tickets first** — `pa ticket list --assignee maintenance --status implementing`. Resume if found.
+2. **Claim new ticket** — If nothing in-progress, run `pa ticket list --assignee maintenance --status pending-implementation` and claim the next item (see §Ticket Claim Protocol).
 3. **Read objective** — What specific issue to investigate, OR "health check" for a full diagnostic
 4. **Gather context** — Read relevant files, logs, registry, timer status
 5. **Diagnose** — Identify the root cause or current health status
@@ -116,9 +116,9 @@ When running a health check, produce a report:
 - Completed: N
 - Crashed: N
 
-## Folder Structure (secretary's domain — report only)
-- [ ] STRUCTURE.md exists (if not, flag for secretary)
-- [ ] Key folders exist (if not, flag for secretary — do NOT create them)
+## Folder Structure (report only — do not create)
+- [ ] STRUCTURE.md exists (if not, flag for Sinh)
+- [ ] Key folders exist (if not, flag for Sinh — do NOT create them)
 
 ## Self-Improvement Backlog
 | Source | Suggestion | Scope | Status |
@@ -136,7 +136,7 @@ When running a health check, produce a report:
 - **Test your fixes.** Run `bash -n` on edited scripts. Use `--dry-run` where available.
 - **Atomic changes.** One fix per logical change. Don't bundle unrelated fixes.
 - **Don't break working things.** If unsure about a fix, document the issue and flag for Sinh instead of applying a risky change.
-- **Don't touch folder structure.** That's the secretary's job. If folders are missing, report it and stop.
+- **Don't touch folder structure.** If folders are missing, report it and stop.
 - **If you don't know what to do, stop and report.** Never guess. Flag the issue for Sinh with your findings so far.
 - **Respect .gitignore.** Never commit secrets or ignored files.
 - **Backward compat.** Fixes must not break existing deployments or timers.

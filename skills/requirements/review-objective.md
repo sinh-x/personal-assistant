@@ -14,4 +14,4 @@ The area skill files (Code Quality, Security, Ops, UI/UAT) are listed in `## Mod
 Read the selected area files at runtime during Phase 3.
 
 When you pick up a ticket for work, claim it with `pa ticket update <id> --assignee team-manager` BEFORE starting (keep status as `requirement-review`).
-Mark it complete with `pa ticket update <id> --status pending-approval --team sinh` when done.
+Mark it complete with `pa ticket update <id> --status pending-approval --assignee sinh` when done.

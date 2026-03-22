@@ -71,7 +71,6 @@ export interface Ticket {
   status: TicketStatus;
   priority: TicketPriority;
   type: TicketType;
-  team: string;
   assignee: string;
   estimate: Estimate;
   from: string;

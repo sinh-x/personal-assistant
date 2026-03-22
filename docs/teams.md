@@ -119,7 +119,7 @@ Global skills from PA_CONFIG shadow those from PA_HOME (matched by filename).
 | `daily` | Daily lifecycle — plan, progress, end-of-day |
 | `maintenance` | System health checks and fixes |
 | `builder` | Multi-phase implementation projects |
-| `secretary` | Intake, routing, and organization |
+| `secretary` | [DEPRECATED] Intake, routing, and organization — absorbed by sprint-master |
 | `house-chores` | Survey and commit uncommitted changes |
 | `requirements` | Requirements gathering and analysis |
 | `knowledge-hub` | Learning, research & intel — YouTube, RSS, Johari blind-spot analysis (absorbs `youtube-processor`) |

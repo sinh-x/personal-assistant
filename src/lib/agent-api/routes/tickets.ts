@@ -22,7 +22,6 @@ export function ticketRoutes(): Hono {
   app.get("/api/tickets", (c: Context) => {
     const filters: {
       project?: string;
-      team?: string;
       status?: string;
       assignee?: string;
       priority?: string;
@@ -30,14 +29,12 @@ export function ticketRoutes(): Hono {
     } = {};
 
     const project = c.req.query("project");
-    const team = c.req.query("team");
     const status = c.req.query("status");
     const assignee = c.req.query("assignee");
     const priority = c.req.query("priority");
     const type = c.req.query("type");
 
     if (project) filters.project = project;
-    if (team) filters.team = team;
     if (status) filters.status = status;
     if (assignee) filters.assignee = assignee;
     if (priority) filters.priority = priority;
@@ -118,9 +115,9 @@ export function ticketRoutes(): Hono {
       );
     }
 
-    const filters: { team?: string } = {};
-    const team = c.req.query("team");
-    if (team) filters.team = team;
+    const filters: { assignee?: string } = {};
+    const assignee = c.req.query("assignee");
+    if (assignee) filters.assignee = assignee;
 
     try {
       const board = buildBoardView(project, filters);

@@ -181,7 +181,7 @@ export class TicketStore {
       timestamp: now,
       changes: {
         status: ["", ticket.status],
-        team: ["", ticket.team],
+        assignee: ["", ticket.assignee],
         estimate: ["", ticket.estimate],
         priority: ["", ticket.priority],
       },
@@ -214,8 +214,8 @@ export class TicketStore {
       );
     }
 
-    // Step 0: Warn when advancing pipeline stage without setting team/assignee
-    if (input.status !== undefined && !input.team && !input.assignee) {
+    // Step 0: Warn when advancing pipeline stage without setting assignee
+    if (input.status !== undefined && !input.assignee) {
       const oldPos = PIPELINE_ORDER[ticket.status] ?? -1;
       const newPos = PIPELINE_ORDER[input.status] ?? -1;
       if (newPos > oldPos) {
@@ -326,7 +326,6 @@ export class TicketStore {
    */
   list(filters: {
     project?: string;
-    team?: string;
     status?: string;
     assignee?: string;
     priority?: string;
@@ -349,7 +348,6 @@ export class TicketStore {
 
     return tickets.filter((t) => {
       if (filters.project && t.project !== filters.project) return false;
-      if (filters.team && t.team !== filters.team) return false;
       if (filters.status && t.status !== filters.status) return false;
       if (filters.assignee && t.assignee !== filters.assignee) return false;
       if (filters.priority && t.priority !== filters.priority) return false;

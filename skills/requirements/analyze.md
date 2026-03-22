@@ -9,10 +9,10 @@ This is an **interactive** session. You talk to the user, ask questions, and bui
 ### Ticket Claim Protocol
 
 When starting a requirements session from an assigned ticket:
-1. List assigned tickets: `pa ticket list --team requirements --status requirement-review`
+1. List assigned tickets: `pa ticket list --assignee requirements --status requirement-review`
 2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status pending-approval --team sinh`
+4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ### Repo Context (mandatory startup)
@@ -183,13 +183,13 @@ Save the requirements document in three places:
    pa ticket create --type review-request --project personal-assistant \
      --title "Review: <descriptive-topic>" \
      --summary "<brief summary of what was produced>" \
-     --team builder --priority high --estimate S \
+     --assignee builder --priority high --estimate S \
      --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
    ```
    Include in the ticket's summary: what Sinh needs to do (approve, feedback, open questions) and what happens next (route to builder for implementation).
 
    **Required fields (mandatory — do not omit):**
-   - `--team builder` — Identifies the downstream team to implement after approval. Use the correct team if builder is not the implementor.
+   - `--assignee builder` — Identifies the downstream team to implement after approval. Use the correct team if builder is not the implementor.
    - `--doc-ref` — Points to the full requirements document in team artifacts.
 
 ## Rules

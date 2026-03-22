@@ -186,26 +186,26 @@ export function computeSprintMetrics(
   const carryOverPct =
     allTickets.length > 0 ? (carryOverCount / allTickets.length) * 100 : 0;
 
-  // By-team breakdown
+  // By-team breakdown (grouped by assignee)
   const teamMap = new Map<string, { tickets: Ticket[]; cycleTimes: number[] }>();
   for (const ticket of completed) {
-    if (!teamMap.has(ticket.team)) {
-      teamMap.set(ticket.team, { tickets: [], cycleTimes: [] });
+    if (!teamMap.has(ticket.assignee)) {
+      teamMap.set(ticket.assignee, { tickets: [], cycleTimes: [] });
     }
-    teamMap.get(ticket.team)!.tickets.push(ticket);
+    teamMap.get(ticket.assignee)!.tickets.push(ticket);
   }
   for (const ticket of completed) {
     const implTime = findStatusEntryTime(ticket.id, "pending-implementation", audit);
     const resolvedAt = ticket.resolvedAt ? parseTs(ticket.resolvedAt) : null;
     if (implTime && resolvedAt) {
       const h = msToHours(resolvedAt.getTime() - implTime.getTime());
-      teamMap.get(ticket.team)?.cycleTimes.push(h);
+      teamMap.get(ticket.assignee)?.cycleTimes.push(h);
     }
   }
 
   const byTeam: Record<string, TeamSprintMetrics> = {};
   for (const [team, data] of teamMap.entries()) {
-    const teamCarryOver = activeAtEnd.filter((t) => t.team === team).length;
+    const teamCarryOver = activeAtEnd.filter((t) => t.assignee === team).length;
     const teamAvgCycle =
       data.cycleTimes.length > 0
         ? data.cycleTimes.reduce((s, h) => s + h, 0) / data.cycleTimes.length

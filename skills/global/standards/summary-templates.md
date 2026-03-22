@@ -85,7 +85,7 @@ SEVERITY: <critical | major | minor>
 ```
 WHAT: `pa ticket update PA-900 --status review-uat` fails with "ticket not found" when ID is valid
 EXPECTED: Ticket status updates to review-uat successfully
-REPRO: pa ticket update PA-900 --status review-uat --team sinh — returns error despite PA-900 existing
+REPRO: pa ticket update PA-900 --status review-uat --assignee sinh — returns error despite PA-900 existing
 SEVERITY: major
 ```
 

@@ -69,7 +69,7 @@ Re-launch with an explicit repo path or an objective that references a file cont
 Parse the `--objective` to identify the target work.
 
 1. **If objective points to a specific ticket ID** — `pa ticket show <id>` to read it directly as the plan document. Skip ticket scan.
-2. **If objective is a topic description** — `pa ticket list --team builder --status pending-implementation` to find a matching assigned ticket:
+2. **If objective is a topic description** — `pa ticket list --assignee builder --status pending-implementation` to find a matching assigned ticket:
    - Match by topic keywords in the ticket title or summary
    - If multiple matches, pick the highest-priority one
 3. **If a matching assigned ticket is found** → go to Phase 3 (Plan Analysis)
@@ -97,7 +97,7 @@ pa status <deploy-id> --wait
 **Step 4 — Wait for Sinh approval:**
 - The requirements team will create a review-request ticket for Sinh to review
 - Sinh reviews, possibly edits, and approves — Sinh assigns the approved ticket to the builder team
-- Monitor `pa ticket list --team builder --status pending-implementation` for the approved item
+- Monitor `pa ticket list --assignee builder --status pending-implementation` for the approved item
 - **Timeout:** 30 minutes (configurable). Check every 60 seconds.
 - **On timeout:** Write a partial work report ticket explaining that requirements were gathered but Sinh approval is still pending. Exit gracefully.
 
@@ -243,8 +243,8 @@ Please confirm the merge target branch and strategy:
 Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a note that merge is pending.
 
 **Step 4 — Post-merge cleanup:**
-- Confirm ticket is at `review-uat --team sinh` (builder should have set this after last phase)
-- If not yet set: `pa ticket update <id> --status review-uat --team sinh`
+- Confirm ticket is at `review-uat --assignee sinh` (builder should have set this after last phase)
+- If not yet set: `pa ticket update <id> --status review-uat --assignee sinh`
 - Verify the plan doc has all phases checked off
 
 ### Phase 6: Report and Shutdown
