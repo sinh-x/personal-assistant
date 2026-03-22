@@ -127,7 +127,15 @@ pa ticket create \
 pa ticket list --team <team-name> --status pending-implementation
 ```
 
-Note: No action required. Awareness of pending work is passed to team manager for context.
+Note awareness of pending work. Then run the board cleanup checks below.
+
+**4a. Board Cleanup (see `workflow-policy.md` §7 for full rules)**
+
+For each `pending-implementation` ticket:
+
+- **Inbox-sweep artifacts** (tagged `inbox-sweep`): check if already done or has a duplicate → cancel with cross-ref comment (§7a)
+- **Misrouted tickets**: verify `--project` matches the repo via `pa repos list` → recreate in correct project + cancel original (§7b)
+- **Missing `doc_ref`**: if summary is too thin to execute → move to `on-hold` with comment (§7c)
 
 **5. Check for active bulletins**
 
@@ -209,6 +217,6 @@ FYI:            pa ticket create --type fyi --team <recipient> --estimate XS
 Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
 File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<TICKET-ID>--<topic>.md
 Tags:           autonomous team:<X> agent:<Y> deployment:<Z>
-Startup HK:     1) create workspaces  2) stale implementing-tickets check  3) pending review-uat check  4) pending-implementation backlog awareness  5) bulletin check  6) main work
+Startup HK:     1) create workspaces  2) stale implementing-tickets check  3) pending review-uat check  4) pending-implementation backlog awareness  4a) board cleanup (inbox-sweep/misrouted/no-doc_ref — see workflow-policy §7)  5) bulletin check  6) main work
 Shutdown:       sub-agents → agents → manager (each logs before stopping)
 ```

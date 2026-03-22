@@ -3,7 +3,7 @@
 This document defines rules, exceptions, and edge cases for the kanban workflow.
 When a rule here conflicts with `kanban-workflow.md`, **this document wins**.
 
-> **Status:** Finalized — all sections decided (2026-03-22, PA-877 phase 2).
+> **Status:** Finalized — all sections decided (2026-03-22, PA-877 phase 2). §7 added 2026-03-22.
 > Requirements approval: d-fb9804. See requirements doc for full rationale.
 
 ---
@@ -92,6 +92,76 @@ Standard flow: `idea → requirement-review → pending-approval → pending-imp
 5. Sprint-master triage cadence: at minimum once per daily-end run. High-priority ideas (`--priority high`) are checked at daily-plan time as well.
 
 **Exception:** Sinh may directly create or advance tickets to any status — Sinh's own tickets are not gated by triage.
+
+---
+
+## 7. Board Cleanup Protocol
+
+**Decision:** Sprint-master runs board cleanup during triage. Builder/team-manager may also run it ad-hoc when the board looks noisy.
+
+Board cleanup is distinct from routine housekeeping (stale tickets, pending reviews). It targets **structural board debt**: misrouted tickets, migration artifacts, and orphaned work items.
+
+### 7a. Inbox-Sweep Migration Artifacts
+
+Tickets tagged `inbox-sweep` were bulk-created during the PA-002 inbox migration. Many are duplicates or already completed.
+
+**Rules:**
+1. For each `pending-implementation` ticket tagged `inbox-sweep`:
+   - Check if the work is already done: search for a `done` ticket with matching title/topic
+   - Check for a duplicate ticket in a better status (e.g., `on-hold` with full context)
+   - If either is found → cancel with a comment referencing the canonical ticket
+2. Cancel command: `pa ticket update <id> --status cancelled --actor <agent>`
+3. Always add a comment before or after cancelling:
+   ```bash
+   pa ticket comment <id> --author <agent> --content "Cancelled: work already completed — see <canonical-id>. Inbox-sweep duplicate."
+   # or
+   pa ticket comment <id> --author <agent> --content "Cancelled: duplicate of <canonical-id> (on-hold, requirements team). Inbox-sweep artifact."
+   ```
+4. **Do not cancel** if no canonical ticket exists and the work is still valid — leave it and ensure `doc_ref` is populated.
+
+### 7b. Misrouted Tickets (Wrong Project)
+
+A ticket belongs to the wrong project when its subject clearly targets a repo other than the ticket's `--project`.
+
+**Rules:**
+1. Cross-reference the ticket's subject against `pa repos list` to identify the correct project key and ticket prefix.
+2. Recreate the ticket in the correct project:
+   ```bash
+   pa ticket create --project <correct-key> --title "<title>" --type <type> \
+     --team <team> --priority <p> --estimate <e> \
+     --summary "<summary>. Originally tracked as <OLD-ID>. Moved to correct project." \
+     --tags "<tags>" --actor <agent>
+   ```
+3. Cancel the original with a cross-reference comment:
+   ```bash
+   pa ticket update <old-id> --status cancelled --actor <agent>
+   pa ticket comment <old-id> --author <agent> \
+     --content "Cancelled: moved to correct project. New ticket: <NEW-ID> in <project-key>."
+   ```
+4. If the correct project key is unknown, do not guess — ask Sinh.
+
+### 7c. Missing `doc_ref` on `pending-implementation` Tickets
+
+A `pending-implementation` ticket with no `doc_ref` is unexecutable — no builder can start without a plan document.
+
+**Rules:**
+1. For each `pending-implementation` ticket with empty `doc_ref`:
+   - If the summary contains enough detail to act (clear WHAT/steps) → leave it, add a comment noting the missing doc_ref
+   - If the summary is too thin to execute → move to `on-hold` with a comment:
+     ```bash
+     pa ticket update <id> --status on-hold --actor <agent>
+     pa ticket comment <id> --author <agent> \
+       --content "On-hold: no doc_ref and summary insufficient to execute. Needs a plan document before implementation can start."
+     ```
+2. **Never attempt to implement** a ticket without either a `doc_ref` or a self-contained summary.
+
+### 7d. Cleanup Cadence
+
+| Who | When |
+|-----|------|
+| Sprint-master | At every daily-end triage run |
+| Builder / team-manager | Ad-hoc, when the `pending-implementation` queue looks noisy |
+| Sinh | Can request a cleanup run at any time |
 
 ---
 
