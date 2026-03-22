@@ -7,6 +7,7 @@ import { getHomeDir, getDataDir, getRegistryPath, getRegistryLockPath } from "..
 import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent } from "../lib/registry.js";
 import { generatePrimer } from "../lib/primer.js";
+import { isTeamBlocked } from "../lib/bulletins/index.js";
 import { spawnDetached } from "../utils/process.js";
 import { resolveRepo } from "../lib/repos.js";
 import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
@@ -110,7 +111,6 @@ export function deployCommand(
     background?: boolean;
     interactive?: boolean;
     objective?: string;
-    routeDecisions?: boolean;
     direct?: boolean;
     teamModel?: string;
     agentModel?: string;
@@ -194,6 +194,22 @@ export function deployCommand(
     }
   }
 
+  // Bulletin guard — block deployment if an active bulletin targets this team.
+  // Skipped in dry-run mode so users can still preview primers when blocked.
+  if (mode !== "dry-run") {
+    const guard = isTeamBlocked(teamName);
+    if (guard.blocked) {
+      const b = guard.bulletin!;
+      const blockStr = b.block === "all" ? "all teams" : `team "${teamName}"`;
+      console.error(`\nDeployment blocked: active bulletin [${b.id}] "${b.title}"`);
+      console.error(`  Blocks: ${blockStr}`);
+      if (b.except.length > 0) console.error(`  Exempt: ${b.except.join(", ")}`);
+      if (b.body) console.error(`\n${b.body}\n`);
+      console.error(`\nTo unblock: pa bulletin resolve ${b.id}`);
+      process.exit(1);
+    }
+  }
+
   mkdirSync(primersDir, { recursive: true });
   mkdirSync(logsDir, { recursive: true });
   mkdirSync(deploymentsDir, { recursive: true });
@@ -267,7 +283,7 @@ export function deployCommand(
     registryLock,
     deploymentsDir,
     extraObjective: opts.objective,
-    deployMode: opts.mode ?? (opts.routeDecisions ? "route-decisions" : opts.direct ? "direct" : undefined),
+    deployMode: opts.mode ?? (opts.direct ? "direct" : undefined),
     cwd,
     repoRoot,
     resolveFile,

@@ -27,7 +27,7 @@ Determine the target repository **before any other work**. This is mandatory —
 
 **Resolution order:**
 
-1. If `--objective` points to a file path (e.g., an inbox item or requirements doc):
+1. If `--objective` points to a ticket ID or file path (e.g., a plan doc):
    - Read the file
    - Look for `repo_path` in frontmatter or plan body
    - If found, use it
@@ -42,7 +42,7 @@ Determine the target repository **before any other work**. This is mandatory —
 - Confirm it is a git repository (`git -C <repo_path> rev-parse --git-dir`)
 - `cd` to the repo root
 
-**If repo cannot be determined → FAIL immediately.** Write a failed work report to Sinh inbox:
+**If repo cannot be determined → FAIL immediately.** Create a failed work-report ticket for Sinh:
 
 ```markdown
 # Work Report: <objective> — Pre-flight Failed
@@ -68,12 +68,12 @@ Re-launch with an explicit repo path or an objective that references a file cont
 
 Parse the `--objective` to identify the target work.
 
-1. **If objective points to a specific file** — read it directly as the plan document. Skip inbox scan.
-2. **If objective is a topic description** — scan `~/Documents/ai-usage/agent-teams/builder/inbox/` for a matching approved item:
-   - Match by topic keywords in the filename (strip date prefix, compare slugs)
-   - If multiple matches, pick the most recent
-3. **If a matching approved item is found** → go to Phase 3 (Plan Analysis)
-4. **If no matching item is found** → go to Phase 2 (Requirements Gathering)
+1. **If objective points to a specific ticket ID** — `pa ticket show <id>` to read it directly as the plan document. Skip ticket scan.
+2. **If objective is a topic description** — `pa ticket list --team builder --status pending-implementation` to find a matching assigned ticket:
+   - Match by topic keywords in the ticket title or summary
+   - If multiple matches, pick the highest-priority one
+3. **If a matching assigned ticket is found** → go to Phase 3 (Plan Analysis)
+4. **If no matching ticket is found** → go to Phase 2 (Requirements Gathering)
 
 ### Phase 2: Requirements Gathering (optional)
 
@@ -95,11 +95,11 @@ pa status <deploy-id> --wait
 ```
 
 **Step 4 — Wait for Sinh approval:**
-- The requirements team will send its output to Sinh's inbox for review
-- Sinh reviews, possibly edits, and approves — the approved doc appears in builder inbox
-- Monitor `~/Documents/ai-usage/agent-teams/builder/inbox/` for the approved item
+- The requirements team will create a review-request ticket for Sinh to review
+- Sinh reviews, possibly edits, and approves — Sinh assigns the approved ticket to the builder team
+- Monitor `pa ticket list --team builder --status pending-implementation` for the approved item
 - **Timeout:** 30 minutes (configurable). Check every 60 seconds.
-- **On timeout:** Write a partial work report explaining that requirements were gathered but Sinh approval is still pending. Exit gracefully.
+- **On timeout:** Write a partial work report ticket explaining that requirements were gathered but Sinh approval is still pending. Exit gracefully.
 
 ```markdown
 # Work Report: <objective> — Partial (Awaiting Approval)
@@ -111,7 +111,7 @@ pa status <deploy-id> --wait
 - Requirements doc created and sent to Sinh for review
 
 ## Needs Attention
-- Approved plan not yet in builder inbox after 30-minute wait
+- No approved ticket yet in builder's todo queue after 30-minute wait
 - Re-launch orchestrator after Sinh approves the requirements
 ```
 
@@ -128,7 +128,7 @@ Read the approved requirement/plan document and extract the implementation detai
 - Plan must have a clear phase checklist with specific deliverables per phase
 - Each phase should have verification steps (build, typecheck, test)
 - If the plan is too thin (no checklist, vague phases, missing verification steps):
-  - Create a review request to Sinh inbox asking for more detail
+  - Create a review-request ticket for Sinh asking for more detail
   - Wait for response (30-minute timeout, same as Phase 2)
   - On timeout: exit partial
 
@@ -170,7 +170,7 @@ pa status <deploy-id> --report
 |--------|--------|
 | Success (exit 0) | Verify phase is checked off in the item file. Continue to next phase. |
 | Failure (exit 1) — transient (test flake, timeout) | Retry once with the same objective. |
-| Failure (exit 1) — real error | Report to Sinh inbox with failure details. See below. |
+| Failure (exit 1) — real error | Create failed work-report ticket for Sinh with failure details. See below. |
 
 **On real failure:**
 
@@ -215,7 +215,7 @@ Check these sources in order:
 
 **Step 3 — If strategy is unclear:**
 
-Create a review request to Sinh inbox:
+Create a review-request ticket for Sinh:
 
 ```markdown
 # Review Request: Merge Strategy for <feature-branch>
@@ -243,12 +243,16 @@ Please confirm the merge target branch and strategy:
 Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a note that merge is pending.
 
 **Step 4 — Post-merge cleanup:**
-- Move the item from `ongoing/` to `done/` (if not already done by the builder)
-- Verify the item file has all phases checked off
+- Confirm ticket is at `review-uat --team sinh` (builder should have set this after last phase)
+- If not yet set: `pa ticket update <id> --status review-uat --team sinh`
+- Verify the plan doc has all phases checked off
 
 ### Phase 6: Report and Shutdown
 
-**Step 1 — Write work report** to `~/Documents/ai-usage/sinh-inputs/inbox/`:
+**Step 1 — Create work report ticket:**
+```
+pa ticket create --type work-report --project personal-assistant --title "<objective>" --summary "<brief summary>" --estimate XS
+```
 
 ```markdown
 # Work Report: <objective>
@@ -284,19 +288,19 @@ Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a no
 
 **Step 3 — Registry completion marker** per standards.
 
-## Inbox Claim Protocol
+## Ticket Coordination Protocol
 
-When working with builder inbox items:
-1. The builder team manages its own inbox claim (inbox → ongoing → done)
-2. Orchestrator reads the item but does NOT move it — the builder handles item lifecycle
-3. Orchestrator tracks progress by reading the item file's phase checklist
+When working with builder tickets:
+1. The builder team manages its own ticket lifecycle (pending-implementation → implementing → review-uat)
+2. Orchestrator reads the ticket but does NOT claim it — the builder handles ticket status updates
+3. Orchestrator tracks progress by reading the ticket's plan doc phase checklist
 
 ## Failure Modes
 
 | Scenario | Action |
 |----------|--------|
 | Repo cannot be resolved | Fail immediately (Phase 0) |
-| No matching inbox item and no requirements team available | Report to Sinh, exit |
+| No matching ticket found and no requirements team available | Report to Sinh via work-report ticket, exit |
 | Requirements team fails | Report failure details to Sinh, exit partial |
 | Sinh approval timeout (30 min) | Exit partial, note in work report |
 | Builder phase fails (transient) | Retry once |
@@ -307,12 +311,10 @@ When working with builder inbox items:
 
 ## Communication with Sinh
 
-All communication with Sinh goes through the inbox system:
-- **Work reports** → `~/Documents/ai-usage/sinh-inputs/inbox/`
-- **Review requests** → `~/Documents/ai-usage/sinh-inputs/inbox/` (with `Type: review-request`)
-- **Failure reports** → `~/Documents/ai-usage/sinh-inputs/inbox/`
-
-Filename convention: `YYYY-MM-DD-orchestrator-<topic>.md`
+All communication with Sinh goes through the ticket system:
+- **Work reports** → `pa ticket create --type work-report --project personal-assistant ...`
+- **Review requests** → `pa ticket create --type review-request --project personal-assistant ...`
+- **Failure reports** → `pa ticket create --type work-report --project personal-assistant --title "FAILED: <topic>" ...`
 
 ## Environment Variables
 

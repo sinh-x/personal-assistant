@@ -4,15 +4,14 @@ You are a spike researcher running in **autonomous mode**. Your job is to resear
 
 This is a **non-interactive** skill. Do NOT use `AskUserQuestion`. Read, analyze, and produce output autonomously.
 
-## Inbox Claim Protocol
+## Ticket Claim Protocol
 
-When starting from an inbox item:
-1. Move the item to `ongoing/` first: `mv ~/Documents/ai-usage/agent-teams/requirements/inbox/<item> ~/Documents/ai-usage/agent-teams/requirements/ongoing/`
-2. Work on it from `ongoing/`
-3. On completion: move to `done/`
-4. On failure/abort: move back to `inbox/` + write FYI to Sinh inbox
-
-Short single-step work may skip `ongoing/` and go directly `inbox/ → done/`.
+When starting from an assigned ticket:
+1. List assigned tickets: `pa ticket list --team requirements --status requirement-review`
+2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
+3. Work on it
+4. On completion: `pa ticket update <id> --status pending-approval --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ---
 
@@ -24,8 +23,8 @@ Resolve the topic and repo context using this fallback chain:
 
 **Topic (required):**
 1. Read `## Additional Instructions` from the primer — use the `--objective` text if present
-2. Check `~/Documents/ai-usage/agent-teams/requirements/inbox/` for a pending inbox item — read the item and extract the topic
-3. If neither source yields a topic: write a failed FYI to Sinh inbox and stop
+2. Check `pa ticket list --team requirements --status requirement-review` for a claimed ticket — read the ticket and extract the topic
+3. If neither source yields a topic: create a failed FYI ticket for Sinh and stop
 
 **Repo context (optional override):**
 1. Check the inbox item for an explicit `repo_root:` or `repo:` field — use that path if present
@@ -287,7 +286,7 @@ Success looks like: <user-facing description of the working feature>
 - [ ] Approve to route to builder for implementation, or request changes
 
 ## Suggested Next Steps
-- If approved: route to builder inbox for implementation
+- If approved: assign ticket to builder team for implementation
 - If changes needed: re-run `pa deploy requirements --interactive --objective "<topic>"`
 ```
 
@@ -307,10 +306,18 @@ Save the document to 3 destinations:
 ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md
 ```
 
-**3. Sinh's inbox (review request):**
-Create `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-spike-<topic-slug>.md`
+**3. Review-request ticket (for Sinh to review):**
+Create a ticket wrapping the key details:
 
-The inbox file wraps the full document inline:
+```bash
+pa ticket create --type review-request --project personal-assistant \
+  --title "Spike Review: <topic>" \
+  --summary "Autonomous spike on <topic>. Produced <light spike | full requirements doc>. Review and decide: approve, request interactive session, or defer." \
+  --team builder --priority medium --estimate S \
+  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
+```
+
+Template for the inline review-request summary (include as `--description` or as a comment):
 
 ```markdown
 # Review Request: Spike — <topic>
@@ -333,7 +340,7 @@ The inbox file wraps the full document inline:
 - [ ] Decide: approve for implementation / request interactive session / defer
 
 ## Suggested Next Steps
-- If approved: route to builder inbox for implementation
+- If approved: assign ticket to builder team for implementation
 - If interactive follow-up needed: `pa deploy requirements --interactive --objective "<topic>"`
 
 ## Also Saved At
@@ -347,8 +354,8 @@ The inbox file wraps the full document inline:
 <paste full spike report or requirements doc here>
 ```
 
-**4. Waiting-for-response tracking:**
-Place tracking copy in `~/Documents/ai-usage/agent-teams/requirements/waiting-for-response/YYYY-MM-DD-review-spike-<topic-slug>.md`
+**4. Track review status:**
+The ticket created in step 3 is in `review` status — this is the waiting-for-response equivalent. No separate tracking file needed.
 
 **5. Session log:**
 Write session log to `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` following the standard session log format.
@@ -362,6 +369,6 @@ Write session log to `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` followi
 - **Confidence per section.** Every section in the output document MUST include a confidence level (high/medium/low).
 - **Grounded findings.** Always anchor web research to codebase context.
 - **Graceful web fallback.** If web search fails, continue with codebase-only findings and note the fallback.
-- **Inbox claim.** Always move inbox items to `ongoing/` before working on them.
+- **Ticket claim.** Claim tickets by setting `--assignee team-manager` (keep status as `requirement-review`). Advance to `pending-approval --team sinh` when complete.
 - **Read before writing.** Always read files before modifying them.
 - **Self-validate before saving.** Verify `From:` and `To:` are populated before writing any document.

@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { teamsCommand } from "./commands/teams.js";
+import { teamsCommand, boardCommand } from "./commands/teams.js";
 import { deployCommand } from "./commands/deploy.js";
 import { dailyCommand } from "./commands/daily.js";
 import { statusCommand } from "./commands/status.js";
@@ -11,6 +11,8 @@ import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
 import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
+import { createTicketCommand } from "./commands/ticket.js";
+import { createBulletinCommand } from "./commands/bulletin.js";
 
 declare const __PA_VERSION__: string;
 
@@ -30,6 +32,20 @@ program
   });
 
 program
+  .command("board")
+  .description(
+    "Show kanban board for a project — all tickets grouped by status with assignee. Use --team or --assignee to filter."
+  )
+  .option("--project <name>", "Project name", "personal-assistant")
+  .option("--team <team>", "Filter by team")
+  .option("--assignee <name>", "Filter by assignee")
+  .action(
+    (opts: { project: string; team?: string; assignee?: string }) => {
+      boardCommand(opts.project, { team: opts.team, assignee: opts.assignee });
+    }
+  );
+
+program
   .command("deploy")
   .description("Deploy an agent team")
   .argument("<team>", "Team name or path to YAML file")
@@ -37,14 +53,13 @@ program
   .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
   .option("--objective <text>", "Append extra instructions to the team objective")
-  .option("--route-decisions", "Inject mode: route-decisions into the deployment primer")
   .option("--direct", "Lightweight direct mode — no sub-agents, skip-permissions")
   .option("--team-model <model>", "Model for the team-manager process (haiku|sonnet|opus)")
   .option("--agent-model <model>", "Model for all named agents, overrides per-agent YAML (haiku|sonnet|opus)")
   .option("--mode <mode-id>", "Deploy using a specific mode (reads mode file as objective)")
   .option("--list-modes", "List available modes for the team and exit")
   .option("--repo <name>", "Target repo name from repos.yaml (overrides CWD-based detection)")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; routeDecisions?: boolean; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string }) => {
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string }) => {
     deployCommand(team, opts);
   });
 
@@ -172,5 +187,8 @@ program
       cors: opts.cors ?? false,
     });
   });
+
+program.addCommand(createTicketCommand());
+program.addCommand(createBulletinCommand());
 
 program.parse();

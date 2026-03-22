@@ -1,53 +1,67 @@
-import { readdirSync, existsSync, readFileSync, statSync } from "node:fs";
-import { resolve, basename } from "node:path";
+import { readdirSync, existsSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import { getAgentTeamsDir, getTeamsDir } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { readRegistry } from "../lib/registry.js";
 import { isProcessAlive } from "../utils/process.js";
 import type { RegistryEvent } from "../lib/types.js";
+import {
+  getTeamStatusSummaries,
+  getTeamBoard,
+  buildBoardView,
+  BOARD_COLUMNS,
+} from "../lib/tickets/board.js";
+import type { BoardView } from "../lib/tickets/board.js";
 
-/** Count .md files in a directory (returns 0 if dir missing) */
-function countMdFiles(dir: string): number {
-  if (!existsSync(dir)) return 0;
-  return readdirSync(dir).filter((f) => f.endsWith(".md")).length;
-}
+// ANSI color helpers (no-op when not a TTY)
+const COLORS = {
+  red: "\x1b[31m",
+  yellow: "\x1b[33m",
+  dim: "\x1b[2m",
+  reset: "\x1b[0m",
+};
 
-/** List .md filenames in a directory (returns [] if dir missing) */
-function listMdFiles(dir: string): string[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".md"))
-    .sort();
-}
-
-interface ItemInfo {
-  slug: string; // filename without date prefix and .md
-  date: string; // YYYY-MM-DD from filename, or '?' if non-standard
-  from: string; // From: frontmatter value or 'unknown'
-  to: string; // To: frontmatter value or 'unknown'
-}
-
-/** Extract item info from filename + frontmatter */
-function extractItemInfo(filePath: string): ItemInfo {
-  const name = basename(filePath, ".md");
-  const dateMatch = name.match(/^(\d{4}-\d{2}-\d{2})-(.+)$/);
-  const date = dateMatch ? dateMatch[1] : "?";
-  const slug = dateMatch ? dateMatch[2] : name;
-
-  let from = "unknown";
-  let to = "unknown";
-  try {
-    const content = readFileSync(filePath, "utf-8");
-    const fromMatch = content.match(/^>\s+\*\*From:\*\*\s*(.+)$/m);
-    const toMatch = content.match(/^>\s+\*\*To:\*\*\s*(.+)$/m);
-    if (fromMatch) from = fromMatch[1].trim();
-    if (toMatch) to = toMatch[1].trim();
-  } catch {
-    // leave from/to as 'unknown'
+function colorByPriority(text: string, priority: string): string {
+  if (!process.stdout.isTTY) return text;
+  switch (priority) {
+    case "critical":
+      return `${COLORS.red}${text}${COLORS.reset}`;
+    case "high":
+      return `${COLORS.yellow}${text}${COLORS.reset}`;
+    case "low":
+      return `${COLORS.dim}${text}${COLORS.reset}`;
+    default:
+      return text;
   }
-
-  return { slug, date, from, to };
 }
+
+/** Short header names for kanban status columns */
+const STATUS_ABBREV: Record<string, string> = {
+  "idea": "IDEA",
+  "requirement-review": "REQ",
+  "pending-approval": "APRV",
+  "pending-implementation": "IMPL",
+  "implementing": "BILD",
+  "review-uat": "UAT",
+  "done": "DONE",
+  "rejected": "REJ",
+  "on-hold": "HOLD",
+  "cancelled": "CNCL",
+};
+
+/** padEnd widths for each status column in summary table */
+const STATUS_WIDTH: Record<string, number> = {
+  "idea": 6,
+  "requirement-review": 5,
+  "pending-approval": 6,
+  "pending-implementation": 6,
+  "implementing": 6,
+  "review-uat": 5,
+  "done": 6,
+  "rejected": 5,
+  "on-hold": 6,
+  "cancelled": 6,
+};
 
 /** Get the team-level model from YAML, or "-" if not declared or YAML not found */
 function getTeamModel(teamName: string): string {
@@ -65,7 +79,6 @@ function getTeamModel(teamName: string): string {
 function getRunningDeploysForTeam(teamName: string): string[] {
   const events = readRegistry();
 
-  // Build deployment records filtered by team
   const deployments = new Map<string, { status: string; pid?: number }>();
   for (const event of events) {
     if (event.team !== teamName) continue;
@@ -90,7 +103,6 @@ function getRunningDeploysForTeam(teamName: string): string[] {
     }
   }
 
-  // Return only those still running with a live PID
   const running: string[] = [];
   for (const [id, rec] of deployments) {
     if (rec.status !== "running") continue;
@@ -101,7 +113,12 @@ function getRunningDeploysForTeam(teamName: string): string[] {
   return running;
 }
 
-/** Show summary table of all agent teams */
+/** Build a separator column segment matching a padEnd(width) column */
+function makeSepCol(width: number): string {
+  return "─".repeat(width - 2) + "  ";
+}
+
+/** Show kanban summary table of all agent teams */
 function showAllTeams(): void {
   const agentTeamsDir = getAgentTeamsDir();
   if (!existsSync(agentTeamsDir)) {
@@ -120,36 +137,52 @@ function showAllTeams(): void {
     return;
   }
 
-  console.log(
-    "TEAM".padEnd(20) +
-      "MODEL".padEnd(9) +
-      "INBOX".padEnd(8) +
-      "ONGOING".padEnd(9) +
-      "WFR".padEnd(7) +
-      "DEPLOY"
-  );
+  // Gather per-team, per-status ticket counts
+  const ticketMap = new Map<string, Record<string, number>>();
+  try {
+    const summaries = getTeamStatusSummaries();
+    for (const s of summaries) {
+      ticketMap.set(s.team, s.counts as Record<string, number>);
+    }
+  } catch {
+    /* ticket system may not be initialized yet */
+  }
 
+  // Header row
+  let header = "TEAM".padEnd(18) + "MODEL".padEnd(9);
+  for (const status of BOARD_COLUMNS) {
+    header += STATUS_ABBREV[status].padEnd(STATUS_WIDTH[status]);
+  }
+  header += "DEPLOY";
+  console.log(header);
+
+  // Separator row
+  let sep = makeSepCol(18) + makeSepCol(9);
+  for (const status of BOARD_COLUMNS) {
+    sep += makeSepCol(STATUS_WIDTH[status]);
+  }
+  sep += "─".repeat(14);
+  console.log(sep);
+
+  // Data rows
   for (const team of entries.sort()) {
-    const teamDir = resolve(agentTeamsDir, team);
     const model = getTeamModel(team);
-    const inbox = countMdFiles(resolve(teamDir, "inbox"));
-    const ongoing = countMdFiles(resolve(teamDir, "ongoing"));
-    const wfr = countMdFiles(resolve(teamDir, "waiting-for-response"));
+    const counts = ticketMap.get(team) ?? {};
     const running = getRunningDeploysForTeam(team);
     const deploy = running.length > 0 ? `${running[0]} [>>]` : "-";
 
-    console.log(
-      team.padEnd(20) +
-        model.padEnd(9) +
-        String(inbox).padEnd(8) +
-        String(ongoing).padEnd(9) +
-        String(wfr).padEnd(7) +
-        deploy
-    );
+    let line = team.padEnd(18) + model.padEnd(9);
+    for (const status of BOARD_COLUMNS) {
+      line += String(counts[status] ?? 0).padEnd(STATUS_WIDTH[status]);
+    }
+    line += deploy;
+    console.log(line);
   }
 }
 
-/** Show detailed folder view for one team */
+const DETAIL_WIDTH = 64;
+
+/** Show kanban board detail view for one team */
 function showOneTeam(name: string): void {
   const agentTeamsDir = getAgentTeamsDir();
   const teamDir = resolve(agentTeamsDir, name);
@@ -162,39 +195,116 @@ function showOneTeam(name: string): void {
   }
 
   console.log(name);
-  console.log("─".repeat(34));
+  console.log("═".repeat(DETAIL_WIDTH));
 
-  for (const folder of ["inbox", "ongoing", "waiting-for-response"] as const) {
-    const folderDir = resolve(teamDir, folder);
-    const files = listMdFiles(folderDir);
+  let board;
+  try {
+    board = getTeamBoard(name);
+  } catch {
+    console.log("\n(ticket system unavailable)");
+    const running = getRunningDeploysForTeam(name);
+    console.log(
+      running.length > 0
+        ? `\ndeployments: ${running.join(", ")}`
+        : "\ndeployments: none running"
+    );
+    return;
+  }
 
-    console.log(`\n${folder} (${files.length})`);
-    if (files.length === 0) {
+  for (const col of board.columns) {
+    const prefix = `── ${col.status} (${col.count}) `;
+    const fill = Math.max(2, DETAIL_WIDTH - prefix.length);
+    console.log(`\n${prefix}${"─".repeat(fill)}`);
+
+    if (col.tickets.length === 0) {
       console.log("  (empty)");
     } else {
-      for (const file of files) {
-        const info = extractItemInfo(resolve(folderDir, file));
-        console.log(`  • ${info.slug}`);
-        console.log(`    ${info.date} | From: ${info.from} → To: ${info.to}`);
+      for (const ticket of col.tickets) {
+        const priorityTag = colorByPriority(
+          `[${ticket.priority}]`,
+          ticket.priority
+        );
+        console.log(`  ${ticket.id.padEnd(8)}${priorityTag}  ${ticket.title}`);
+        if (ticket.summary) {
+          const summary =
+            ticket.summary.length > 80
+              ? ticket.summary.slice(0, 77) + "..."
+              : ticket.summary;
+          console.log(`          ${summary}`);
+        }
       }
     }
   }
 
-  const doneCount = countMdFiles(resolve(teamDir, "done"));
-  console.log(`\ndone: ${doneCount} items`);
-
   const running = getRunningDeploysForTeam(name);
-  if (running.length > 0) {
-    console.log(`\ndeployments: ${running.join(", ")}`);
-  } else {
-    console.log("\ndeployments: none running");
+  console.log(
+    running.length > 0
+      ? `\ndeployments: ${running.join(", ")}`
+      : "\ndeployments: none running"
+  );
+}
+
+/** Show project-wide kanban board, optionally filtered by team or assignee */
+function showBoard(
+  project: string,
+  filters: { team?: string; assignee?: string } = {}
+): void {
+  let board: BoardView;
+  try {
+    board = buildBoardView(project, filters);
+  } catch {
+    console.error("(ticket system unavailable)");
+    return;
   }
+
+  const filterDesc = [
+    filters.team ? `team:${filters.team}` : null,
+    filters.assignee ? `assignee:${filters.assignee}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const title = filterDesc
+    ? `Board: ${project}  [${filterDesc}]`
+    : `Board: ${project}  (all tickets)`;
+  console.log(title);
+  console.log("═".repeat(DETAIL_WIDTH));
+
+  for (const col of board.columns) {
+    if (col.tickets.length === 0) continue;
+    const prefix = `── ${col.status} (${col.count}) `;
+    const fill = Math.max(2, DETAIL_WIDTH - prefix.length);
+    console.log(`\n${prefix}${"─".repeat(fill)}`);
+
+    for (const ticket of col.tickets) {
+      const rawPriority = `[${ticket.priority}]`;
+      const coloredPriority = colorByPriority(rawPriority, ticket.priority);
+      const assignee = (ticket.assignee || "(unassigned)").padEnd(16);
+      console.log(
+        `  ${ticket.id.padEnd(8)}${coloredPriority}${"".padEnd(Math.max(1, 11 - rawPriority.length))}${assignee}  ${ticket.title}`
+      );
+    }
+  }
+
+  console.log(`\n(${board.total} total)`);
 }
 
 /**
- * Show agent team workflow status.
- * Without name: summary table of all teams (inbox/ongoing/wfr counts + running deploy).
- * With name: full folder view for one team.
+ * Show project-wide kanban board (all tickets by status, with assignee).
+ * Default project: personal-assistant.
+ * Optional --team and --assignee filters.
+ */
+export function boardCommand(
+  project: string,
+  filters: { team?: string; assignee?: string } = {}
+): void {
+  showBoard(project, filters);
+}
+
+/**
+ * Show agent team kanban board.
+ * Without name: summary table of all teams with per-status ticket counts.
+ * With name: kanban board for one team, tickets grouped by status.
  */
 export function teamsCommand(name?: string): void {
   if (name) {

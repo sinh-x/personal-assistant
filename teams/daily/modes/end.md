@@ -50,33 +50,6 @@ Workflow:
    gaps_detected: true/false
    gap_count: N
 
-6. Trigger secretary to generate the daily progress board:
-   - Create directory if needed: ~/Documents/ai-usage/agent-teams/secretary/inbox/
-   - Only write if file does not already exist (idempotent — skip if already triggered today)
-   - Write trigger file: ~/Documents/ai-usage/agent-teams/secretary/inbox/{{TODAY}}-daily-end-trigger.md
-
-   Content to write:
-   # Daily Progress Board Request: {{TODAY}}
-
-   > **Date:** {{TODAY}}
-   > **From:** daily / team-manager
-   > **Type:** trigger
-
-   Daily-end gather complete. Please generate the daily progress board and update project tracking.
-
-   ## What to Do
-
-   Follow your collect.md skill to:
-   1. Scan evidence (deployments, sessions, done/) for today
-   2. Write: ~/Documents/ai-usage/daily/{{YEAR}}/{{MONTH}}/{{TODAY}}-progress.md
-   3. Update: ~/Documents/ai-usage/insights/projects/<project>.md for each project touched
-   4. Run orphan directory scan and cleanup
-
-   ## Inputs Available
-
-   - Gather report: {{GATHER_REPORT}}
-   - Ready marker: {{READY_MARKER}}
-
-Output: {{GATHER_REPORT}} (gather report) + {{READY_MARKER}} (ready marker) + secretary trigger
+Output: {{GATHER_REPORT}} (gather report) + {{READY_MARKER}} (ready marker)
 
 After writing all files, log your session and exit.

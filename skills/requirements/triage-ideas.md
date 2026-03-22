@@ -4,15 +4,14 @@ You are a requirements analyst running in **automated triage mode**. Your job is
 
 This is a **non-interactive** skill. Do not ask questions — read, analyze, and produce output autonomously.
 
-## Inbox Claim Protocol
+## Ticket Claim Protocol
 
-When starting from an inbox item:
-1. Move the item to `ongoing/` first: `mv ~/Documents/ai-usage/agent-teams/requirements/inbox/<item> ~/Documents/ai-usage/agent-teams/requirements/ongoing/`
-2. Work on it from `ongoing/`
-3. On completion: move to `done/`
-4. On failure/abort: move back to `inbox/` + write FYI to Sinh inbox
-
-Short single-step work that completes in one action may skip `ongoing/` and go directly `inbox/ → done/`.
+When starting from an assigned ticket:
+1. List assigned tickets: `pa ticket list --team requirements --status requirement-review`
+2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
+3. Work on it
+4. On completion: `pa ticket update <id> --status pending-approval --team sinh`
+5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ## Flags
 
@@ -83,7 +82,7 @@ Triaged N ideas into M groups. N new ideas processed.
 - [ ] Flag any ideas that should be deferred or dropped
 
 ## Suggested Next Steps
-- If approved: requirements team creates individual inbox items per group
+- If approved: requirements team creates individual tickets per group
 - If changes needed: re-run with --force after adjusting ideas
 
 ## Idea Groups
@@ -122,14 +121,18 @@ Triaged N ideas into M groups. N new ideas processed.
 
 **Otherwise:**
 
-1. **Save proposal to Sinh's inbox:**
+1. **Create review-request ticket for Sinh:**
    ```
-   ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-ideas-triage.md
+   pa ticket create --type review-request --project personal-assistant \
+     --title "Ideas Triage: YYYY-MM-DD" \
+     --summary "Triaged N ideas into M groups. Review groupings and priorities." \
+     --team requirements --priority medium --estimate S \
+     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-ideas-triage-proposal.md"
    ```
 
-2. **Save tracking copy to requirements WFR:**
+2. **Save tracking copy to requirements artifacts:**
    ```
-   ~/Documents/ai-usage/agent-teams/requirements/waiting-for-response/YYYY-MM-DD-review-ideas-triage.md
+   ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-ideas-triage-proposal.md
    ```
 
 3. **Update idea files:** For each triaged idea:
@@ -137,34 +140,30 @@ Triaged N ideas into M groups. N new ideas processed.
    - Move the file to `~/Documents/ai-usage/sinh-inputs/ideas/triaged/`
    - Create the `triaged/` subfolder if it doesn't exist: `mkdir -p ~/Documents/ai-usage/sinh-inputs/ideas/triaged/`
 
-4. **Save to team artifacts:**
-   ```
-   ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-ideas-triage-proposal.md
-   ```
+4. **The proposal document was already saved to artifacts in step 2 above.**
 
 ### Phase T6: Process Approved Proposals (post-approval flow)
 
-**When to run this phase:** Check `~/Documents/ai-usage/agent-teams/requirements/inbox/` for files that look like approved triage proposals (contain `Type: implementation-request` or routed from `sinh-inputs/approved/` with triage content).
+**When to run this phase:** Check `pa ticket list --team requirements --status pending-implementation --type implementation-request` for approved triage proposals.
 
-If an approved proposal is found:
+If an approved ticket is found:
 
-1. Read the approved proposal and any Sinh feedback
-2. For each group in the proposal, create an individual inbox item:
+1. Read the ticket and its doc_ref for Sinh's feedback
+2. For each group in the proposal, create an individual requirements ticket:
    ```
-   ~/Documents/ai-usage/agent-teams/requirements/inbox/YYYY-MM-DD-requirements-<group-slug>.md
+   pa ticket create --type task --project personal-assistant \
+     --title "Requirements: <group-slug>" \
+     --summary "<group context and ideas>" \
+     --team requirements --priority medium --estimate M
    ```
-   Each item contains:
-   - The group's ideas and context
-   - Sinh's feedback (if any) for that group
-   - Instruction to run interactive requirements analysis for this group
 3. Update idea files: change `Status: triaged` → `Status: in-requirements`
-4. Move the approved proposal item to `done/`
+4. Mark the approved ticket complete: `pa ticket update <id> --status review-uat --team sinh`
 
 **If no approved proposals found:** Skip this phase silently.
 
 ## Idempotency Rules
 
-- **Never create duplicate proposals.** Before Phase T5, check if `~/Documents/ai-usage/sinh-inputs/inbox/` or `~/Documents/ai-usage/agent-teams/requirements/waiting-for-response/` already contains a file matching `*-review-ideas-triage.md`. If found, skip creating a new proposal and log: "Existing triage proposal pending review — skipping."
+- **Never create duplicate proposals.** Before Phase T5, check `pa ticket list --team requirements --type review-request --status pending-approval` for an existing triage proposal ticket. If found, skip creating a new one and log: "Existing triage proposal pending review — skipping."
 - **Never re-triage already-triaged ideas** (unless `--force`). Filter by `Status: new` only.
 - **Never move ideas that were already moved.** Check that the file exists in `ideas/` (not `ideas/triaged/`) before moving.
 

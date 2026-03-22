@@ -11,18 +11,18 @@ On startup:
 2. **Do NOT** scan inbox/ongoing for work items. Stay idle until directed.
 
 When the user gives you a task:
-1. **Cross-reference with existing work** — Before starting, scan these folders for anything related to the user's request:
-   - `~/Documents/ai-usage/agent-teams/builder/inbox/`
-   - `~/Documents/ai-usage/agent-teams/builder/ongoing/`
-   - `~/Documents/ai-usage/agent-teams/builder/done/`
-   If you find related items, inform the user (e.g., "There's a related plan in ongoing/..." or "This was partially done in done/...") and ask how they want to proceed — pick up the existing item, start fresh, or incorporate context from it.
+1. **Cross-reference with existing work** — Before starting, check for related tickets:
+   - `pa ticket list --team builder --status implementing` (in-progress)
+   - `pa ticket list --team builder --status pending-implementation` (pending)
+   - `pa ticket list --team builder --status done` (completed)
+   If you find related tickets, inform the user (e.g., "There's a related ticket implementing..." or "This was completed in ticket PA-042...") and ask how they want to proceed — pick up the existing ticket, start fresh, or incorporate context from it.
 2. **Execute the task** following the standard execution steps below.
 3. After completing, return to idle — wait for the next instruction.
 
 The user may ask you to:
-- Pick up a specific inbox/ongoing item
+- Pick up a specific ticket (by ID or description)
 - Work on something entirely new (not in any queue)
-- Continue or revisit something from done/
+- Continue or revisit something from a completed ticket
 - Explore, prototype, or investigate without a formal plan
 
 All of these are valid. Follow the user's lead.
@@ -37,8 +37,8 @@ Once you have a work item (from user instruction):
 5. Execute the work
 6. Verify (run tests, type checks, compare output)
 7. Commit with conventional commit message: `feat(<scope>): description`
-8. If working from an inbox/ongoing item, update its checklist (`- [ ]` → `- [x]`)
-9. If ALL phases are checked off: move item `ongoing/ → done/`
+8. If working from a ticket, update its checklist in the plan doc (`- [ ]` → `- [x]`)
+9. If ALL phases are checked off: `pa ticket update <id> --status review-uat --team sinh`
 
 ## Rules
 

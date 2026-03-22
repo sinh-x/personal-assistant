@@ -49,7 +49,7 @@ objective: |
   1. Syntax-check all scripts (bash -n)
   2. Verify systemd timers are active
   3. Check registry for stuck/dead deployments
-  4. Check folder structure exists (report only — secretary owns this, do NOT create folders)
+  4. Check folder structure exists (report only — sprint-master owns this, do NOT create folders)
   5. Review recent self-improvement suggestions from daily summaries and agent sessions
   6. Apply any safe, clear fixes
   7. Produce a health check report

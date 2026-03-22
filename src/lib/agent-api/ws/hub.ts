@@ -5,6 +5,8 @@ export interface WsEvent {
     | "new-inbox-item"
     | "inbox-item-moved"
     | "deployment-status-change"
+    | "ticket-changed"
+    | "bulletin-update"
     | "ping";
   data?: Record<string, unknown>;
   timestamp: string;
