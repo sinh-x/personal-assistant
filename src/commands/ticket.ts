@@ -139,6 +139,7 @@ export function createTicketCommand(): Command {
     .option("--priority <priority>", "New priority (critical|high|medium|low)")
     .option("--tags <tags>", "Comma-separated tags (replaces existing)")
     .option("--estimate <size>", "New effort estimate (XS|S|M|L|XL)")
+    .option("--doc-ref <path>", "Document reference path (plan doc, requirements doc, etc.)")
     .option("--actor <name>", "Actor for audit log", "cli-user")
     .action(
       (
@@ -149,6 +150,7 @@ export function createTicketCommand(): Command {
           priority?: string;
           tags?: string;
           estimate?: string;
+          docRef?: string;
           actor: string;
         }
       ) => {
@@ -163,6 +165,7 @@ export function createTicketCommand(): Command {
         if (opts.estimate) {
           input.estimate = validateEstimate(opts.estimate);
         }
+        if (opts.docRef !== undefined) input.doc_ref = opts.docRef;
         const ticket = store.update(id, input, opts.actor);
         console.log(`Updated: ${ticket.id}`);
         console.log(JSON.stringify(ticket, null, 2));

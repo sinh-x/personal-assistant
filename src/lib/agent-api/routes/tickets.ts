@@ -4,6 +4,7 @@
  * GET    /api/tickets              — list tickets with optional query filters
  * POST   /api/tickets              — create a new ticket
  * GET    /api/tickets/:id          — get a single ticket by ID
+ * GET    /api/tickets/:id/review   — review context: ticket + doc_ref_url + attachment_urls
  * PATCH  /api/tickets/:id          — update ticket fields
  * GET    /api/board                — board view grouped by status (project required)
  *
@@ -77,6 +78,22 @@ export function ticketRoutes(): Hono {
       const message = err instanceof Error ? err.message : String(err);
       return c.json({ error: message, code: "CREATE_FAILED" }, 400);
     }
+  });
+
+  // GET /api/tickets/:id/review — review context: ticket + document links
+  app.get("/api/tickets/:id/review", (c: Context) => {
+    const id = c.req.param("id") as string;
+    const ticket = store.get(id);
+    if (!ticket) {
+      return c.json({ error: "Ticket not found", code: "NOT_FOUND" }, 404);
+    }
+    const doc_ref_url = ticket.doc_ref
+      ? `/api/documents?path=${encodeURIComponent(ticket.doc_ref)}`
+      : null;
+    const attachment_urls = (ticket.attachments ?? []).map(
+      (p: string) => `/api/documents?path=${encodeURIComponent(p)}`
+    );
+    return c.json({ ticket, doc_ref_url, attachment_urls });
   });
 
   // GET /api/tickets/:id — get single ticket

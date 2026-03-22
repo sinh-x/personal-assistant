@@ -226,6 +226,22 @@ export class TicketStore {
       }
     }
 
+    // Step 0b: Warn when advancing to a review gate without doc_ref
+    if (
+      (input.status === "pending-approval" || input.status === "review-uat") &&
+      !input.doc_ref &&
+      !ticket.doc_ref
+    ) {
+      process.stderr.write(
+        `Warning: Advancing to ${input.status} without doc_ref — ticket may lack review context\n`
+      );
+      // Inject needs-doc-ref tag (additive — preserves existing tags)
+      const existingTags = input.tags ?? ticket.tags ?? [];
+      if (!existingTags.includes("needs-doc-ref")) {
+        input.tags = [...existingTags, "needs-doc-ref"];
+      }
+    }
+
     const now = new Date().toISOString();
     const changes: Record<string, [unknown, unknown]> = {};
 
