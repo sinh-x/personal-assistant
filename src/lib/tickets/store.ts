@@ -126,8 +126,10 @@ export class TicketStore {
     const auditPath = this.auditPath();
     const lockPath = this.lockPath;
     const json = JSON.stringify(entry);
+    // Pass content via env var to avoid shell quoting issues with special chars (apostrophes, quotes, etc.)
     execSync(
-      `flock -w 5 ${JSON.stringify(lockPath)} bash -c 'echo ${JSON.stringify(json)} >> ${JSON.stringify(auditPath)}'`
+      `flock -w 5 ${JSON.stringify(lockPath)} bash -c 'printf "%s\\n" "$_AUDIT_ENTRY" >> ${JSON.stringify(auditPath)}'`,
+      { env: { ...process.env, _AUDIT_ENTRY: json } }
     );
   }
 
