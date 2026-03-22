@@ -169,7 +169,28 @@ If a ticket has `blockedBy` entries that are still unresolved, flag it:
 - Add a comment: "Blocked: waiting on dependency <DEP-ID>"
 - Set priority to `urgent` if the dependent ticket is `urgent`
 
-### Step 11 — Write daily digest
+### Step 11 — Monitor needs-doc-ref tickets
+
+Tickets tagged `needs-doc-ref` were advanced to `pending-approval` or `review-uat` without an attached artifact. Find and chase them down:
+
+```bash
+pa ticket list --tags needs-doc-ref
+```
+
+For each ticket tagged `needs-doc-ref`:
+
+1. **Identify the responsible team** — check the ticket's `assignee` field and recent comments to find the team that last advanced the status
+2. **Add a comment requesting the missing document:**
+   ```bash
+   pa ticket comment <id> --author sprint-master \
+     --content "Missing doc_ref at <status> gate. <team>: please attach document with 'pa ticket update <id> --doc-ref <path>'."
+   ```
+3. **Do NOT block the ticket status** — the team can still work; the tag surfaces the gap
+4. **Once attached:** the originating team should remove the tag via `pa ticket update <id> --tags ""` (or update tags list without `needs-doc-ref`). Sprint-master confirms removal during the next triage run.
+
+Include a count of `needs-doc-ref` tickets in the daily digest Triage Summary section.
+
+### Step 12 — Write daily digest
 
 Write the daily digest as a document file to the sprint-master artifacts directory:
 
@@ -205,6 +226,7 @@ Daily digest format:
 - Escalated W tickets as stale or blocked
 - Auto-archived A terminal tickets (>30 days old)
 - Suggested backlog on B stale idea tickets (>14 days no activity)
+- Chased C needs-doc-ref tickets (missing artifact at status gate)
 
 | Ticket | Title | Priority | Team | Estimate | Action |
 |--------|-------|----------|------|----------|--------|
