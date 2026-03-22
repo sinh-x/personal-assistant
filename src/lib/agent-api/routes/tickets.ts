@@ -259,11 +259,14 @@ export function ticketRoutes(): Hono {
       );
     }
 
+    const DEFAULT_EXCLUDE_TAGS = ["backlog", "archived"];
     const filters: { assignee?: string; excludeTags?: string[] } = {};
     const assignee = c.req.query("assignee");
     const excludeTagsParam = c.req.query("excludeTags");
     if (assignee) filters.assignee = assignee;
-    if (excludeTagsParam) filters.excludeTags = excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean);
+    filters.excludeTags = excludeTagsParam
+      ? excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean)
+      : DEFAULT_EXCLUDE_TAGS;
 
     try {
       const board = buildBoardView(project, filters);
