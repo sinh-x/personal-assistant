@@ -13,4 +13,4 @@ Follow the **researcher skill** (embedded above in `## Agents`) exactly — it d
 This is a **non-interactive** skill. Do NOT use `AskUserQuestion`. Decide and act autonomously.
 
 When you pick up a ticket for work, claim it with `pa ticket update <id> --assignee team-manager` BEFORE starting (keep status as `requirement-review`).
-Mark it complete with `pa ticket update <id> --status pending-approval --team sinh` when done.
+Mark it complete with `pa ticket update <id> --status pending-approval --assignee sinh` when done.

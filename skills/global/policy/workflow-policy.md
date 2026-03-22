@@ -87,7 +87,7 @@ Standard flow: `idea → requirement-review → pending-approval → pending-imp
 **Rules:**
 1. Any agent creates ticket with `--status idea` (or omits status — default is `idea`).
 2. Sprint-master picks up all `idea` tickets during triage and routes them.
-3. Routing means: set `--status requirement-review`, set `--team requirements`, add triage comment with context.
+3. Routing means: set `--status requirement-review`, set `--assignee requirements`, add triage comment with context.
 4. No team may self-advance an `idea` to `requirement-review` — sprint-master is the single triage router.
 5. Sprint-master triage cadence: at minimum once per daily-end run. High-priority ideas (`--priority high`) are checked at daily-plan time as well.
 
@@ -128,7 +128,7 @@ A ticket belongs to the wrong project when its subject clearly targets a repo ot
 2. Recreate the ticket in the correct project:
    ```bash
    pa ticket create --project <correct-key> --title "<title>" --type <type> \
-     --team <team> --priority <p> --estimate <e> \
+     --assignee <team> --priority <p> --estimate <e> \
      --summary "<summary>. Originally tracked as <OLD-ID>. Moved to correct project." \
      --tags "<tags>" --actor <agent>
    ```

@@ -57,18 +57,18 @@ Run a diagnostic pass on the system:
 ### Ticket Claim Protocol
 
 When you start working on an assigned ticket:
-1. List assigned tickets: `pa ticket list --team maintenance --status pending-implementation`
+1. List assigned tickets: `pa ticket list --assignee maintenance --status pending-implementation`
 2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
 3. Work on it
-4. On completion: `pa ticket update <id> --status review-uat --team sinh`
+4. On completion: `pa ticket update <id> --status review-uat --assignee sinh`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
-Short single-step work may go directly `pending-implementation → review-uat --team sinh` without an intermediate `implementing` step.
+Short single-step work may go directly `pending-implementation → review-uat --assignee sinh` without an intermediate `implementing` step.
 
 ### On Each Run
 
-1. **Check in-progress tickets first** — `pa ticket list --team maintenance --status implementing`. Resume if found.
-2. **Claim new ticket** — If nothing in-progress, run `pa ticket list --team maintenance --status pending-implementation` and claim the next item (see §Ticket Claim Protocol).
+1. **Check in-progress tickets first** — `pa ticket list --assignee maintenance --status implementing`. Resume if found.
+2. **Claim new ticket** — If nothing in-progress, run `pa ticket list --assignee maintenance --status pending-implementation` and claim the next item (see §Ticket Claim Protocol).
 3. **Read objective** — What specific issue to investigate, OR "health check" for a full diagnostic
 4. **Gather context** — Read relevant files, logs, registry, timer status
 5. **Diagnose** — Identify the root cause or current health status

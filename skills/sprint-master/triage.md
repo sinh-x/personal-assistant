@@ -103,7 +103,7 @@ All tickets MUST have an effort estimate. If missing, infer from content:
 ```bash
 pa ticket update <TICKET-ID> \
   --priority <priority> \
-  --team <team> \
+  --assignee <team> \
   --assignee team-manager \
   --estimate <XS|S|M|L|XL>
 ```
@@ -122,7 +122,7 @@ For any stale `implementing` ticket:
 2. Reset to `pending-implementation` if no recent audit activity or comments
 
 ```bash
-pa ticket update <TICKET-ID> --status pending-implementation --team <original-team>
+pa ticket update <TICKET-ID> --status pending-implementation --assignee <original-team>
 ```
 
 ### Step 8 — Escalate blockers
@@ -190,7 +190,7 @@ pa ticket create \
   --project personal-assistant \
   --title "FYI: Daily digest ready — YYYY-MM-DD" \
   --type fyi \
-  --team sinh \
+  --assignee sinh \
   --priority normal \
   --estimate XS \
   --doc-ref "agent-teams/sprint-master/artifacts/YYYY-MM-DD-daily-digest.md" \

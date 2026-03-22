@@ -93,7 +93,7 @@ mkdir -p ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/
 **2. Check in-progress tickets (stale check)**
 
 ```bash
-pa ticket list --team <team-name> --status implementing
+pa ticket list --assignee <team-name> --status implementing
 ```
 
 For each ticket in `implementing` state that has not been updated in >3 days, add a stale comment:
@@ -105,7 +105,7 @@ pa ticket comment <ticket-id> --content "Stale check: this ticket has been in 'i
 **3. Check pending review tickets**
 
 ```bash
-pa ticket list --team sinh --type review-request --status review-uat
+pa ticket list --assignee sinh --type review-request --status review-uat
 ```
 
 For each review ticket >3 days old, create a reminder FYI:
@@ -115,7 +115,7 @@ pa ticket create \
   --project personal-assistant \
   --title "FYI: Pending review >3 days — <ticket-id>" \
   --type fyi \
-  --team sinh \
+  --assignee sinh \
   --priority normal \
   --estimate XS \
   --summary "Ticket <ticket-id> has been waiting for Sinh's review for >3 days: <ticket-title>"
@@ -124,7 +124,7 @@ pa ticket create \
 **4. Check pending-implementation backlog for your team**
 
 ```bash
-pa ticket list --team <team-name> --status pending-implementation
+pa ticket list --assignee <team-name> --status pending-implementation
 ```
 
 Note awareness of pending work. Then run the board cleanup checks below.
@@ -159,7 +159,7 @@ Agent claims it
   → begin work
 
 Agent work completes
-  → pa ticket update <id> --status review-uat --team sinh
+  → pa ticket update <id> --status review-uat --assignee sinh
   → add completion comment on the ticket
 
 Agent work fails / aborts
@@ -171,7 +171,7 @@ Agent work fails / aborts
 **Rules:**
 - Always claim (set to `implementing`) before starting work — never work on a `pending-implementation` ticket without claiming
 - Never leave a ticket in `implementing` state without a comment when you stop — add a comment if interrupted
-- Short single-step work that completes in one action: `pending-implementation → review-uat --team sinh` directly, no `implementing` step needed
+- Short single-step work that completes in one action: `pending-implementation → review-uat --assignee sinh` directly, no `implementing` step needed
 - `blocked` is a tag, not a status — use `--tags blocked` + comment protocol instead
 
 ### When a task cannot be completed
@@ -191,12 +191,12 @@ All cross-team documents now use ticket fields instead of inline `From:` / `To:`
 | Old field | New equivalent |
 |-----------|---------------|
 | `From: <team> / <agent>` | `--summary` includes agent identity; ticket audit log records actor |
-| `To: <team>` | `--team <recipient-team>` on the ticket |
+| `To: <team>` | `--assignee <recipient-team>` on the ticket |
 | `Type: work-report` | `--type work-report` |
 | `Type: review-request` | `--type review-request` |
 | `Type: fyi` | `--type fyi` |
 
-**Self-validation (mandatory):** Before creating any ticket, verify `--team` and `--title` are populated and meaningful. A ticket without a clear recipient team is unroutable.
+**Self-validation (mandatory):** Before creating any ticket, verify `--assignee` and `--title` are populated and meaningful. A ticket without a clear recipient assignee is unroutable.
 
 ---
 
@@ -208,12 +208,12 @@ Registry:       ~/Documents/ai-usage/deployments/registry.jsonl (team manager on
 Team workspace: ~/Documents/ai-usage/agent-teams/<team-name>/  (persistent, cross-deployment)
 Run workspace:  ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/  (per-deployment)
 Bulletins:      pa bulletin list  (check on startup — FIRST priority!)
-Ticket work:    pa ticket list --team <team> --status pending-implementation
+Ticket work:    pa ticket list --assignee <team> --status pending-implementation
 Ticket claim:   pa ticket update <id> --status implementing --assignee <agent>
-Ticket done:    pa ticket update <id> --status review-uat --team sinh
+Ticket done:    pa ticket update <id> --status review-uat --assignee sinh
 Blocked:        pa ticket update <id> --tags blocked  (keep status, add tag + comment)
-Review request: pa ticket create --type review-request --team <downstream> --estimate M
-FYI:            pa ticket create --type fyi --team <recipient> --estimate XS
+Review request: pa ticket create --type review-request --assignee <downstream> --estimate M
+FYI:            pa ticket create --type fyi --assignee <recipient> --estimate XS
 Session logs:   ~/Documents/ai-usage/sessions/YYYY/MM/agent-team/
 File naming:    YYYY-MM-DD-<hash>-<team>--<agent>--<TICKET-ID>--<topic>.md
 Tags:           autonomous team:<X> agent:<Y> deployment:<Z>

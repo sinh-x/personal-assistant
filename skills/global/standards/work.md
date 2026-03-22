@@ -9,8 +9,8 @@ Every agent follows this priority order on startup:
 1. **Check bulletins first** (see §6). If an active bulletin blocks your team, stop and exit.
 2. **Check Additional Instructions** — if your primer has an `## Additional Instructions` section, that is your PRIMARY objective. Execute it and skip the routine ticket scan entirely.
 3. **Routine ticket triage** — only if there are no additional instructions:
-   - Resume any `implementing` tickets: `pa ticket list --team <team> --status implementing`
-   - Pick up new assigned work: `pa ticket list --team <team> --status pending-implementation`
+   - Resume any `implementing` tickets: `pa ticket list --assignee <team> --status implementing`
+   - Pick up new assigned work: `pa ticket list --assignee <team> --status pending-implementation`
    - Check high-priority items first: add `--priority high` to each query
 
 ---
@@ -53,10 +53,10 @@ In addition to the deployment registry, all work items are tracked as tickets.
 
 ```bash
 # Resume in-progress tickets first
-pa ticket list --team <team-name> --status implementing
+pa ticket list --assignee <team-name> --status implementing
 
 # Then pick up new assigned work
-pa ticket list --team <team-name> --status pending-implementation
+pa ticket list --assignee <team-name> --status pending-implementation
 ```
 
 **Claim a ticket before starting:**
@@ -69,10 +69,10 @@ pa ticket update <ticket-id> --status implementing --assignee <agent-name>
 
 ```bash
 # Builder / maintenance / house-chores → advance to UAT review
-pa ticket update <ticket-id> --status review-uat --team sinh
+pa ticket update <ticket-id> --status review-uat --assignee sinh
 
 # Requirements team → advance to approval gate
-pa ticket update <ticket-id> --status pending-approval --team sinh
+pa ticket update <ticket-id> --status pending-approval --assignee sinh
 ```
 
 ---
@@ -257,14 +257,14 @@ pa ticket create \
   --project personal-assistant \
   --title "Review: <descriptive-topic>" \
   --type review-request \
-  --team <downstream-team-if-approved> \
+  --assignee <downstream-team-if-approved> \
   --priority high \
   --estimate M \
   --doc-ref "agent-teams/<team_name>/artifacts/YYYY-MM-DD-<descriptive-name>.md" \
   --summary "<what was built; what Sinh needs to review; what happens if approved>"
 ```
 
-The `--team` field is the downstream team that receives the work if Sinh approves. Sinh updates ticket status to route it.
+The `--assignee` field is the downstream team that receives the work if Sinh approves. Sinh updates ticket status to route it.
 
 The `--doc-ref` points to the full deliverable in `artifacts/`. Sinh reads the ticket summary first, then opens the artifact for details.
 
@@ -280,7 +280,7 @@ pa ticket create \
   --project personal-assistant \
   --title "FYI: <descriptive-topic>" \
   --type fyi \
-  --team <recipient-team-or-sinh> \
+  --assignee <recipient-team-or-sinh> \
   --priority low \
   --estimate XS \
   --summary "<brief informational content — what happened, why it is relevant>"
@@ -295,7 +295,7 @@ pa ticket create \
   --project personal-assistant \
   --title "Daily Plan: YYYY-MM-DD" \
   --type plan-draft \
-  --team sinh \
+  --assignee sinh \
   --priority normal \
   --estimate XS \
   --doc-ref "daily/YYYY/MM/YYYY-MM-DD-plan.md" \
@@ -318,15 +318,15 @@ Follow §0 priority order. For routine ticket scanning:
 
 ```bash
 # Resume in-progress work first (high-priority first)
-pa ticket list --team <team-name> --status implementing --priority high
-pa ticket list --team <team-name> --status implementing
+pa ticket list --assignee <team-name> --status implementing --priority high
+pa ticket list --assignee <team-name> --status implementing
 
 # Pick up new assigned work
-pa ticket list --team <team-name> --status pending-implementation --priority high
-pa ticket list --team <team-name> --status pending-implementation
+pa ticket list --assignee <team-name> --status pending-implementation --priority high
+pa ticket list --assignee <team-name> --status pending-implementation
 
 # Requirements team: check for elaboration work
-pa ticket list --team requirements --status requirement-review
+pa ticket list --assignee requirements --status requirement-review
 ```
 
 ### Claim a ticket
@@ -344,10 +344,10 @@ pa ticket comment <ticket-id> --content "BLOCKED: <reason>. Waiting on: <depende
 # When unblocked: update tags without blocked, add resolution comment
 
 # When implementation complete — builder / maintenance / house-chores → UAT
-pa ticket update <ticket-id> --status review-uat --team sinh
+pa ticket update <ticket-id> --status review-uat --assignee sinh
 
 # When requirements complete — requirements team → approval gate
-pa ticket update <ticket-id> --status pending-approval --team sinh
+pa ticket update <ticket-id> --status pending-approval --assignee sinh
 ```
 
 ### Create tickets for discovered work
@@ -359,7 +359,7 @@ pa ticket create \
   --project personal-assistant \
   --title "<title>" \
   --type task \
-  --team <team> \
+  --assignee <team> \
   --priority normal \
   --estimate <XS|S|M|L|XL> \
   --summary "<description of the work needed>"
@@ -385,7 +385,7 @@ If a bulletin blocks your team (`block: all` or your team name in `block:`) and 
      --project personal-assistant \
      --title "FYI: Deployment blocked by bulletin — <bulletin title>" \
      --type fyi \
-     --team sinh \
+     --assignee sinh \
      --priority high \
      --estimate XS \
      --summary "Deployment <deployment_id> blocked by active bulletin: <bulletin title>. Team: <team_name>. No work performed."
