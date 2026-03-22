@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "test": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "dev": "tsup --watch",
     "bump:patch": "bash scripts/version_bump.sh patch",
