@@ -79,7 +79,7 @@ objective: |
   7. Commit with conventional commit message: `feat(<scope>): phase N - description`
   8. Update the inbox item — check off completed phase (`- [ ]` → `- [x]`)
   9. If ALL phases are checked off: move item `ongoing/ → done/`. Otherwise leave in `ongoing/`.
-  10. Submit work report to ~/Documents/ai-usage/sinh-inputs/inbox/
+  10. Add completion comment on the working ticket: `pa ticket comment <id> --author team-manager --content "Phase N complete: <summary>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"`
 
   IMPORTANT: ONE phase per deployment. Do not attempt multiple phases.
   If a phase fails verification, stop and report. Do not proceed to the next phase.

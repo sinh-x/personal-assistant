@@ -117,23 +117,28 @@ Save the sprint summary to the team artifacts:
 ~/Documents/ai-usage/agent-teams/sprint-master/artifacts/YYYY-MM-DD-sprint-review-<start>-to-<end>.md
 ```
 
-### Step 6 — Write review request to Sinh
+### Step 6 — Send review request to Sinh
 
-Create a review request in `~/Documents/ai-usage/sinh-inputs/inbox/`:
+Create a review-request ticket pointing to the sprint summary artifact:
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "Review: Sprint Review <start>-to-<end>" \
+  --type review-request \
+  --assignee sinh \
+  --priority normal \
+  --estimate XS \
+  --doc-ref "agent-teams/sprint-master/artifacts/YYYY-MM-DD-sprint-review-<start>-to-<end>.md" \
+  --summary "Sprint review for period <start> to <end>. N tickets completed, M failed, K carry-over. See doc for full metrics and action items."
 ```
-YYYY-MM-DD-review-sprint-review-<dates>.md
+
+### Step 7 — Add completion comment
+
+Add a brief completion comment on the working ticket (if a ticket is being worked):
+```bash
+pa ticket comment <ticket-id> --author team-manager --content "Sprint review complete for <period>. Artifact: agent-teams/sprint-master/artifacts/YYYY-MM-DD-sprint-review-<dates>.md. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
 ```
-
-Include the full sprint summary inline (embed the content — Sinh reads the one file).
-
-Format: Use the review-request template from global standards.
-
-### Step 7 — Write work report
-
-After sending the review request, write a brief work report:
-```
-~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-sprint-master-sprint-review.md
-```
+If no working ticket, the review-request ticket from Step 6 serves as the notification to Sinh.
 
 ## Rules
 

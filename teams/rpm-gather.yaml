@@ -42,6 +42,6 @@ objective: |
   4. Read daily summaries from this week
   5. Estimate MAP item progress via keyword matching in avo worklogs
   6. Write gather report to ~/Documents/ai-usage/agent-teams/rpm/inbox/YYYY-MM-DD-weekly-gather.md
-  7. Write work report to ~/Documents/ai-usage/sinh-inputs/inbox/
+  7. Create FYI ticket: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: RPM weekly gather complete YYYY-MM-DD" --summary "<brief summary of gather results>"`
 
   When done, write the completion marker and exit.

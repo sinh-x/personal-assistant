@@ -205,7 +205,15 @@ Before saving, validate each block:
 At session end:
 1. Confirm what was saved: "Saved N RPM blocks to rpm-blocks.yaml"
 2. Report Anytype sync status: "Synced N/N blocks to Anytype" (or note failures)
-3. Write work report to `~/Documents/ai-usage/sinh-inputs/inbox/`
+3. Add completion comment on the working ticket (if any), or create an FYI ticket:
+   ```bash
+   # If working on a ticket:
+   pa ticket comment <ticket-id> --author team-manager --content "RPM blocks updated. Saved N blocks. Synced N/N to Anytype. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
+   # If no working ticket:
+   pa ticket create --type fyi --assignee sinh --priority low --estimate XS \
+     --title "FYI: RPM blocks updated YYYY-MM-DD" \
+     --summary "Created/updated N RPM blocks. Synced N/N to Anytype."
+   ```
 
 ---
 

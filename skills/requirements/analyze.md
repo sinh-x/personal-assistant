@@ -178,8 +178,20 @@ Save the requirements document in three places:
    ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md
    ```
 
-3. **Review-request ticket** (for Sinh to review and approve):
+3. **Ticket update (conditional):**
+
+   ### If working on an existing ticket (ticket_id is set):
+   Advance the existing ticket instead of creating a new one:
+   ```bash
+   pa ticket update <ticket_id> --status pending-approval --assignee sinh \
+     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
+   pa ticket comment <ticket_id> --author <agent_name> \
+     --content "Requirements complete. Doc: agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md. Review and approve to route to builder."
    ```
+
+   ### If NO existing ticket (standalone work):
+   Create a new review-request ticket:
+   ```bash
    pa ticket create --type review-request --project personal-assistant \
      --title "Review: <descriptive-topic>" \
      --summary "<brief summary of what was produced>" \

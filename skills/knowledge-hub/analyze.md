@@ -194,7 +194,8 @@ Produce a structured Johari gap table from the tracker:
 
 Save this report to:
 - Deployment workspace: `~/Documents/ai-usage/deployments/<deployment_id>/analyst/weekly-johari.md`
-- Sinh's inbox: `~/Documents/ai-usage/sinh-inputs/inbox/<YYYY-MM-DD>-knowledge-hub-weekly-johari.md`
+- Team artifacts: `~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/<YYYY-MM-DD>-weekly-johari.md`
+- Notify via FYI ticket: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: Knowledge-hub weekly Johari report YYYY-MM-DD" --summary "<top blind spots, engagement summary, suggested focus>"`
 
 ---
 
@@ -257,8 +258,8 @@ For yearly reports, add:
 
 Save to:
 - Deployment workspace: `~/Documents/ai-usage/deployments/<deployment_id>/analyst/periodic-report.md`
-- Sinh's inbox: `~/Documents/ai-usage/sinh-inputs/inbox/<YYYY-MM-DD>-knowledge-hub-<monthly|quarterly|yearly>-report.md`
 - Team artifacts: `~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/<YYYY-MM-DD>-johari-<cadence>.md`
+- Notify via FYI ticket: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: Knowledge-hub <monthly|quarterly|yearly> report YYYY-MM-DD" --summary "<engagement summary, blind spots, suggested focus for next period>"`
 
 ---
 
@@ -293,7 +294,7 @@ Write your summary report to the deployment workspace. This is the primary outpu
 
 | Cadence | Status | Destination |
 |---------|--------|-------------|
-| Weekly | Produced / Skipped | ~/Documents/ai-usage/sinh-inputs/inbox/<filename> |
+| Weekly | Produced / Skipped | agent-teams/knowledge-hub/artifacts/<filename> |
 | Monthly | Produced / Skipped | — |
 | ... | ... | ... |
 
@@ -311,6 +312,6 @@ Write your summary report to the deployment workspace. This is the primary outpu
 - **Empty tracker is valid.** If the tracker has no data, write "Johari tracker not yet initialized. Run will establish baseline."
 - **No fabrication.** Only report patterns you actually found in the files. Don't invent failures or gaps.
 - **Cap system scan.** Read at most the last 50 registry lines and last 30 session files. Don't exhaust context on scanning.
-- **Sink reports via Sinh inbox.** Weekly / monthly / periodic reports go to `~/Documents/ai-usage/sinh-inputs/inbox/`. Daily micro stays embedded in the analyst report (team manager surfaces it in the digest).
+- **Sink reports via team artifacts + FYI ticket.** Weekly / monthly / periodic reports go to `~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/` and a FYI ticket notifies Sinh. Daily micro stays embedded in the analyst report (team manager surfaces it in the digest).
 - **Log errors.** If a file can't be read, note it in the Errors section. Don't fail silently.
 - **Don't duplicate daily team output.** Intel digest focuses on knowledge, learning gaps, and system patterns — not task planning or daily schedule.

@@ -8,7 +8,7 @@ Follow the **reviewer skill** (embedded above in `## Agents`) exactly — it def
 3. Per-area exploration — read the area skill file and follow the checklist
 4. Local testing — run tests/build per selected areas
 5. Findings consolidation — group and prioritize findings
-6. Produce review report — save to 3 destinations
+6. Produce review report — save to 3 destinations (workspace + team artifacts + review-request ticket)
 
 The area skill files (Code Quality, Security, Ops, UI/UAT) are listed in `## Mode Skills`.
 Read the selected area files at runtime during Phase 3.

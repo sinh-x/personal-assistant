@@ -58,4 +58,5 @@ objective: |
   STOP and report your findings. Do not guess or make risky changes.
 
   After fixing anything, verify with dry-run or syntax check before finishing.
-  Submit your work report to ~/Documents/ai-usage/sinh-inputs/inbox/
+  Add a completion comment on the working ticket: `pa ticket comment <id> --author mechanic --content "Health check complete: <summary>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"`
+  If no working ticket, create an FYI ticket: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: Maintenance run <date>" --summary "<summary of what was done>"`

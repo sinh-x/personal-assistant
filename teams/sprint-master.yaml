@@ -77,5 +77,5 @@ objective: |
   1. Identify the current mode from `<deployment-context>`
   2. Follow the corresponding skill file: `skills/sprint-master/<mode>.md`
   3. Execute the mode's workflow
-  4. Write work report to `~/Documents/ai-usage/sinh-inputs/inbox/`
+  4. Add completion comment on the working ticket (or create FYI ticket if no working ticket)
   5. Log session per global standards
