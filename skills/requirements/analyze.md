@@ -12,7 +12,7 @@ When starting a requirements session from an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee requirements --status requirement-review`
 2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh`
+4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ### Repo Context (mandatory startup)
@@ -213,3 +213,4 @@ Save the requirements document in three places:
 - **Keep it scannable** — tables, checkboxes, short bullets. No walls of text.
 - **Challenge assumptions** — if something sounds vague ("make it better"), push for specifics.
 - **Flag scope creep** — if the user keeps adding things, note it and suggest phasing.
+- **Always set doc_ref on handoff** — when advancing to `pending-approval`, always include `--doc-ref` pointing to the requirements artifact. A ticket advancing without doc_ref will be automatically tagged `needs-doc-ref` by the CLI. Use `pa ticket update <id> --doc-ref <path>` to attach retroactively if needed.

@@ -140,11 +140,12 @@ A ticket belongs to the wrong project when its subject clearly targets a repo ot
    ```
 4. If the correct project key is unknown, do not guess — ask Sinh.
 
-### 7c. Missing `doc_ref` on `pending-implementation` Tickets
+### 7c. Missing `doc_ref` Tickets
 
-A `pending-implementation` ticket with no `doc_ref` is unexecutable — no builder can start without a plan document.
+A ticket advancing through key gates should always have `doc_ref` populated so downstream teams and Sinh have full context without searching.
 
-**Rules:**
+**At `pending-implementation` (unexecutable without a plan):**
+
 1. For each `pending-implementation` ticket with empty `doc_ref`:
    - If the summary contains enough detail to act (clear WHAT/steps) → leave it, add a comment noting the missing doc_ref
    - If the summary is too thin to execute → move to `on-hold` with a comment:
@@ -154,6 +155,20 @@ A `pending-implementation` ticket with no `doc_ref` is unexecutable — no build
        --content "On-hold: no doc_ref and summary insufficient to execute. Needs a plan document before implementation can start."
      ```
 2. **Never attempt to implement** a ticket without either a `doc_ref` or a self-contained summary.
+
+**At `pending-approval` and `review-uat` (handoff gates):**
+
+When the CLI detects a transition to `pending-approval` or `review-uat` without `doc_ref`, it emits a stderr warning and adds the `needs-doc-ref` tag automatically. The transition still succeeds (soft enforcement).
+
+Sprint-master action for tickets tagged `needs-doc-ref`:
+1. Identify the team that last advanced the ticket (check ticket comments or assignee history)
+2. Add a comment requesting the missing document:
+   ```bash
+   pa ticket comment <id> --author sprint-master \
+     --content "Missing doc_ref at <status> gate. <team>: please attach document with 'pa ticket update <id> --doc-ref <path>'."
+   ```
+3. Do NOT block the ticket status — the team can still work. The tag surfaces the gap.
+4. Once doc_ref is attached, remove the `needs-doc-ref` tag via `pa ticket update <id> --tags ""` (or update tags list without it)
 
 ### 7d. Cleanup Cadence
 
