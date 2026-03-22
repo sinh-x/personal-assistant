@@ -4,6 +4,55 @@ This document defines the ticket status lifecycle, role ownership, and transitio
 
 ---
 
+## Ticket Lifecycle Ownership
+
+> **Core principle:** A ticket is only marked `done` when its final objective is achieved — not when one team or agent finishes their part.
+
+### Rule 1 — Each team advances to the NEXT status only
+
+Every ticket flows through the full pipeline:
+```
+idea → requirement-review → pending-approval → pending-implementation → implementing → review-uat → done
+```
+
+No team may skip to `done` except Sinh (via UAT sign-off). The correct advancement per role:
+
+| Role | From | To | Must also set |
+|------|------|----|---------------|
+| Sprint-master | `idea` | `requirement-review` | `--team requirements` |
+| Requirements team | `requirement-review` | `pending-approval` | `--team sinh` |
+| Sinh | `pending-approval` | `pending-implementation` | `--team builder` or `--team orchestrator` |
+| Builder / Orchestrator | `pending-implementation` | `implementing` | `--assignee <agent-name>` |
+| Builder / Orchestrator | `implementing` | `review-uat` | `--team sinh` |
+| Sinh | `review-uat` | `done` | — (terminal) |
+
+### Rule 2 — Status change = handoff
+
+When advancing a ticket's status, the actor **MUST** also set `team` and/or `assignee` to the next owner.
+If status is advanced without setting team/assignee, the CLI warns: `"Status advanced without setting team/assignee — ticket may be orphaned."`
+
+Every active ticket must have an owner. Sprint-master flags unowned active tickets during triage.
+
+### Rule 3 — Feedback loops are explicit
+
+When Sinh (or any gate owner) rejects or requests changes, the actor **MUST**:
+1. Set status back to the appropriate earlier stage
+2. Set `team` and/or `assignee` to the team responsible for rework
+3. Add a comment explaining exactly what needs to change
+
+**Example — Sinh sends back for rework:**
+```bash
+pa ticket update PA-042 --status implementing --team builder --assignee team-manager
+pa ticket comment PA-042 --author sinh --content "REWORK: API response schema is wrong. Expected { data: [] }, got { results: [] }. Fix before re-submitting for UAT."
+```
+
+### Rule 4 — No orphaned tickets
+
+Every active ticket (any status except terminal states) must have a `team` or `assignee`.
+Sprint-master reviews and re-assigns unowned tickets during each triage run.
+
+---
+
 ## Status Flow
 
 ```
@@ -105,6 +154,29 @@ Terminal. Was valid but no longer relevant. Different from rejected — no judgm
 ### `on-hold`
 Parking. Valid work, paused. Can resume to any active status.
 Set `on-hold` + comment explaining why. Sprint-master reviews on-hold tickets weekly.
+
+---
+
+## Blocked Tag Protocol
+
+`blocked` is a **tag**, not a status. Agents must never set `--status blocked`.
+
+When an agent cannot proceed due to an external dependency or missing decision:
+
+1. **Keep current status** — do not change the ticket's status
+2. **Add `blocked` tag:**
+   ```bash
+   pa ticket update <id> --tags blocked
+   ```
+3. **Add comment explaining the block:**
+   ```bash
+   pa ticket comment <id> --author <agent> --content "BLOCKED: <reason>. Waiting on: <dependency or decision>."
+   ```
+4. **When unblocked:**
+   - Remove `blocked` tag (update tags without it)
+   - Add comment noting what resolved the block and what work resumes
+
+Sprint-master monitors tickets with `blocked` tag during triage and escalates if unresolved after 24h.
 
 ---
 

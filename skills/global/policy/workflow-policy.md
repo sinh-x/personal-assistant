@@ -3,88 +3,105 @@
 This document defines rules, exceptions, and edge cases for the kanban workflow.
 When a rule here conflicts with `kanban-workflow.md`, **this document wins**.
 
-> **Status:** Skeleton — sections defined, decisions pending Sinh's input.
-> Agents: treat undefined policies as "default applies" (follow kanban-workflow.md strictly).
+> **Status:** Finalized — all sections decided (2026-03-22, PA-877 phase 2).
+> Requirements approval: d-fb9804. See requirements doc for full rationale.
 
 ---
 
 ## 1. `review-uat` Skip Conditions
 
-**Default:** All tickets require Sinh's review before closing from `review-uat`.
+**Decision:** No skip conditions. Both Sinh gates are always required.
 
-**Policy TBD — Sinh to define:**
-- Can XS estimate tickets auto-close if all automated tests pass?
-- Can implementer self-close if Sinh pre-approved "no UAT needed" at `pending-approval`?
-- Are internal-only tooling changes (no user-facing impact) exempt?
+All tickets must pass Sinh's UAT review before closing from `review-uat`. No exceptions apply at this time.
 
-_Until defined: no skip conditions apply. All `review-uat` → `done` transitions require Sinh._
+**Rationale:** The system is still early-stage. Automated tests are not yet comprehensive enough to substitute for human sign-off. This policy will be revisited once test coverage is high and patterns are stable.
+
+**Specific questions answered:**
+- XS estimate tickets: **No auto-close** — size does not determine review requirement.
+- Implementer self-close with pre-approval: **Not permitted** — approval at `pending-approval` does not waive UAT.
+- Internal-only tooling changes: **Still require UAT** — "no user-facing impact" is a judgment call that Sinh makes, not agents.
+
+**Future trigger for revisiting:** When `pnpm test` covers >80% of ticket workflows and a defined set of regression scenarios passes, this policy can be reopened.
 
 ---
 
 ## 2. Bug Fast-Track
 
-**Default:** Bugs follow the full flow: `idea → requirement-review → pending-approval → pending-implementation → implementing → review-uat → done`.
+**Decision:** All bugs follow the standard flow regardless of severity.
 
-**Policy TBD — Sinh to define:**
-- What severity/impact qualifies a bug for fast-track?
-- Which stages can be skipped and under what conditions?
-- Must Sinh still be notified even if gates are bypassed?
-- Maximum time allowed per stage for `critical` priority tickets?
+Standard flow: `idea → requirement-review → pending-approval → pending-implementation → implementing → review-uat → done`
 
-_Until defined: all bugs follow the standard flow regardless of priority._
+**Rationale:** No severity classification system is defined yet. Fast-tracking without classification criteria creates ambiguity about which bugs qualify. Until a severity taxonomy is agreed, every bug follows the same pipeline.
+
+**Specific questions answered:**
+- What severity qualifies for fast-track: **TBD** — severity taxonomy not yet defined. Revisit after first critical bug requires it.
+- Which stages can be skipped: **None** — no stages skipped until severity policy exists.
+- Must Sinh be notified even if gates are bypassed: **Moot** — no bypass permitted.
+- Maximum time per stage for `critical` tickets: **TBD** — define at the same time as severity taxonomy.
+
+**Future trigger for revisiting:** First occurrence of a production-blocking bug, or when Sinh defines a severity taxonomy.
 
 ---
 
 ## 3. Executor Selection (Builder vs Orchestrator)
 
-**Default guidance (not yet policy):**
+**Decision:** Sinh sets the executor at `pending-approval`. Sprint-master may recommend but not decide.
+
+**Rules:**
+1. Sinh sets `team: builder` or `team: orchestrator` when advancing from `pending-approval` to `pending-implementation`.
+2. Sprint-master may add a recommendation comment during triage (e.g., `"Recommend: orchestrator — 3 parallel sub-tasks identified"`), but the final decision is Sinh's.
+3. If Sinh advances without setting a team, the CLI warns: "Status advanced without setting team/assignee — ticket may be orphaned."
+
+**Guidance table (advisory, not policy):**
 
 | Use `builder` | Use `orchestrator` |
-|-------------|------------------|
-| Single-domain change | Cross-cutting or multi-module |
+|---|---|
+| Single-domain change | Cross-cutting or multi-module change |
 | Clear sequential steps | Parallelisable sub-tasks |
 | S or M estimate | L or XL estimate |
+| One repo affected | Multiple repos affected |
 
-**Policy TBD — Sinh to define:**
-- Is this decision always Sinh's at `pending-approval`, or can sprint-master recommend during triage?
-- Fallback if orchestrator is unavailable?
-
-_Until defined: Sinh sets `team: builder` or `team: orchestrator` at `pending-approval`._
+**Fallback if orchestrator is unavailable:** Route to builder with a comment noting the fallback. Sprint-master monitors for stalled orchestrator tickets.
 
 ---
 
 ## 4. `work-report` and `fyi` Ticket Flow
 
-**Default:** `work-report` and `fyi` tickets are operational/communication items.
-Teams do NOT create tickets for routine work reports — they write files to `sinh-inputs/inbox/`.
-Sprint-master aggregates these during triage runs.
+**Decision:** `work-report` and `fyi` type tickets are excluded from the active kanban board columns.
 
-**Policy TBD — Sinh to define:**
-- Should `work-report` / `fyi` type tickets be excluded from the main kanban board view?
-- Retention: how long before terminal work-reports are archived?
+**Rules:**
+1. `work-report` and `fyi` tickets do NOT appear in the standard board columns (`idea`, `requirement-review`, etc.).
+2. They are visible in a separate "archive" or "comms" filter view only.
+3. New `work-report` tickets should NOT be created — agents add completion comments directly to the working ticket instead (see `work.md` §4 for the hybrid model).
+4. Legacy `work-report` tickets (from the inbox migration) flow `idea → done` directly after Sinh reads them. Sprint-master closes them in bulk during triage.
+5. Retention: `work-report` and `fyi` tickets in terminal status (`done`, `rejected`, `cancelled`) are archived after 90 days.
 
-_Until defined: work-report/fyi tickets (if any exist) flow `idea → done` directly after Sinh reads them._
+**Note on work reports vs ticket comments:** The standard agent output flow is now ticket-centric. Agents post a brief completion comment on the ticket they worked on. Standalone work-report files and tickets are deprecated except for edge cases without an associated ticket.
 
 ---
 
 ## 5. Agent-Created Ideas — Routing
 
-**Default:** All agent-created ideas land in `idea` status first. Sprint-master routes them during triage.
+**Decision:** All agent-created ideas land in `idea` status first. No team may create tickets directly in `requirement-review`.
 
-**Policy TBD — Sinh to define:**
-- Can any team create tickets directly in `requirement-review` without going through `idea` first?
-- Sprint-master triage cadence for processing the `idea` queue?
+**Rules:**
+1. Any agent creates ticket with `--status idea` (or omits status — default is `idea`).
+2. Sprint-master picks up all `idea` tickets during triage and routes them.
+3. Routing means: set `--status requirement-review`, set `--team requirements`, add triage comment with context.
+4. No team may self-advance an `idea` to `requirement-review` — sprint-master is the single triage router.
+5. Sprint-master triage cadence: at minimum once per daily-end run. High-priority ideas (`--priority high`) are checked at daily-plan time as well.
 
-_Until defined: all agent ideas land in `idea`, no direct `requirement-review` creation._
+**Exception:** Sinh may directly create or advance tickets to any status — Sinh's own tickets are not gated by triage.
 
 ---
 
 ## 6. `requirement-review` Back-Assignment Rules
 
-**Default:** Requirements team assigns unclear tickets back to the author with a comment explaining what's missing.
+**Decision:** 7-day timeout before sprint-master escalation. Requirements team cannot reject without Sinh.
 
-**Policy TBD — Sinh to define:**
-- How long to wait for author response before escalating to sprint-master?
-- Can requirements team reject a ticket without Sinh's input if it's clearly out of scope?
-
-_Until defined: requirements team waits indefinitely; cannot reject without Sinh._
+**Rules:**
+1. When a `requirement-review` ticket is unclear, requirements team adds a comment explaining what's missing and assigns back to the original author.
+2. **7-day timeout:** If the author has not responded within 7 days, requirements team adds a comment flagging the timeout and assigns the ticket to sprint-master for escalation decision.
+3. Sprint-master escalation options: (a) reach out to Sinh for clarification, (b) put ticket `on-hold` with expiration note, (c) close as `rejected` with Sinh's input.
+4. **Requirements team cannot reject without Sinh.** Even clearly out-of-scope requests must be escalated to Sinh before closing as `rejected`.
+5. Requirements team may put a ticket `on-hold` pending author response, but must add a comment with the 7-day deadline.
