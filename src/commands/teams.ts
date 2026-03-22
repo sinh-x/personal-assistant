@@ -244,8 +244,8 @@ function showOneTeam(name: string): void {
 
 /** Show project-wide kanban board, optionally filtered by assignee */
 function showBoard(
-  project: string,
-  filters: { assignee?: string } = {}
+  project?: string,
+  filters: { assignee?: string; excludeTags?: string[] } = {}
 ): void {
   let board: BoardView;
   try {
@@ -261,9 +261,10 @@ function showBoard(
     .filter(Boolean)
     .join(", ");
 
+  const projectLabel = project ?? "all projects";
   const title = filterDesc
-    ? `Board: ${project}  [${filterDesc}]`
-    : `Board: ${project}  (all tickets)`;
+    ? `Board: ${projectLabel}  [${filterDesc}]`
+    : `Board: ${projectLabel}  (all tickets)`;
   console.log(title);
   console.log("═".repeat(DETAIL_WIDTH));
 
@@ -288,12 +289,12 @@ function showBoard(
 
 /**
  * Show project-wide kanban board (all tickets by status, with assignee).
- * Default project: personal-assistant.
- * Optional --assignee filter.
+ * Defaults to all projects if no project is specified.
+ * Always excludes backlog and archived tickets.
  */
 export function boardCommand(
-  project: string,
-  filters: { assignee?: string } = {}
+  project?: string,
+  filters: { assignee?: string; excludeTags?: string[] } = {}
 ): void {
   showBoard(project, filters);
 }

@@ -34,13 +34,16 @@ program
 program
   .command("board")
   .description(
-    "Show kanban board for a project — all tickets grouped by status with assignee. Use --assignee to filter."
+    "Show kanban board — all tickets grouped by status with assignee. Defaults to all projects. Backlog and archived tickets are excluded by default."
   )
-  .option("--project <name>", "Project name", "personal-assistant")
+  .option("--project <name>", "Filter by project (default: all projects)")
   .option("--assignee <name>", "Filter by assignee")
   .action(
-    (opts: { project: string; assignee?: string }) => {
-      boardCommand(opts.project, { assignee: opts.assignee });
+    (opts: { project?: string; assignee?: string }) => {
+      boardCommand(opts.project, {
+        assignee: opts.assignee,
+        excludeTags: ["backlog", "archived"],
+      });
     }
   );
 

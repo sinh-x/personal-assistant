@@ -40,11 +40,11 @@ export interface TeamStatusSummary {
 /**
  * Build a Kanban board view grouped by status.
  *
- * @param project - Filter by project name (required for cross-team board)
+ * @param project - Filter by project name. Omit to show all projects.
  * @param filters - Optional additional filters
  */
 export function buildBoardView(
-  project: string,
+  project?: string,
   filters: {
     assignee?: string;
     priority?: string;
@@ -84,7 +84,7 @@ export function buildBoardView(
   });
 
   return {
-    project,
+    project: project ?? "all",
     columns,
     total: tickets.length,
     assigneeCounts,
