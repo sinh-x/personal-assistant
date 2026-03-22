@@ -34,10 +34,10 @@ Standard flow: `idea → requirement-review → pending-approval → pending-imp
 **Rationale:** No severity classification system is defined yet. Fast-tracking without classification criteria creates ambiguity about which bugs qualify. Until a severity taxonomy is agreed, every bug follows the same pipeline.
 
 **Specific questions answered:**
-- What severity qualifies for fast-track: **TBD** — severity taxonomy not yet defined. Revisit after first critical bug requires it.
+- What severity qualifies for fast-track: **None currently** — no severity taxonomy defined. All bugs use standard flow.
 - Which stages can be skipped: **None** — no stages skipped until severity policy exists.
 - Must Sinh be notified even if gates are bypassed: **Moot** — no bypass permitted.
-- Maximum time per stage for `critical` tickets: **TBD** — define at the same time as severity taxonomy.
+- Maximum time per stage for `critical` tickets: **No SLA defined** — define alongside severity taxonomy if/when introduced.
 
 **Future trigger for revisiting:** First occurrence of a production-blocking bug, or when Sinh defines a severity taxonomy.
 
