@@ -20,34 +20,11 @@ import type { Context } from "hono";
 import { readFile, readdir } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import { join, basename } from "node:path";
-import { homedir } from "node:os";
-import { validateSandboxPath } from "../utils/sandbox.js";
+import { validateSandboxPath, normalizeSandboxPath } from "../utils/sandbox.js";
 import {
   parseMarkdownMetadata,
   detectDocumentType,
 } from "../utils/markdown.js";
-
-const HOME = homedir();
-const AI_USAGE = join(HOME, "Documents", "ai-usage");
-const AI_USAGE_TILDE = "~/Documents/ai-usage/";
-
-/** Normalize a doc_ref / path param to an absolute filesystem path. */
-function normalizePath(inputPath: string): string {
-  // Strip ~/Documents/ai-usage/ prefix (literal ~ not expanded by resolve)
-  if (inputPath.startsWith(AI_USAGE_TILDE)) {
-    return join(AI_USAGE, inputPath.slice(AI_USAGE_TILDE.length));
-  }
-  // Handle other ~/... paths
-  if (inputPath.startsWith("~/")) {
-    return join(HOME, inputPath.slice(2));
-  }
-  // Already absolute
-  if (inputPath.startsWith("/")) {
-    return inputPath;
-  }
-  // Relative — resolve against sandbox root
-  return join(AI_USAGE, inputPath);
-}
 
 interface FileItem {
   id: string;
@@ -101,7 +78,7 @@ export function documentsRoutes(): Hono {
       );
     }
 
-    const normalized = normalizePath(pathParam);
+    const normalized = normalizeSandboxPath(pathParam);
 
     // Defense-in-depth: validate resolved path is inside sandbox
     let resolvedPath: string;

@@ -1,7 +1,27 @@
-import { resolve } from "node:path";
+import { resolve, join } from "node:path";
 import { homedir } from "node:os";
 
-const SANDBOX_ROOT = resolve(homedir(), "Documents/ai-usage");
+const HOME = homedir();
+const SANDBOX_ROOT = resolve(HOME, "Documents/ai-usage");
+const TILDE_PREFIX = "~/Documents/ai-usage/";
+
+/**
+ * Normalize a path (relative, tilde-prefixed, or absolute) to an absolute path
+ * within the sandbox. Used by middleware and route handlers.
+ */
+export function normalizeSandboxPath(inputPath: string): string {
+  if (inputPath.startsWith(TILDE_PREFIX)) {
+    return join(SANDBOX_ROOT, inputPath.slice(TILDE_PREFIX.length));
+  }
+  if (inputPath.startsWith("~/")) {
+    return join(HOME, inputPath.slice(2));
+  }
+  if (inputPath.startsWith("/")) {
+    return inputPath;
+  }
+  // Relative — resolve against sandbox root
+  return join(SANDBOX_ROOT, inputPath);
+}
 
 /**
  * Validate that a given path is inside the ~/Documents/ai-usage/ sandbox.

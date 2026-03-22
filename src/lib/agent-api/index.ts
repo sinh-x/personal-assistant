@@ -4,7 +4,7 @@ import { cors } from "hono/cors";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { Server } from "node:http";
 import type { Http2SecureServer, Http2Server } from "node:http2";
-import { isInsideSandbox } from "./utils/sandbox.js";
+import { isInsideSandbox, normalizeSandboxPath } from "./utils/sandbox.js";
 import { inboxRoutes } from "./routes/inbox.js";
 import { foldersRoutes } from "./routes/folders.js";
 import { configRoutes } from "./routes/config.js";
@@ -42,9 +42,10 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   }
 
   // Security middleware: path traversal protection for any ?path= query param
+  // Normalizes relative/tilde paths to absolute before sandbox check
   app.use("*", async (c: Context, next: Next) => {
     const pathParam = c.req.query("path");
-    if (pathParam !== undefined && !isInsideSandbox(pathParam)) {
+    if (pathParam !== undefined && !isInsideSandbox(normalizeSandboxPath(pathParam))) {
       return c.json({ error: "Path traversal denied", code: "SANDBOX_VIOLATION" }, 403);
     }
     await next();
