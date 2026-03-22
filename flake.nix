@@ -27,7 +27,12 @@
           pname = "personal-assistant";
           version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
 
-          src = ./.;
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter = path: _type:
+              let baseName = builtins.baseNameOf path;
+              in !(builtins.elem baseName [ "node_modules" "dist" ".git" ]);
+          };
 
           nativeBuildInputs = with pkgs; [
             nodejs_22
