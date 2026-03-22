@@ -117,22 +117,20 @@ Last updated: YYYY-MM-DD
 - YYYY-MM-DD: Triage N tickets → (captured in work reports)
 ```
 
-### Step 7 — Write curation report
+### Step 7 — Save curation report and notify
 
-Write a work report to `~/Documents/ai-usage/sinh-inputs/inbox/`:
+Save a curation summary to team artifacts:
 ```
-YYYY-MM-DD-sprint-master-knowledge-org.md
+~/Documents/ai-usage/agent-teams/sprint-master/artifacts/YYYY-MM-DD-knowledge-org.md
 ```
 
 Report format:
 ```markdown
-# Work Report: Knowledge Organization Run
+# Knowledge Organization Report: YYYY-MM-DD
 
 > **Date:** YYYY-MM-DD
-> **From:** sprint-master / team-manager
-> **To:** sinh
+> **By:** sprint-master / team-manager
 > **Deployment:** <deployment_id>
-> **Type:** work-report
 > **Status:** success | partial
 
 ## What Was Done
@@ -162,6 +160,16 @@ Report format:
 ## Suggested Next Steps
 
 - <e.g., "Run knowledge-org again after skills are updated in sessions 6-7">
+```
+
+Add a completion comment on the working ticket (if any), or create an FYI ticket:
+```bash
+# If working on a ticket:
+pa ticket comment <ticket-id> --author team-manager --content "Knowledge org complete. Added M docs, updated K, flagged W for review. Artifact: agent-teams/sprint-master/artifacts/YYYY-MM-DD-knowledge-org.md"
+# If no working ticket:
+pa ticket create --type fyi --assignee sinh --priority low --estimate XS \
+  --title "FYI: Knowledge org run YYYY-MM-DD" \
+  --summary "Scanned N folders, added M docs, updated K, flagged W. See artifact: agent-teams/sprint-master/artifacts/YYYY-MM-DD-knowledge-org.md"
 ```
 
 ## Rules

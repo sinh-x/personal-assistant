@@ -6,7 +6,7 @@ Finalize today's plan draft through interactive review with Sinh. You do this YO
 Workflow:
 1. Check for draft at {{DRAFT_PATH}}
    - If found: read it and present it
-   - If NOT found: check {{HOME}}/Documents/ai-usage/sinh-inputs/inbox/ for any *-plan-draft.md
+   - If NOT found: check {{OUTPUT_DIR}}/ for any *-plan-draft.md (plan.md now writes drafts to the daily folder)
    - If still not found: read yesterday's daily summary + current avo tasks and create a quick draft inline
 2. [RPM CONTEXT — opt-in] If {{RPM_BLOCKS}} exists and the draft does NOT already have a "## Today's RPM Focus" section:
    - Read rpm-blocks.yaml and apply skills/rpm/context.md to inject the RPM Focus section

@@ -137,9 +137,10 @@ objective: |
      - Update johari-tracker.md with today's engagement data
      - Output: cadence-appropriate Johari analysis
 
-  4. Synthesize into intel digest → deliver to Sinh's inbox
-     - File: ~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-knowledge-hub-daily-digest.md
+  4. Synthesize into intel digest → save to team artifacts + notify via FYI ticket
+     - File: ~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/YYYY-MM-DD-daily-digest.md
      - Contains: N items processed, system flags, daily Johari micro-note
+     - Notify: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: Knowledge-hub digest YYYY-MM-DD" --summary "<N items processed, key topics, any flags>"`
 
   Empty queue / no new content: exit cleanly with "Nothing new to process" and minimal digest confirming the run.
 
@@ -166,5 +167,5 @@ objective: |
   - YouTube queue file path must remain ~/Documents/ai-usage/queue/youtube-video-queue.txt (backward compatible)
   - Knowledge base: ~/Documents/ai-usage/knowledge-base/learning/ and knowledge-base/intel/
   - Johari tracker: ~/Documents/ai-usage/agent-teams/knowledge-hub/johari-tracker.md
-  - Intel digest: ~/Documents/ai-usage/sinh-inputs/inbox/ per global standards §4
+  - Intel digest: ~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/ + FYI ticket per global standards §4
   - Session logs per global standards §4 (all agents log before shutting down)

@@ -405,6 +405,28 @@ If a bulletin blocks your team (`block: all` or your team name in `block:`) and 
 
 ---
 
+## 8. One Ticket Per Work Item
+
+**Core rule:** Every piece of work has ONE ticket. All lifecycle tracking happens on that ticket via comments and status transitions.
+
+**Do NOT create separate tickets for:**
+- Decision notifications ("Decision Notification: Approved ...")
+- Waiting-for-response tracking ("Waiting: ... Review Request")
+- Review-request tracking when an existing ticket already exists
+- Status change announcements ("Tracking: ... Awaiting Review")
+
+**Instead, on the existing ticket:**
+1. Add a comment describing the event: `pa ticket comment <id> --author <agent> --content "..."`
+2. Advance the status: `pa ticket update <id> --status <next-status> --assignee <next-owner>`
+3. Link artifacts: `pa ticket update <id> --doc-ref <path>`
+
+**When to create a NEW ticket:**
+- Genuinely new, independent work items discovered during your task
+- FYI notifications about cross-cutting issues (not tied to an existing ticket)
+- Spike research initiated by an agent with no existing ticket
+
+---
+
 ## 9. Self-Improvement
 
 Every agent MUST reflect on its own performance in the `## Self-Improvement` section of their session log (see §4 template).

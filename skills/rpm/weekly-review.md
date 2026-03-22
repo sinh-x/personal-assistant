@@ -190,38 +190,16 @@ Write a summary artifact to:
 
 ---
 
-## Step 10 — Write Work Report to Sinh Inbox
+## Step 10 — Log completion via ticket comment
 
-Write: `~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-rpm-weekly-review.md`
-
-```markdown
-# Work Report: RPM Weekly Review — YYYY-MM-DD
-
-> **Date:** YYYY-MM-DD
-> **From:** rpm / team-manager
-> **To:** sinh
-> **Deployment:** <deployment_id>
-> **Type:** work-report
-> **Status:** success
-
-## What Was Done
-
-- Guided weekly RPM review with Sinh
-- Updated N blocks (MAP items, status changes)
-
-## Outputs
-
-- Review artifact: ~/Documents/ai-usage/agent-teams/rpm/artifacts/YYYY-MM-DD-weekly-review.md
-- Updated blocks file: ~/Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml
-
-## Needs Attention
-
-- <any blocks with concerns, or "None">
-
-## Suggested Next Steps
-
-- Next weekly gather: next Sunday auto-schedule (if timer is set)
-- Next interactive review: `pa deploy rpm --interactive` to update blocks mid-week if needed
+Add a completion comment on the working ticket (if any), or create an FYI ticket:
+```bash
+# If working on a ticket:
+pa ticket comment <ticket-id> --author team-manager --content "RPM weekly review complete. Updated N blocks. Artifact: agent-teams/rpm/artifacts/YYYY-MM-DD-weekly-review.md. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
+# If no working ticket:
+pa ticket create --type fyi --assignee sinh --priority low --estimate XS \
+  --title "FYI: RPM weekly review complete YYYY-MM-DD" \
+  --summary "Reviewed N blocks. Updated M MAP items. Any blocks with concerns: <list or 'None'>. Artifact: agent-teams/rpm/artifacts/YYYY-MM-DD-weekly-review.md"
 ```
 
 ---

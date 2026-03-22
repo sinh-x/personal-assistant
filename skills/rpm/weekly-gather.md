@@ -207,39 +207,19 @@ If a gather file for today already exists, overwrite it (idempotent).
 
 ---
 
-## Step 8 — Write Work Report to Sinh Inbox
+## Step 8 — Notify Sinh via FYI Ticket
 
-After writing the gather report, write a brief work report:
+After writing the gather report, create an FYI ticket to notify Sinh:
 
-`~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-rpm-gather-weekly.md`
-
-```markdown
-# Work Report: RPM Weekly Gather — YYYY-MM-DD
-
-> **Date:** YYYY-MM-DD
-> **From:** rpm-gather / team-manager
-> **To:** sinh
-> **Deployment:** <deployment_id>
-> **Type:** work-report
-> **Status:** success
-
-## What Was Done
-
-- Collected avo week data and mapped to RPM life areas
-- Analyzed MAP item progress via keyword matching (best-effort)
-- Wrote gather report to agent-teams/rpm/inbox/
-
-## Outputs
-
-- Gather report: ~/Documents/ai-usage/agent-teams/rpm/inbox/YYYY-MM-DD-weekly-gather.md
-
-## Needs Attention
-
-- <any blocks with 0 avo time this week, or "None">
-
-## Suggested Next Steps
-
-- Run `pa deploy rpm --interactive` to start the weekly review session
+```bash
+pa ticket create \
+  --type fyi \
+  --project personal-assistant \
+  --title "FYI: RPM weekly gather complete YYYY-MM-DD" \
+  --assignee sinh \
+  --priority low \
+  --estimate XS \
+  --summary "Weekly RPM data collected. Total tracked: Xh. Blocks with 0 time: <list or 'None'>. Gather report: agent-teams/rpm/inbox/YYYY-MM-DD-weekly-gather.md. Run 'pa deploy rpm --interactive' to start review."
 ```
 
 ---
@@ -250,4 +230,4 @@ After writing the gather report, write a brief work report:
 - **Best-effort.** If avo has no data for some days, note it and continue.
 - **Idempotent.** If gather file already exists for today, overwrite it.
 - **Graceful failure.** If rpm-blocks.yaml is missing, write minimal report noting no blocks.
-- **Write work report.** Always write to sinh-inputs/inbox/ when done (even on failure).
+- **Notify via ticket.** Always create an FYI ticket when done (even on failure — update summary to reflect failure).

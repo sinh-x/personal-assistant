@@ -34,11 +34,21 @@ Workflow (you do all steps directly):
    - If a goal has no matching avo task, note it for Sinh to create
 7. Write the daily plan as a DRAFT for Sinh to review when he's ready
 
-Output: {{HOME}}/Documents/ai-usage/sinh-inputs/inbox/{{TODAY}}-plan-draft.md
+Output:
+1. Save plan draft file to: {{OUTPUT_DIR}}/{{TODAY}}-plan-draft.md
+2. Create a plan-draft ticket so Sinh sees it in his ticket queue:
+   pa ticket create \
+     --project personal-assistant \
+     --title "Daily Plan: {{TODAY}}" \
+     --type plan-draft \
+     --assignee sinh \
+     --priority normal \
+     --estimate XS \
+     --doc-ref "daily/{{YEAR}}/{{MONTH}}/{{TODAY}}-plan-draft.md" \
+     --summary "<goals summary and time budget — 1-2 sentences>"
 
 IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
-- Save to sinh-inputs/inbox/ (NOT the daily folder) so Sinh finds it in his review queue
-- Save as *-plan-draft.md (not -plan.md)
+- Save to {{OUTPUT_DIR}}/ (the daily folder) as *-plan-draft.md (not -plan.md)
 - Add a header: ## DRAFT — Review and adjust when ready
 - Include a checklist at the top for quick review:
   - [ ] Goals look right
@@ -47,7 +57,7 @@ IMPORTANT: This is a DRAFT — it runs at 05:00 before Sinh is awake.
   - [ ] Avo plan looks right
 - Add a ## Next Steps section at the bottom explaining:
   1. Review and adjust goals/time budget above
-  2. Finalize by copying to {{OUTPUT_DIR}}/{{TODAY}}-plan.md (or ask pa to finalize)
+  2. Finalize by renaming to {{OUTPUT_DIR}}/{{TODAY}}-plan.md (or ask pa to finalize)
   3. Optionally add notes for tomorrow at {{INPUT_NOTES}} before going to bed
 - Sinh will review this draft and finalize it himself
 

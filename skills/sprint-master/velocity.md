@@ -146,14 +146,17 @@ Report format:
 - <or "None — velocity is healthy">
 ```
 
-### Step 7 — Write work report
+### Step 7 — Notify and add completion comment
 
-Write to `~/Documents/ai-usage/sinh-inputs/inbox/`:
+Add a completion comment on the working ticket (if any), or create an FYI ticket:
+```bash
+# If working on a ticket:
+pa ticket comment <ticket-id> --author team-manager --content "Velocity report complete for week of <date>. Throughput: N tickets. Artifact: agent-teams/sprint-master/artifacts/YYYY-MM-DD-velocity-report.md. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
+# If no working ticket:
+pa ticket create --type fyi --assignee sinh --priority low --estimate XS \
+  --title "FYI: Velocity report week of YYYY-MM-DD" \
+  --summary "Throughput: N tickets. Avg cycle time: X.Xh. Key finding: <1 sentence>. See artifact: agent-teams/sprint-master/artifacts/YYYY-MM-DD-velocity-report.md"
 ```
-YYYY-MM-DD-sprint-master-velocity.md
-```
-
-Include a link to the velocity report artifact and a brief summary of key findings.
 
 ## Rules
 

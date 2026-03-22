@@ -49,27 +49,17 @@ Determine the target repository **before any other work**. This is mandatory —
 - Confirm it is a git repository (`git -C <repo_path> rev-parse --git-dir`)
 - `cd` to the repo root
 
-**If repo cannot be determined → FAIL immediately.** Write a failed work report to Sinh inbox:
+**If repo cannot be determined → FAIL immediately.** Create an FYI ticket for Sinh:
 
-```markdown
-# Work Report: <objective> — Pre-flight Failed
-
-> **Date:** <today>
-> **From:** orchestrator / team-manager
-> **To:** sinh
-> **Type:** work-report
-> **Status:** failed
-
-## What Happened
-Repo resolution failed. Could not determine the target repository from the objective.
-
-## Details
-- **Objective:** <objective text>
-- **Checked:** file path frontmatter, git context, explicit path in objective
-- **Result:** No valid repo found
-
-## Action Required
-Re-launch with an explicit repo path or an objective that references a file containing repo_path.
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "FYI: Orchestrator pre-flight failed — repo not found" \
+  --type fyi \
+  --assignee sinh \
+  --priority high \
+  --estimate XS \
+  --summary "FAILED: <objective>. Repo resolution failed. Checked: file path frontmatter, git context, explicit path in objective. No valid repo found. Re-launch with explicit repo path."
 ```
 
 ### Phase 1: Understand Objective
@@ -107,20 +97,17 @@ pa status <deploy-id> --wait
 - Sinh reviews, possibly edits, and approves — the approved doc appears in builder inbox
 - Monitor `~/Documents/ai-usage/agent-teams/builder/inbox/` for the approved item
 - **Timeout:** 30 minutes (configurable). Check every 60 seconds.
-- **On timeout:** Write a partial work report explaining that requirements were gathered but Sinh approval is still pending. Exit gracefully.
+- **On timeout:** Create an FYI ticket noting the partial state and exit gracefully.
 
-```markdown
-# Work Report: <objective> — Partial (Awaiting Approval)
-
-> **Status:** partial
-
-## What Was Done
-- Launched requirements team (deploy: <deploy-id>)
-- Requirements doc created and sent to Sinh for review
-
-## Needs Attention
-- Approved plan not yet in builder inbox after 30-minute wait
-- Re-launch orchestrator after Sinh approves the requirements
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "FYI: Orchestrator partial — awaiting Sinh approval for <objective>" \
+  --type fyi \
+  --assignee sinh \
+  --priority high \
+  --estimate XS \
+  --summary "Partial: Requirements doc created by deploy <deploy-id>. Approval timeout (30 min). Re-launch orchestrator after approving requirements."
 ```
 
 ### Phase 3: Plan Analysis
@@ -136,7 +123,13 @@ Read the approved requirement/plan document and extract the implementation detai
 - Plan must have a clear phase checklist with specific deliverables per phase
 - Each phase should have verification steps (build, typecheck, test)
 - If the plan is too thin (no checklist, vague phases, missing verification steps):
-  - Create a review request to Sinh inbox asking for more detail
+  - Create a review-request ticket asking for more detail:
+    ```bash
+    pa ticket create --type review-request --project personal-assistant \
+      --title "Review: Plan too thin for orchestration — <objective>" \
+      --assignee sinh --priority high --estimate XS \
+      --summary "Plan for '<objective>' lacks phase checklist or verification steps. Please add detail and re-launch orchestrator."
+    ```
   - Wait for response (30-minute timeout, same as Phase 2)
   - On timeout: exit partial
 
@@ -182,28 +175,20 @@ pa status <deploy-id> --report
 
 **On real failure:**
 
-Read the builder's report via `pa status <deploy-id> --report` and compose a failure report:
+Read the builder's report via `pa status <deploy-id> --report` and create an FYI ticket:
 
-```markdown
-# Work Report: <objective> — Build Failed at Phase N
-
-> **Status:** partial
-
-## What Was Done
-- Phases 1 through N-1 completed successfully
-- Phase N failed
-
-## Failure Details
-- **Phase:** N — <description>
-- **Builder deploy:** <deploy-id>
-- **Builder report:** <paste key details from --report output>
-
-## Needs Attention
-- Review the failure and decide: retry, fix manually, or abort
-- Re-launch orchestrator after resolving the issue
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "FYI: Orchestrator build failed at phase N — <objective>" \
+  --type fyi \
+  --assignee sinh \
+  --priority high \
+  --estimate XS \
+  --summary "PARTIAL: Phases 1 through N-1 succeeded. Phase N failed. Builder deploy: <deploy-id>. Failure: <key error from --report>. Review and decide: retry, fix manually, or abort. Re-launch orchestrator after resolving."
 ```
 
-After writing the failure report, **stop**. Do not continue to the next phase or attempt the merge.
+After creating the failure ticket, **stop**. Do not continue to the next phase or attempt the merge.
 
 ### Phase 5: Merge
 
@@ -223,30 +208,17 @@ Check these sources in order:
 
 **Step 3 — If strategy is unclear:**
 
-Create a review request to Sinh inbox:
+Create a review-request ticket asking for merge strategy confirmation:
 
-```markdown
-# Review Request: Merge Strategy for <feature-branch>
-
-> **From:** orchestrator / team-manager
-> **To:** sinh
-> **Type:** review-request
-
-## Context
-All phases completed successfully for: <objective>
-
-## Current State
-- **Repo:** <repo_path>
-- **Feature branch:** <feature-branch>
-- **Commits:** <number of commits>
-- **Branches found:** <list main, develop, etc.>
-
-## What I Need
-Please confirm the merge target branch and strategy:
-- Merge into `main`?
-- Merge into `develop`?
-- Create a PR for review first?
-- Other instructions?
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "Review: Merge strategy needed for <feature-branch>" \
+  --type review-request \
+  --assignee sinh \
+  --priority high \
+  --estimate XS \
+  --summary "All phases for '<objective>' completed. Repo: <repo_path>. Branch: <feature-branch> (<N> commits). Branches found: <list>. Confirm: merge into main? develop? Create PR first? Other?"
 ```
 
 Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a note that merge is pending.
@@ -257,37 +229,23 @@ Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a no
 
 ### Phase 6: Report and Shutdown
 
-**Step 1 — Write work report** to `~/Documents/ai-usage/sinh-inputs/inbox/`:
+**Step 1 — Create completion ticket comment or FYI ticket:**
 
-```markdown
-# Work Report: <objective>
+If the orchestrator was working on an assigned ticket, add a completion comment:
+```bash
+pa ticket comment <ticket-id> --author team-manager --content "Orchestration complete for '<objective>'. All N phases done, merged to <branch>. Deploys: <phase→deploy-id list>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
+```
 
-> **Date:** <today>
-> **From:** orchestrator / team-manager
-> **To:** sinh
-> **Type:** work-report
-> **Status:** success | partial | failed
-
-## What Was Done
-- <summary of phases completed>
-- <merge status>
-
-## Builder Deploys
-| Phase | Deploy ID | Status |
-|-------|-----------|--------|
-| 1     | <id>      | success |
-| 2     | <id>      | success |
-| ...   | ...       | ...     |
-
-## Outputs
-- <list key files created/modified>
-- <branch and merge details>
-
-## Needs Attention
-- <any open items, or "None">
-
-## Suggested Next Steps
-- <what comes next, if anything>
+If no working ticket (standalone orchestration), create an FYI ticket:
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "FYI: Orchestration complete — <objective>" \
+  --type fyi \
+  --assignee sinh \
+  --priority low \
+  --estimate XS \
+  --summary "STATUS: <success|partial|failed>. Phases: <N completed>. Merge: <status>. Builder deploys: <deploy-id list>. Outputs: <key files/branch>. Next: <what comes next>"
 ```
 
 **Step 2 — Session log** per standards (deployment workspace).
@@ -317,12 +275,11 @@ When working with builder inbox items:
 
 ## Communication with Sinh
 
-All communication with Sinh goes through the inbox system:
-- **Work reports** → `~/Documents/ai-usage/sinh-inputs/inbox/`
-- **Review requests** → `~/Documents/ai-usage/sinh-inputs/inbox/` (with `Type: review-request`)
-- **Failure reports** → `~/Documents/ai-usage/sinh-inputs/inbox/`
-
-Filename convention: `YYYY-MM-DD-orchestrator-<topic>.md`
+All communication with Sinh goes through the ticket system:
+- **Completion (working ticket)** → `pa ticket comment <ticket-id>` with summary and session log reference
+- **Completion (no ticket)** → `pa ticket create --type fyi --assignee sinh`
+- **Review requests** → `pa ticket create --type review-request --assignee sinh`
+- **Failure reports** → `pa ticket create --type fyi --assignee sinh --priority high`
 
 ## Environment Variables
 

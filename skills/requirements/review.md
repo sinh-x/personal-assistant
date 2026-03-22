@@ -187,16 +187,18 @@ Prioritized list of recommendations as requirements, ready to route to builder i
 ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md
 ```
 
-**3. Sinh's inbox (review request with full content embedded):**
+**3. Review-request ticket (for Sinh to review and route):**
+```bash
+pa ticket create \
+  --project personal-assistant \
+  --title "Review: System review findings — <system-slug>" \
+  --type review-request \
+  --assignee builder \
+  --priority high \
+  --estimate M \
+  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md" \
+  --summary "WHAT: System review of <system name> covering <selected areas>. REVIEW: N critical, M major, K minor findings. NEXT: Approve to route prioritized fixes to builder for implementation."
 ```
-~/Documents/ai-usage/sinh-inputs/inbox/YYYY-MM-DD-review-<system-slug>-findings.md
-```
-
-Follow the review-request template from `standards.md` §4. Embed the full report inline.
-
-**Required frontmatter (mandatory):**
-- `From: requirements / team-manager` — router notifies you of Sinh's decision
-- `To: builder` — router forwards to builder inbox if approved
 
 ---
 
