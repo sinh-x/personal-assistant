@@ -62,7 +62,8 @@ idea → requirement-review → pending-approval → pending-implementation → 
               ↑
    (back to author if unclear)
 
-Off-ramps at any stage: on-hold | rejected | cancelled
+Off-ramps at any stage: rejected | cancelled
+Deprioritize: add `backlog` tag (ticket stays in current status)
 ```
 
 ---
@@ -88,7 +89,7 @@ The idea is being elaborated into a scoped, actionable requirement.
 
 **Sinh gate — required before leaving this status.** Requirements team does not self-advance.
 
-**Out:** → `pending-approval` (via review-request ticket to Sinh) | `idea` (back to author) | `rejected` | `on-hold`
+**Out:** → `pending-approval` (via review-request ticket to Sinh) | `idea` (back to author) | `rejected` | `cancelled`
 
 ---
 
@@ -99,7 +100,7 @@ Requirements doc ready. Waiting for Sinh to review and approve.
 - Sinh approves → sets `pending-implementation`, assigns `team: builder` or `team: orchestrator`
 - Sinh rejects → sets `rejected` with comment
 
-**Out:** → `pending-implementation` (Sinh approves) | `requirement-review` (rework) | `rejected` | `on-hold`
+**Out:** → `pending-implementation` (Sinh approves) | `requirement-review` (rework) | `rejected` | `cancelled`
 
 ---
 
@@ -111,7 +112,7 @@ Approved and ready to build. The `team` field determines the executor:
 
 Executor scans `pa ticket list --assignee <team> --status pending-implementation` on startup and claims the ticket.
 
-**Out:** → `implementing` (work starts) | `on-hold`
+**Out:** → `implementing` (work starts) | `cancelled`
 
 ---
 
@@ -122,7 +123,7 @@ Executor scans `pa ticket list --assignee <team> --status pending-implementation
 
 **Orchestrator mode:** Decomposes into parallel sub-tasks, launches multiple builder agents, aggregates results. Ticket stays `implementing` until all builders are done.
 
-**Out:** → `review-uat` (complete, ready for Sinh) | `on-hold` | `pending-implementation` (abandoned, reset)
+**Out:** → `review-uat` (complete, ready for Sinh) | `pending-implementation` (abandoned, reset) | `cancelled`
 
 ---
 
@@ -153,9 +154,67 @@ Terminal. Decided not to do this. Add comment with reason. Preserved for history
 ### `cancelled`
 Terminal. Was valid but no longer relevant. Different from rejected — no judgment on merit.
 
-### `on-hold`
-Parking. Valid work, paused. Can resume to any active status.
-Set `on-hold` + comment explaining why. Sprint-master reviews on-hold tickets weekly.
+---
+
+## Tag Reference
+
+### `backlog` Tag
+
+Marks a ticket as deprioritized. The ticket remains in its current status and is not deleted or closed.
+
+**When to use:** Valid work that is not actively prioritized — paused, low-priority, or waiting for Sinh's attention.
+
+**How to tag:**
+```bash
+pa ticket update <id> --tags backlog
+```
+
+**How to untag (re-activate):**
+```bash
+# Remove backlog from tags — include any other tags you want to keep
+pa ticket update <id> --tags ""
+```
+
+**Board behavior:** The default board view excludes tickets tagged `backlog` (`GET /api/board?excludeTags=backlog,archived`). Use the Backlog view to see them: `pa ticket list --tags backlog`.
+
+**Sprint-master behavior:** Sprint-master may add a comment suggesting backlog for stale active tickets (no updates >14 days), but does NOT add the tag — only Sinh decides.
+
+---
+
+### `archived` Tag
+
+Applied automatically by sprint-master to terminal tickets (done/cancelled/rejected) older than 30 days. Non-destructive — tickets are still searchable.
+
+**Auto-archive logic (sprint-master, daily-end triage):**
+1. List all terminal tickets: `pa ticket list --status done,cancelled,rejected`
+2. For each: if `(now - updatedAt) > 30 days` AND not already tagged `archived`: add `archived` tag
+3. Log count of archived tickets
+
+**Board behavior:** The default board view excludes tickets tagged `archived`. Archive view: `pa ticket list --tags archived`.
+
+**Un-archive:** Remove the `archived` tag manually if you need to reference or reopen the ticket.
+
+---
+
+### `blockedBy` Field
+
+The `blockedBy` field on a ticket contains an array of ticket IDs that must resolve before this ticket can proceed. It replaces the old `dependencies` field.
+
+**How it works:**
+- When `blockedBy` is non-empty, the `blocked` tag is automatically added to the ticket
+- When `blockedBy` is cleared, the `blocked` tag is automatically removed
+- The ticket stays in its current status — `blockedBy` describes the dependency, not the work state
+
+**CLI usage:**
+```bash
+# Block on one or more tickets
+pa ticket update <id> --blocked-by PA-100,PA-101
+
+# Clear blockedBy (unblock)
+pa ticket update <id> --blocked-by ""
+```
+
+**Sprint-master:** Monitors tickets with `blocked` tag during triage and escalates if unresolved after 24h.
 
 ---
 
@@ -163,20 +222,29 @@ Set `on-hold` + comment explaining why. Sprint-master reviews on-hold tickets we
 
 `blocked` is a **tag**, not a status. `blocked` must never appear as a status value — it belongs in `--tags` only.
 
-When an agent cannot proceed due to an external dependency or missing decision:
+There are two ways a ticket becomes blocked:
 
-1. **Keep current status** — do not change the ticket's status
-2. **Add `blocked` tag:**
-   ```bash
-   pa ticket update <id> --tags blocked
-   ```
-3. **Add comment explaining the block:**
-   ```bash
-   pa ticket comment <id> --author <agent> --content "BLOCKED: <reason>. Waiting on: <dependency or decision>."
-   ```
-4. **When unblocked:**
-   - Remove `blocked` tag (update tags without it)
-   - Add comment noting what resolved the block and what work resumes
+**1. Blocked by another ticket** — use `--blocked-by` (preferred):
+```bash
+# Block on a specific ticket
+pa ticket update <id> --blocked-by PA-100
+# → auto-adds 'blocked' tag; ticket stays in current status
+
+# Clear when resolved
+pa ticket update <id> --blocked-by ""
+# → auto-removes 'blocked' tag
+```
+
+**2. Blocked by an external factor** (decision, missing info, etc.) — use tags manually:
+```bash
+# Add blocked tag manually
+pa ticket update <id> --tags blocked
+
+# Add comment explaining what's needed
+pa ticket comment <id> --author <agent> --content "BLOCKED: <reason>. Waiting on: <decision or external dependency>."
+
+# When unblocked: update tags to remove 'blocked', add resolution comment
+```
 
 Sprint-master monitors tickets with `blocked` tag during triage and escalates if unresolved after 24h.
 
@@ -195,11 +263,11 @@ Sprint-master monitors tickets with `blocked` tag during triage and escalates if
 
 ## Role Summary
 
-| Role | Statuses they own |
-|------|-------------------|
-| Any agent / Sinh | Create `idea` tickets |
-| Sprint-master | Triage `idea` → route to requirements |
-| Requirements team | Own `requirement-review` — elaborate, clarify, or assign back to author |
-| Sinh | Gate at `pending-approval` and `review-uat` |
-| Builder | `pending-implementation` → `implementing` → `review-uat` (single-team) |
-| Orchestrator | `pending-implementation` → `implementing` → `review-uat` (parallel builders) |
+| Role | Statuses they own | Tag responsibilities |
+|------|-------------------|---------------------|
+| Any agent / Sinh | Create `idea` tickets | — |
+| Sprint-master | Triage `idea` → route to requirements | Add `archived` tag (auto, daily-end); suggest `backlog` (comment only, Sinh decides); monitor `blocked` tag |
+| Requirements team | Own `requirement-review` — elaborate, clarify, or assign back to author | — |
+| Sinh | Gate at `pending-approval` and `review-uat` | Approve `backlog` suggestions; un-archive tickets |
+| Builder | `pending-implementation` → `implementing` → `review-uat` (single-team) | — |
+| Orchestrator | `pending-implementation` → `implementing` → `review-uat` (parallel builders) | — |

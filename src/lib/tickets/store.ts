@@ -31,11 +31,10 @@ const PIPELINE_ORDER: Record<string, number> = {
   "done": 6,
   "rejected": 6,
   "cancelled": 6,
-  // on-hold is intentionally omitted — parking is not a pipeline advance
 };
 
 /** All valid statuses in display order */
-const ALL_VALID_STATUSES = [...ACTIVE_STATUSES, "done", "rejected", "on-hold", "cancelled"];
+const ALL_VALID_STATUSES = [...ACTIVE_STATUSES, "done", "rejected", "cancelled"];
 
 /**
  * TicketStore — manages all ticket CRUD operations with flock locking.
@@ -267,6 +266,18 @@ export class TicketStore {
       }
     }
 
+    // Auto-manage `blocked` tag based on blockedBy field changes
+    if (input.blockedBy !== undefined) {
+      const currentTags: string[] = input.tags ?? ticket.tags ?? [];
+      const hasBlockedBy = input.blockedBy.length > 0;
+      const hasTag = currentTags.includes("blocked");
+      if (hasBlockedBy && !hasTag) {
+        input.tags = [...currentTags, "blocked"];
+      } else if (!hasBlockedBy && hasTag) {
+        input.tags = currentTags.filter((t) => t !== "blocked");
+      }
+    }
+
     const updated: Ticket = { ...ticket, ...input, updatedAt: now };
     writeFileSync(this.ticketPath(id), JSON.stringify(updated, null, 2));
 
@@ -473,6 +484,7 @@ export class TicketStore {
     priority?: string;
     type?: string;
     tags?: string[];
+    excludeTags?: string[];
   } = {}): Ticket[] {
     const files = readdirSync(this.dir).filter(
       (f) => f.endsWith(".json") && f !== "counter.json"
@@ -496,6 +508,9 @@ export class TicketStore {
       if (filters.type && t.type !== filters.type) return false;
       if (filters.tags?.length) {
         if (!filters.tags.every((tag) => t.tags.includes(tag))) return false;
+      }
+      if (filters.excludeTags?.length) {
+        if (filters.excludeTags.some((tag) => t.tags.includes(tag))) return false;
       }
       return true;
     });

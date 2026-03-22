@@ -36,6 +36,8 @@ export function ticketRoutes(): Hono {
       assignee?: string;
       priority?: string;
       type?: string;
+      tags?: string[];
+      excludeTags?: string[];
     } = {};
 
     const project = c.req.query("project");
@@ -43,12 +45,16 @@ export function ticketRoutes(): Hono {
     const assignee = c.req.query("assignee");
     const priority = c.req.query("priority");
     const type = c.req.query("type");
+    const tagsParam = c.req.query("tags");
+    const excludeTagsParam = c.req.query("excludeTags");
 
     if (project) filters.project = project;
     if (status) filters.status = status;
     if (assignee) filters.assignee = assignee;
     if (priority) filters.priority = priority;
     if (type) filters.type = type;
+    if (tagsParam) filters.tags = tagsParam.split(",").map((t) => t.trim()).filter(Boolean);
+    if (excludeTagsParam) filters.excludeTags = excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean);
 
     try {
       const tickets = store.list(filters);
@@ -253,9 +259,11 @@ export function ticketRoutes(): Hono {
       );
     }
 
-    const filters: { assignee?: string } = {};
+    const filters: { assignee?: string; excludeTags?: string[] } = {};
     const assignee = c.req.query("assignee");
+    const excludeTagsParam = c.req.query("excludeTags");
     if (assignee) filters.assignee = assignee;
+    if (excludeTagsParam) filters.excludeTags = excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean);
 
     try {
       const board = buildBoardView(project, filters);

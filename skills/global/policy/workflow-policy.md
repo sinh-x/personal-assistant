@@ -108,14 +108,14 @@ Tickets tagged `inbox-sweep` were bulk-created during the PA-002 inbox migration
 **Rules:**
 1. For each `pending-implementation` ticket tagged `inbox-sweep`:
    - Check if the work is already done: search for a `done` ticket with matching title/topic
-   - Check for a duplicate ticket in a better status (e.g., `on-hold` with full context)
+   - Check for a duplicate ticket in a better status (e.g., tagged `backlog`, with full context)
    - If either is found → cancel with a comment referencing the canonical ticket
 2. Cancel command: `pa ticket update <id> --status cancelled --actor <agent>`
 3. Always add a comment before or after cancelling:
    ```bash
    pa ticket comment <id> --author <agent> --content "Cancelled: work already completed — see <canonical-id>. Inbox-sweep duplicate."
    # or
-   pa ticket comment <id> --author <agent> --content "Cancelled: duplicate of <canonical-id> (on-hold, requirements team). Inbox-sweep artifact."
+   pa ticket comment <id> --author <agent> --content "Cancelled: duplicate of <canonical-id> (backlog, requirements team). Inbox-sweep artifact."
    ```
 4. **Do not cancel** if no canonical ticket exists and the work is still valid — leave it and ensure `doc_ref` is populated.
 
@@ -148,11 +148,11 @@ A ticket advancing through key gates should always have `doc_ref` populated so d
 
 1. For each `pending-implementation` ticket with empty `doc_ref`:
    - If the summary contains enough detail to act (clear WHAT/steps) → leave it, add a comment noting the missing doc_ref
-   - If the summary is too thin to execute → move to `on-hold` with a comment:
+   - If the summary is too thin to execute → add `backlog` tag with a comment:
      ```bash
-     pa ticket update <id> --status on-hold --actor <agent>
+     pa ticket update <id> --tags backlog --actor <agent>
      pa ticket comment <id> --author <agent> \
-       --content "On-hold: no doc_ref and summary insufficient to execute. Needs a plan document before implementation can start."
+       --content "Tagged backlog: no doc_ref and summary insufficient to execute. Needs a plan document before implementation can start."
      ```
 2. **Never attempt to implement** a ticket without either a `doc_ref` or a self-contained summary.
 
@@ -187,6 +187,6 @@ Sprint-master action for tickets tagged `needs-doc-ref`:
 **Rules:**
 1. When a `requirement-review` ticket is unclear, requirements team adds a comment explaining what's missing and assigns back to the original author.
 2. **7-day timeout:** If the author has not responded within 7 days, requirements team adds a comment flagging the timeout and assigns the ticket to sprint-master for escalation decision.
-3. Sprint-master escalation options: (a) reach out to Sinh for clarification, (b) put ticket `on-hold` with expiration note, (c) close as `rejected` with Sinh's input.
+3. Sprint-master escalation options: (a) reach out to Sinh for clarification, (b) add `backlog` tag with expiration note, (c) close as `rejected` with Sinh's input.
 4. **Requirements team cannot reject without Sinh.** Even clearly out-of-scope requests must be escalated to Sinh before closing as `rejected`.
-5. Requirements team may put a ticket `on-hold` pending author response, but must add a comment with the 7-day deadline.
+5. Requirements team may add a `backlog` tag pending author response, but must add a comment with the 7-day deadline.

@@ -29,7 +29,7 @@ For each ticket with `implementing` or recently-completed status, run `pa ticket
 - What was completed (from completion comments)
 - Any "needs attention" or blocked items (look for BLOCKED comments or `blocked` tags)
 
-Include a summary row per team in the daily digest (see Step 9).
+Include a summary row per team in the daily digest (see Step 11).
 
 > **Why first?** Sprint-master is the single aggregation point for all team activity. Ticket comments replaced standalone work-report files. All team completion reports are now ticket comments.
 
@@ -125,13 +125,51 @@ For any stale `implementing` ticket:
 pa ticket update <TICKET-ID> --status pending-implementation --assignee <original-team>
 ```
 
-### Step 8 — Escalate blockers
+### Step 8 — Auto-archive terminal tickets
 
-If a ticket has `dependencies` that are still in `backlog`/`todo`, flag it:
+During daily-end triage, add the `archived` tag to terminal tickets that are older than 30 days
+and have not already been tagged `archived`.
+
+```bash
+# Find all terminal tickets
+pa ticket list --status done,cancelled,rejected
+```
+
+For each terminal ticket:
+1. Check `updatedAt` (or `resolvedAt` if set) — if older than 30 days AND not already tagged `archived`:
+   ```bash
+   pa ticket update <id> --tags archived
+   ```
+2. Log the count of newly archived tickets in the daily digest.
+
+**Skip tickets already tagged `archived`.** This step is idempotent — safe to run on every triage.
+
+### Step 9 — Suggest backlog for stale ideas
+
+During triage, find active `idea` tickets that have had no updates in 14 or more days
+and add a comment recommending backlog. **Do NOT add the tag — Sinh decides.**
+
+```bash
+# Find all idea tickets
+pa ticket list --status idea
+```
+
+For each `idea` ticket where `(now - updatedAt) >= 14 days` AND not already tagged `backlog`:
+
+```bash
+pa ticket comment <id> --author sprint-master \
+  --content "Recommend backlog — no activity for 14+ days. To approve: pa ticket update <id> --tags backlog"
+```
+
+**Do not add the `backlog` tag directly.** Only Sinh may approve backlog tagging. This is informational only.
+
+### Step 10 — Escalate blockers
+
+If a ticket has `blockedBy` entries that are still unresolved, flag it:
 - Add a comment: "Blocked: waiting on dependency <DEP-ID>"
 - Set priority to `urgent` if the dependent ticket is `urgent`
 
-### Step 9 — Write daily digest
+### Step 11 — Write daily digest
 
 Write the daily digest as a document file to the sprint-master artifacts directory:
 
@@ -165,6 +203,8 @@ Daily digest format:
 - Assigned team to Y tickets
 - Set estimates on Z tickets
 - Escalated W tickets as stale or blocked
+- Auto-archived A terminal tickets (>30 days old)
+- Suggested backlog on B stale idea tickets (>14 days no activity)
 
 | Ticket | Title | Priority | Team | Estimate | Action |
 |--------|-------|----------|------|----------|--------|
@@ -200,7 +240,9 @@ pa ticket create \
 ## Rules
 
 - Never change a ticket's status during triage — only priority, team, assignee, estimate
-- Do not close or archive tickets — triage only assigns and prioritizes
+- Do not close tickets during triage — only Sinh closes (moves to terminal status)
+- **Exception:** You MAY add the `archived` tag to terminal tickets older than 30 days (Step 8) — this is non-destructive; the ticket remains searchable
+- Do NOT add the `backlog` tag — only suggest it via comment (Step 9); Sinh decides
 - If a ticket is unclear, add a clarifying comment but do not guess the team assignment
 - Prefer leaving a ticket unassigned over assigning incorrectly
 - Log the triage run in session log per global standards

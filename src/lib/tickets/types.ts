@@ -3,7 +3,8 @@
  *   idea → requirement-review → pending-approval → pending-implementation → implementing → review-uat → done
  *
  * Terminal statuses: done, rejected, cancelled
- * Parking status:   on-hold (can resume to any active status)
+ * Deprioritized: use the `backlog` tag (not a status)
+ * Blocked: use the `blocked` tag + blockedBy field
  */
 export type TicketStatus =
   | "idea"
@@ -14,7 +15,6 @@ export type TicketStatus =
   | "review-uat"
   | "done"
   | "rejected"
-  | "on-hold"
   | "cancelled";
 
 /** Terminal statuses — tickets here are considered resolved */
@@ -78,7 +78,7 @@ export interface Ticket {
   from: string;
   to: string;
   tags: string[];
-  dependencies: string[];
+  blockedBy: string[];
   doc_ref: string;
   attachments: string[];
   comments: Comment[];
