@@ -244,10 +244,10 @@ function showOneTeam(name: string): void {
   );
 }
 
-/** Show project-wide kanban board, optionally filtered by team or assignee */
+/** Show project-wide kanban board, optionally filtered by assignee */
 function showBoard(
   project: string,
-  filters: { team?: string; assignee?: string } = {}
+  filters: { assignee?: string } = {}
 ): void {
   let board: BoardView;
   try {
@@ -258,7 +258,6 @@ function showBoard(
   }
 
   const filterDesc = [
-    filters.team ? `team:${filters.team}` : null,
     filters.assignee ? `assignee:${filters.assignee}` : null,
   ]
     .filter(Boolean)
@@ -292,11 +291,11 @@ function showBoard(
 /**
  * Show project-wide kanban board (all tickets by status, with assignee).
  * Default project: personal-assistant.
- * Optional --team and --assignee filters.
+ * Optional --assignee filter.
  */
 export function boardCommand(
   project: string,
-  filters: { team?: string; assignee?: string } = {}
+  filters: { assignee?: string } = {}
 ): void {
   showBoard(project, filters);
 }

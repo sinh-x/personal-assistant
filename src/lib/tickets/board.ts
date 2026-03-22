@@ -27,11 +27,11 @@ export interface BoardView {
   project: string;
   columns: BoardColumn[];
   total: number;
-  /** Ticket counts per team (across all statuses) */
-  teamCounts: Record<string, number>;
+  /** Ticket counts per assignee (across all statuses) */
+  assigneeCounts: Record<string, number>;
 }
 
-/** Per-team ticket counts broken down by status */
+/** Per-assignee ticket counts broken down by status */
 export interface TeamStatusSummary {
   team: string;
   counts: Record<TicketStatus, number>;
@@ -47,7 +47,6 @@ export interface TeamStatusSummary {
 export function buildBoardView(
   project: string,
   filters: {
-    team?: string;
     assignee?: string;
     priority?: string;
   } = {}
@@ -60,7 +59,7 @@ export function buildBoardView(
     grouped.set(status, []);
   }
 
-  const teamCounts: Record<string, number> = {};
+  const assigneeCounts: Record<string, number> = {};
 
   for (const ticket of tickets) {
     const col = grouped.get(ticket.status);
@@ -70,7 +69,7 @@ export function buildBoardView(
       // Unknown status — add to idea as fallback
       grouped.get("idea")!.push(ticket);
     }
-    teamCounts[ticket.team] = (teamCounts[ticket.team] ?? 0) + 1;
+    assigneeCounts[ticket.assignee] = (assigneeCounts[ticket.assignee] ?? 0) + 1;
   }
 
   const columns: BoardColumn[] = BOARD_COLUMNS.map((status) => {
@@ -88,7 +87,7 @@ export function buildBoardView(
     project,
     columns,
     total: tickets.length,
-    teamCounts,
+    assigneeCounts,
   };
 }
 
@@ -103,12 +102,12 @@ export function getTeamStatusSummaries(project?: string): TeamStatusSummary[] {
   const byTeam = new Map<string, Record<TicketStatus, number>>();
 
   for (const ticket of tickets) {
-    if (!byTeam.has(ticket.team)) {
+    if (!byTeam.has(ticket.assignee)) {
       const zeroCounts: Record<TicketStatus, number> = {} as Record<TicketStatus, number>;
       for (const s of BOARD_COLUMNS) zeroCounts[s] = 0;
-      byTeam.set(ticket.team, zeroCounts);
+      byTeam.set(ticket.assignee, zeroCounts);
     }
-    const counts = byTeam.get(ticket.team)!;
+    const counts = byTeam.get(ticket.assignee)!;
     counts[ticket.status] = (counts[ticket.status] ?? 0) + 1;
   }
 
@@ -127,7 +126,7 @@ export function getTeamBoard(
   filters: { project?: string } = {}
 ): BoardView & { team: string } {
   const store = new TicketStore();
-  const tickets = store.list({ team, ...filters });
+  const tickets = store.list({ assignee: team, ...filters });
 
   const grouped = new Map<TicketStatus, Ticket[]>();
   for (const status of BOARD_COLUMNS) {
@@ -149,6 +148,6 @@ export function getTeamBoard(
     project: filters.project ?? "all",
     columns,
     total: tickets.length,
-    teamCounts: { [team]: tickets.length },
+    assigneeCounts: { [team]: tickets.length },
   };
 }

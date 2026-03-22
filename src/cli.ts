@@ -34,14 +34,13 @@ program
 program
   .command("board")
   .description(
-    "Show kanban board for a project — all tickets grouped by status with assignee. Use --team or --assignee to filter."
+    "Show kanban board for a project — all tickets grouped by status with assignee. Use --assignee to filter."
   )
   .option("--project <name>", "Project name", "personal-assistant")
-  .option("--team <team>", "Filter by team")
   .option("--assignee <name>", "Filter by assignee")
   .action(
-    (opts: { project: string; team?: string; assignee?: string }) => {
-      boardCommand(opts.project, { team: opts.team, assignee: opts.assignee });
+    (opts: { project: string; assignee?: string }) => {
+      boardCommand(opts.project, { assignee: opts.assignee });
     }
   );
 

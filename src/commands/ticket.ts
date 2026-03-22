@@ -32,13 +32,13 @@ function validateEstimate(value: string): Estimate {
 }
 
 /** Format a ticket row for the list view */
-function formatRow(id: string, status: string, priority: string, estimate: string, team: string, title: string): string {
+function formatRow(id: string, status: string, priority: string, estimate: string, assignee: string, title: string): string {
   return (
     id.padEnd(9) +
     status.padEnd(25) +
     priority.padEnd(11) +
     estimate.padEnd(6) +
-    team.padEnd(16) +
+    assignee.padEnd(16) +
     title
   );
 }
@@ -57,11 +57,10 @@ export function createTicketCommand(): Command {
       "--type <type>",
       "Ticket type (feature|bug|task|review-request|work-report|fyi|idea|question)"
     )
-    .requiredOption("--team <team>", "Target team")
     .requiredOption("--priority <priority>", "Priority (critical|high|medium|low)")
     .requiredOption("--estimate <size>", "Effort estimate (XS|S|M|L|XL)")
+    .requiredOption("--assignee <name>", "Assignee")
     .option("--summary <text>", "Short summary", "")
-    .option("--assignee <name>", "Assignee", "")
     .option("--tags <tags>", "Comma-separated tags", "")
     .option("--doc-ref <path>", "Document reference path", "")
     .option("--from <team>", "From team", "")
@@ -72,11 +71,10 @@ export function createTicketCommand(): Command {
         project: string;
         title: string;
         type: string;
-        team: string;
         priority: string;
         estimate: string;
-        summary: string;
         assignee: string;
+        summary: string;
         tags: string;
         docRef: string;
         from: string;
@@ -108,7 +106,6 @@ export function createTicketCommand(): Command {
             project: opts.project,
             title: opts.title,
             type: opts.type as TicketType,
-            team: opts.team,
             priority: opts.priority as TicketPriority,
             estimate,
             status: "idea",
@@ -139,7 +136,6 @@ export function createTicketCommand(): Command {
     .option("--status <status>", "New status (idea|requirement-review|pending-approval|pending-implementation|implementing|review-uat|done|rejected|on-hold|cancelled)")
     .option("--assignee <name>", "New assignee")
     .option("--priority <priority>", "New priority (critical|high|medium|low)")
-    .option("--team <team>", "New team")
     .option("--tags <tags>", "Comma-separated tags (replaces existing)")
     .option("--estimate <size>", "New effort estimate (XS|S|M|L|XL)")
     .option("--actor <name>", "Actor for audit log", "cli-user")
@@ -150,7 +146,6 @@ export function createTicketCommand(): Command {
           status?: string;
           assignee?: string;
           priority?: string;
-          team?: string;
           tags?: string;
           estimate?: string;
           actor: string;
@@ -161,7 +156,6 @@ export function createTicketCommand(): Command {
         if (opts.status) input.status = opts.status as TicketStatus;
         if (opts.assignee !== undefined) input.assignee = opts.assignee;
         if (opts.priority) input.priority = opts.priority as TicketPriority;
-        if (opts.team) input.team = opts.team;
         if (opts.tags !== undefined) {
           input.tags = opts.tags.split(",").map((t) => t.trim()).filter(Boolean);
         }
@@ -180,7 +174,6 @@ export function createTicketCommand(): Command {
     .command("list")
     .description("List tickets with optional filters")
     .option("--project <name>", "Filter by project")
-    .option("--team <team>", "Filter by team")
     .option("--status <status>", "Filter by status")
     .option("--assignee <name>", "Filter by assignee")
     .option("--priority <priority>", "Filter by priority")
@@ -188,7 +181,6 @@ export function createTicketCommand(): Command {
     .action(
       (opts: {
         project?: string;
-        team?: string;
         status?: string;
         assignee?: string;
         priority?: string;
@@ -197,7 +189,6 @@ export function createTicketCommand(): Command {
         const store = new TicketStore();
         const tickets = store.list({
           project: opts.project,
-          team: opts.team,
           status: opts.status,
           assignee: opts.assignee,
           priority: opts.priority,
@@ -209,10 +200,10 @@ export function createTicketCommand(): Command {
           return;
         }
 
-        console.log(formatRow("ID", "STATUS", "PRIORITY", "EST", "TEAM", "TITLE"));
+        console.log(formatRow("ID", "STATUS", "PRIORITY", "EST", "ASSIGNEE", "TITLE"));
         console.log("-".repeat(80));
         for (const t of tickets) {
-          console.log(formatRow(t.id, t.status, t.priority, t.estimate, t.team, t.title));
+          console.log(formatRow(t.id, t.status, t.priority, t.estimate, t.assignee, t.title));
         }
         console.log(`\n${tickets.length} ticket(s)`);
       }
