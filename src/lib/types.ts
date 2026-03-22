@@ -82,6 +82,7 @@ export interface RegistryEvent {
   models?: Record<string, string>;
   error?: string;
   exit_code?: number;
+  ticket_id?: string;
 }
 
 /** Computed deployment status from registry events */
