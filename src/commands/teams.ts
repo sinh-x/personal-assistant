@@ -8,8 +8,10 @@ import type { RegistryEvent } from "../lib/types.js";
 import {
   getTeamStatusSummaries,
   getTeamBoard,
+  buildBoardView,
   BOARD_COLUMNS,
 } from "../lib/tickets/board.js";
+import type { BoardView } from "../lib/tickets/board.js";
 
 // ANSI color helpers (no-op when not a TTY)
 const COLORS = {
@@ -240,6 +242,63 @@ function showOneTeam(name: string): void {
       ? `\ndeployments: ${running.join(", ")}`
       : "\ndeployments: none running"
   );
+}
+
+/** Show project-wide kanban board, optionally filtered by team or assignee */
+function showBoard(
+  project: string,
+  filters: { team?: string; assignee?: string } = {}
+): void {
+  let board: BoardView;
+  try {
+    board = buildBoardView(project, filters);
+  } catch {
+    console.error("(ticket system unavailable)");
+    return;
+  }
+
+  const filterDesc = [
+    filters.team ? `team:${filters.team}` : null,
+    filters.assignee ? `assignee:${filters.assignee}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  const title = filterDesc
+    ? `Board: ${project}  [${filterDesc}]`
+    : `Board: ${project}  (all tickets)`;
+  console.log(title);
+  console.log("═".repeat(DETAIL_WIDTH));
+
+  for (const col of board.columns) {
+    if (col.tickets.length === 0) continue;
+    const prefix = `── ${col.status} (${col.count}) `;
+    const fill = Math.max(2, DETAIL_WIDTH - prefix.length);
+    console.log(`\n${prefix}${"─".repeat(fill)}`);
+
+    for (const ticket of col.tickets) {
+      const rawPriority = `[${ticket.priority}]`;
+      const coloredPriority = colorByPriority(rawPriority, ticket.priority);
+      const assignee = (ticket.assignee || "(unassigned)").padEnd(16);
+      console.log(
+        `  ${ticket.id.padEnd(8)}${coloredPriority}${"".padEnd(Math.max(1, 11 - rawPriority.length))}${assignee}  ${ticket.title}`
+      );
+    }
+  }
+
+  console.log(`\n(${board.total} total)`);
+}
+
+/**
+ * Show project-wide kanban board (all tickets by status, with assignee).
+ * Default project: personal-assistant.
+ * Optional --team and --assignee filters.
+ */
+export function boardCommand(
+  project: string,
+  filters: { team?: string; assignee?: string } = {}
+): void {
+  showBoard(project, filters);
 }
 
 /**

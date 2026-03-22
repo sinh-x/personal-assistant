@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { teamsCommand } from "./commands/teams.js";
+import { teamsCommand, boardCommand } from "./commands/teams.js";
 import { deployCommand } from "./commands/deploy.js";
 import { dailyCommand } from "./commands/daily.js";
 import { statusCommand } from "./commands/status.js";
@@ -30,6 +30,20 @@ program
   .action((name?: string) => {
     teamsCommand(name);
   });
+
+program
+  .command("board")
+  .description(
+    "Show kanban board for a project — all tickets grouped by status with assignee. Use --team or --assignee to filter."
+  )
+  .option("--project <name>", "Project name", "personal-assistant")
+  .option("--team <team>", "Filter by team")
+  .option("--assignee <name>", "Filter by assignee")
+  .action(
+    (opts: { project: string; team?: string; assignee?: string }) => {
+      boardCommand(opts.project, { team: opts.team, assignee: opts.assignee });
+    }
+  );
 
 program
   .command("deploy")
