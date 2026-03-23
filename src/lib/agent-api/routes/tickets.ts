@@ -7,7 +7,6 @@
  * GET    /api/tickets/:id/review   — review context: ticket + doc_ref_url + attachment_urls
  * PATCH  /api/tickets/:id          — update ticket fields
  * GET    /api/board                — board view grouped by status (project optional)
- * GET    /api/ticket-projects      — distinct project keys with active ticket counts
  * GET    /api/projects             — full project metadata + active ticket counts
  *
  * Comment routes:
@@ -249,17 +248,6 @@ export function ticketRoutes(): Hono {
         return c.json({ error: message, code: "NOT_FOUND" }, 404);
       }
       return c.json({ error: message, code: "ATTACH_FAILED" }, 400);
-    }
-  });
-
-  // GET /api/ticket-projects — distinct project keys with active ticket counts
-  app.get("/api/ticket-projects", (c: Context) => {
-    try {
-      const projects = store.getProjectCounts();
-      return c.json({ projects });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      return c.json({ error: message, code: "PROJECTS_FAILED" }, 500);
     }
   });
 

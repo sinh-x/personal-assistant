@@ -119,13 +119,3 @@ export function getRepoPrefix(projectName: string): string | undefined {
     return undefined;
   }
 }
-
-/** Get all project name → prefix mappings from repos.yaml. */
-export function getAllRepoPrefixes(): Record<string, string> {
-  const repos = loadReposYaml();
-  const result: Record<string, string> = {};
-  for (const [name, entry] of Object.entries(repos)) {
-    if (entry.prefix) result[name] = entry.prefix;
-  }
-  return result;
-}
