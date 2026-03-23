@@ -18,7 +18,7 @@ import type {
   CreateTicketInput,
   UpdateTicketInput,
 } from "./types.js";
-import { ACTIVE_STATUSES } from "./types.js";
+import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
 import { getRepoPrefix } from "../repos.js";
 
 /** Pipeline stage order for handoff warning — higher index = later stage */
@@ -609,5 +609,23 @@ export class TicketStore {
     return existsSync(path)
       ? (JSON.parse(readFileSync(path, "utf-8")) as CounterStore)
       : {};
+  }
+
+  /**
+   * Return distinct project keys with active ticket counts.
+   * Excludes tickets tagged 'archived' or 'backlog' and terminal statuses.
+   * Results sorted alphabetically by key.
+   */
+  getProjectCounts(): Array<{ key: string; count: number }> {
+    const tickets = this.list({ excludeTags: ["archived", "backlog"] });
+    const counts = new Map<string, number>();
+    for (const t of tickets) {
+      if (TERMINAL_STATUSES.includes(t.status)) continue;
+      counts.set(t.project, (counts.get(t.project) ?? 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .filter(([, count]) => count > 0)
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => a.key.localeCompare(b.key));
   }
 }
