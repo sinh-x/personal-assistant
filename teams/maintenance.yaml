@@ -24,6 +24,12 @@ deploy_modes:
     phone_visible: false
     mode_type: interactive
     solo: true
+  - id: repo-scan
+    label: Repo Scan
+    phone_visible: true
+    mode_type: work
+    solo: true
+    objective: skills/maintenance/repo-scan-objective.md
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."
