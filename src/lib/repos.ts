@@ -75,18 +75,49 @@ export function resolveRepo(name: string): { name: string } & RepoEntry {
   return { name, ...entry };
 }
 
-/** Look up the ticket prefix for a project name from repos.yaml. */
-export function getRepoPrefix(projectName: string): string | undefined {
+/**
+ * Resolve any project input (key, prefix, or path basename) to { key, prefix }.
+ * Resolution order:
+ *   (a) exact key match in repos.yaml
+ *   (b) prefix match (case-insensitive)
+ *   (c) path basename match
+ * Throws a clear error listing valid keys for unknown input.
+ */
+export function resolveProject(input: string): { key: string; prefix: string } {
   const repos = loadReposYaml();
-  // Try exact match on repo key first
-  if (repos[projectName]?.prefix) return repos[projectName].prefix;
-  // Try matching by description or path basename
-  for (const entry of Object.values(repos)) {
-    if (entry.prefix && entry.path.endsWith(`/${projectName}`)) {
-      return entry.prefix;
+
+  // (a) Exact key match
+  if (repos[input]?.prefix) {
+    return { key: input, prefix: repos[input].prefix! };
+  }
+
+  // (b) Prefix match (case-insensitive)
+  for (const [key, entry] of Object.entries(repos)) {
+    if (entry.prefix && entry.prefix.toLowerCase() === input.toLowerCase()) {
+      return { key, prefix: entry.prefix };
     }
   }
-  return undefined;
+
+  // (c) Path basename match
+  for (const [key, entry] of Object.entries(repos)) {
+    if (entry.prefix && entry.path.endsWith(`/${input}`)) {
+      return { key, prefix: entry.prefix };
+    }
+  }
+
+  const validKeys = Object.keys(repos)
+    .filter((k) => repos[k].prefix)
+    .join(", ") || "(none)";
+  throw new Error(`Unknown project "${input}". Valid project keys: ${validKeys}`);
+}
+
+/** Look up the ticket prefix for a project name from repos.yaml. */
+export function getRepoPrefix(projectName: string): string | undefined {
+  try {
+    return resolveProject(projectName).prefix;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Get all project name → prefix mappings from repos.yaml. */
