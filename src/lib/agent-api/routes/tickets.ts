@@ -6,8 +6,9 @@
  * GET    /api/tickets/:id          — get a single ticket by ID
  * GET    /api/tickets/:id/review   — review context: ticket + doc_ref_url + attachment_urls
  * PATCH  /api/tickets/:id          — update ticket fields
- * GET    /api/board                — board view grouped by status (project required)
+ * GET    /api/board                — board view grouped by status (project optional)
  * GET    /api/ticket-projects      — distinct project keys with active ticket counts
+ * GET    /api/projects             — full project metadata + active ticket counts
  *
  * Comment routes:
  * POST   /api/tickets/:id/comments              — add a comment
@@ -24,6 +25,7 @@ import { TicketStore } from "../../tickets/index.js";
 import { validateAuthor } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
 import type { CreateTicketInput, UpdateTicketInput } from "../../tickets/types.js";
+import { listRepos } from "../../repos.js";
 
 export function ticketRoutes(): Hono {
   const app = new Hono();
@@ -261,15 +263,34 @@ export function ticketRoutes(): Hono {
     }
   });
 
-  // GET /api/board — board view (project required, team optional)
-  app.get("/api/board", (c: Context) => {
-    const project = c.req.query("project");
-    if (!project) {
-      return c.json(
-        { error: "project query param is required", code: "BAD_REQUEST" },
-        400,
-      );
+  // GET /api/projects — full project metadata + active ticket counts
+  app.get("/api/projects", (c: Context) => {
+    try {
+      const repos = listRepos();
+      const counts = store.getProjectCounts();
+      const countMap = new Map(counts.map(({ key, count }) => [key, count]));
+
+      const projects = repos
+        .filter((r) => r.prefix)
+        .map((r) => ({
+          key: r.name,
+          prefix: r.prefix!,
+          description: r.description ?? "",
+          path: r.path,
+          activeTicketCount: countMap.get(r.name) ?? 0,
+        }))
+        .sort((a, b) => a.key.localeCompare(b.key));
+
+      return c.json({ projects });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: message, code: "PROJECTS_FAILED" }, 500);
     }
+  });
+
+  // GET /api/board — board view grouped by status (project optional)
+  app.get("/api/board", (c: Context) => {
+    const project = c.req.query("project") || undefined;
 
     const DEFAULT_EXCLUDE_TAGS = ["backlog", "archived"];
     const filters: { assignee?: string; excludeTags?: string[] } = {};
