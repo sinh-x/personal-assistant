@@ -1,7 +1,8 @@
 import { readFileSync, existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, basename } from "node:path";
 import type { TeamConfig, DeployMode } from "./types.js";
 import { BulletinStore } from "./bulletins/index.js";
+import { listRepos } from "./repos.js";
 
 interface PrimerOptions {
   deployId: string;
@@ -47,6 +48,39 @@ function applyTemplateVars(content: string, vars: Record<string, string>): strin
   return result;
 }
 
+/** Resolve a repo path to its registry key (slug). Falls back to directory basename. */
+function resolveRepoSlug(repoRoot: string): string {
+  try {
+    for (const repo of listRepos()) {
+      if (repo.path === repoRoot) {
+        return repo.name;
+      }
+    }
+  } catch {
+    // Repos.yaml unavailable — fall through to basename
+  }
+  return basename(repoRoot);
+}
+
+/**
+ * Read cached repo context from knowledge-base and return as a primer section.
+ * Returns empty string if repoRoot is not set.
+ */
+function injectRepoContext(repoRoot: string, homeDir: string): string {
+  const slug = resolveRepoSlug(repoRoot);
+  const contextPath = resolve(homeDir, 'Documents/ai-usage/knowledge-base/repo-context', `${slug}.md`);
+
+  let contextContent: string;
+  if (existsSync(contextPath)) {
+    contextContent = readFileSync(contextPath, 'utf-8');
+    if (!contextContent.endsWith('\n')) contextContent += '\n';
+  } else {
+    contextContent = 'No pre-computed codebase knowledge available for this repo. Agent will explore independently.\n';
+  }
+
+  return `\n## Repository Context\n\n${contextContent}`;
+}
+
 /**
  * Returns the list of standards module names to include for a given mode type.
  *   'housekeeping' → ['core', 'housekeeping']
@@ -57,7 +91,7 @@ function selectModules(modeType: string): string[] {
   if (modeType === 'housekeeping') {
     return ['core', 'housekeeping', 'cli-reference', 'kanban-workflow', 'workflow-policy'];
   }
-  return ['core', 'work', 'inbox-output', 'cli-reference', 'kanban-workflow', 'workflow-policy'];
+  return ['core', 'work', 'inbox-output', 'cli-reference', 'kanban-workflow', 'workflow-policy', 'codebase-exploration'];
 }
 
 /**
@@ -159,7 +193,13 @@ team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
 ${cwd ? `cwd: ${cwd}\n` : ""}${repoRoot ? `repo_root: ${repoRoot}\n` : ""}agents:
 ${agentsList}${modelsBlock}${modeBlock}
 </deployment-context>
+`;
 
+  if (repoRoot) {
+    primer += injectRepoContext(repoRoot, homeDir);
+  }
+
+  primer += `
 Your identity is **team-manager** (team: **${teamName}**, deployment: **${deployId}**).
 You MUST follow all rules in the **Global Skills** section below — especially \`standards.md\`.
 
