@@ -141,6 +141,7 @@ export function teamsRoutes(): Hono {
         name: r.name,
         path: r.path,
         description: r.description,
+        prefix: r.prefix,
       }));
       return c.json({ repos });
     } catch {

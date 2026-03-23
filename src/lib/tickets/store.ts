@@ -19,7 +19,7 @@ import type {
   UpdateTicketInput,
 } from "./types.js";
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
-import { getRepoPrefix } from "../repos.js";
+import { resolveProject } from "../repos.js";
 
 /** Pipeline stage order for handoff warning — higher index = later stage */
 const PIPELINE_ORDER: Record<string, number> = {
@@ -180,7 +180,11 @@ export class TicketStore {
 
   /** Get the ticket prefix for a project name from repos.yaml. */
   getPrefix(projectName: string): string | undefined {
-    return getRepoPrefix(projectName);
+    try {
+      return resolveProject(projectName).prefix;
+    } catch {
+      return undefined;
+    }
   }
 
   // ── Audit log ─────────────────────────────────────────────────────────────
@@ -221,18 +225,15 @@ export class TicketStore {
    * - Appends an audit entry.
    */
   create(input: CreateTicketInput, actor: string): Ticket {
-    const prefix = this.getPrefix(input.project);
-    if (!prefix) {
-      throw new Error(
-        `Unknown project "${input.project}". Register it first with registerProject().`
-      );
-    }
+    const resolved = resolveProject(input.project);
+    const { key: canonicalKey, prefix } = resolved;
 
     const id = this.allocateId(prefix);
     const now = new Date().toISOString();
 
     const ticket: Ticket = {
       ...input,
+      project: canonicalKey,
       id,
       createdAt: now,
       updatedAt: now,
