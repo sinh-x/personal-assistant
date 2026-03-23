@@ -55,9 +55,9 @@ function applyTemplateVars(content: string, vars: Record<string, string>): strin
  */
 function selectModules(modeType: string): string[] {
   if (modeType === 'housekeeping') {
-    return ['core', 'housekeeping'];
+    return ['core', 'housekeeping', 'cli-reference', 'kanban-workflow', 'workflow-policy'];
   }
-  return ['core', 'work', 'inbox-output'];
+  return ['core', 'work', 'inbox-output', 'cli-reference', 'kanban-workflow', 'workflow-policy'];
 }
 
 /**
