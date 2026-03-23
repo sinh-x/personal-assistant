@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
+import { homedir } from "node:os";
 import type { TeamConfig, DeployMode } from "./types.js";
 import { BulletinStore } from "./bulletins/index.js";
 import { listRepos } from "./repos.js";
@@ -66,9 +67,9 @@ function resolveRepoSlug(repoRoot: string): string {
  * Read cached repo context from knowledge-base and return as a primer section.
  * Returns empty string if repoRoot is not set.
  */
-function injectRepoContext(repoRoot: string, homeDir: string): string {
+function injectRepoContext(repoRoot: string): string {
   const slug = resolveRepoSlug(repoRoot);
-  const contextPath = resolve(homeDir, 'Documents/ai-usage/knowledge-base/repo-context', `${slug}.md`);
+  const contextPath = resolve(homedir(), 'Documents/ai-usage/knowledge-base/repo-context', `${slug}.md`);
 
   let contextContent: string;
   if (existsSync(contextPath)) {
@@ -196,7 +197,7 @@ ${agentsList}${modelsBlock}${modeBlock}
 `;
 
   if (repoRoot) {
-    primer += injectRepoContext(repoRoot, homeDir);
+    primer += injectRepoContext(repoRoot);
   }
 
   primer += `
