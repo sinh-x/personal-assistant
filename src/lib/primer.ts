@@ -91,7 +91,7 @@ function selectModules(modeType: string): string[] {
   if (modeType === 'housekeeping') {
     return ['core', 'housekeeping', 'cli-reference', 'kanban-workflow', 'workflow-policy'];
   }
-  return ['core', 'work', 'inbox-output', 'cli-reference', 'kanban-workflow', 'workflow-policy', 'codebase-exploration'];
+  return ['core', 'work', 'inbox-output', 'cli-reference', 'kanban-workflow', 'workflow-policy', 'codebase-exploration', 'impact-analysis'];
 }
 
 /**

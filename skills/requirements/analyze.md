@@ -52,6 +52,8 @@ Before asking more questions, **explore the codebase and existing systems yourse
 - Identify technical constraints or opportunities
 - Look at related issues, PRs, or prior work
 
+**Impact analysis (when ticket has `doc_ref`):** If the ticket you are working on has a `doc_ref` pointing to a plan or prior requirements document, follow the `impact-analysis` global skill (injected in your primer). Run Steps 1–4 to identify the change surface, downstream consumers, risk levels, and hidden dependencies. Add an `## Impact Analysis` section to the requirements document you produce.
+
 Report back to the user: "Here's what I found in the codebase..." — then ask:
 
 1. **Constraints** — "Are there any technical constraints I should know about? (performance, compatibility, etc.)"
