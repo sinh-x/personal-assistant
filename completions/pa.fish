@@ -99,11 +99,40 @@ function __pa_timer_names
     systemctl --user list-timers 'pa-*' --no-legend 2>/dev/null | string match -r 'pa-\S+\.timer' | string replace -r '^pa-' '' | string replace -r '\.timer$' '' | sort -u
 end
 
+function __pa_projects
+    # List project names from 'pa repos list'. Parse the NAME column (skip 2 header lines).
+    pa repos list 2>/dev/null | awk 'NR>2 && NF>0 {print $1}'
+end
+
+function __pa_ticket_ids
+    # List active ticket IDs with title as description. Skip header (2 lines) and summary line.
+    pa ticket list 2>/dev/null | awk 'NR>2 && /^[A-Z]/ {
+        id = $1;
+        title = "";
+        for (i=6; i<=NF; i++) title = title (i>6?" ":"") $i;
+        print id "\t" title
+    }'
+end
+
+function __pa_bulletin_ids
+    # List active bulletin IDs from 'pa bulletin list'. Format in output: [B-001].
+    pa bulletin list 2>/dev/null | string match -rg '\[([A-Z]+-[0-9]+)\]'
+end
+
+function __pa_assignees
+    # Combine unique assignees from active tickets + team names.
+    # Filter column 5 to only valid assignee tokens (no overflow artifacts from long names).
+    set -l from_tickets (pa ticket list 2>/dev/null | awk 'NR>2 && /^[A-Z]/ {print $5}' | grep -E '^[a-z][a-z0-9/_-]*$')
+    set -l from_teams (__pa_teams)
+    printf '%s\n' $from_tickets $from_teams | sort -u
+end
+
 # --- Disable file completions for pa ---
 complete -c pa -f
 
 # --- Subcommands ---
 complete -c pa -n __fish_use_subcommand -a teams        -d 'List available teams'
+complete -c pa -n __fish_use_subcommand -a board        -d 'Show kanban board'
 complete -c pa -n __fish_use_subcommand -a deploy       -d 'Deploy an agent team'
 complete -c pa -n __fish_use_subcommand -a daily        -d 'Daily lifecycle (plan|progress|end)'
 complete -c pa -n __fish_use_subcommand -a status       -d 'Show deployment status'
@@ -114,6 +143,9 @@ complete -c pa -n __fish_use_subcommand -a idea         -d 'Log an idea interact
 complete -c pa -n __fish_use_subcommand -a report       -d 'Submit a bug report, feature request, or feedback'
 complete -c pa -n __fish_use_subcommand -a repos        -d 'Manage repository roots registry'
 complete -c pa -n __fish_use_subcommand -a requirements -d 'Requirements lifecycle (ideas)'
+complete -c pa -n __fish_use_subcommand -a serve        -d 'Start the agent API server'
+complete -c pa -n __fish_use_subcommand -a ticket       -d 'Manage tickets'
+complete -c pa -n __fish_use_subcommand -a bulletin     -d 'Manage bulletins (deploy-time blockers)'
 
 # --- deploy: <team> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
@@ -151,6 +183,9 @@ complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (comman
 # --- remove-timer: <name> ---
 complete -c pa -n '__fish_seen_subcommand_from remove-timer' -a '(__pa_timer_names)' -d 'Timer to remove'
 
+# --- teams: <name> ---
+complete -c pa -n '__fish_seen_subcommand_from teams; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
+
 # --- repos: <subcommand> ---
 complete -c pa -n '__fish_seen_subcommand_from repos; and not __fish_seen_subcommand_from list' -a 'list' -d 'List registered repos'
 
@@ -160,3 +195,72 @@ complete -c pa -n '__fish_seen_subcommand_from requirements' -l force       -d '
 complete -c pa -n '__fish_seen_subcommand_from requirements' -l dry-run     -d 'Generate primer and print it, no execution'
 complete -c pa -n '__fish_seen_subcommand_from requirements' -l background  -d 'Run in background'
 complete -c pa -n '__fish_seen_subcommand_from requirements' -l interactive -d 'Run in foreground, user approves each tool call'
+
+# --- board: flags ---
+complete -c pa -n '__fish_seen_subcommand_from board' -l project  -d 'Filter by project' -r -a '(__pa_projects)'
+complete -c pa -n '__fish_seen_subcommand_from board' -l assignee -d 'Filter by assignee' -r -a '(__pa_assignees)'
+
+# --- serve: flags ---
+complete -c pa -n '__fish_seen_subcommand_from serve' -l port       -d 'Port to listen on' -r
+complete -c pa -n '__fish_seen_subcommand_from serve' -l host       -d 'Host address to bind to' -r
+complete -c pa -n '__fish_seen_subcommand_from serve' -l background -d 'Run in background mode'
+complete -c pa -n '__fish_seen_subcommand_from serve' -l cors       -d 'Enable CORS headers'
+
+# --- ticket: nested subcommands ---
+complete -c pa -n '__fish_seen_subcommand_from ticket; and not __fish_seen_subcommand_from create update list show attach comment' -a 'create update list show attach comment'
+
+# ticket create
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l project  -d 'Project name (key from repos.yaml)' -r -a '(__pa_projects)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l title    -d 'Ticket title' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l type     -d 'Ticket type' -r -a 'feature bug task review-request work-report fyi idea question'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l assignee -d 'Assignee' -r -a '(__pa_assignees)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l priority -d 'Priority' -r -a 'critical high medium low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l estimate -d 'Effort estimate' -r -a 'XS S M L XL'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l summary  -d 'Short summary' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l tags     -d 'Comma-separated tags' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l doc-ref  -d 'Document reference path' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l blocked-by -d 'Comma-separated blocking ticket IDs' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l actor    -d 'Actor for audit log' -r
+
+# ticket update <ID>
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l status   -d 'New status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l assignee -d 'New assignee' -r -a '(__pa_assignees)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l priority -d 'New priority' -r -a 'critical high medium low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l estimate -d 'New estimate' -r -a 'XS S M L XL'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l tags     -d 'Comma-separated tags (replaces existing)' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l blocked-by -d 'Comma-separated blocking ticket IDs (empty to clear)' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l doc-ref  -d 'Document reference path' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l actor    -d 'Actor for audit log' -r
+
+# ticket list
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l project  -d 'Filter by project' -r -a '(__pa_projects)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l status   -d 'Filter by status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l assignee -d 'Filter by assignee' -r -a '(__pa_assignees)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority -d 'Filter by priority' -r -a 'critical high medium low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l type     -d 'Filter by type' -r -a 'feature bug task review-request work-report fyi idea question'
+
+# ticket show <ID>
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
+
+# ticket attach <ID>
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from attach; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from attach' -l file  -d 'File path or doc-ref to attach' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from attach' -l actor -d 'Actor for audit log' -r
+
+# ticket comment <ID>
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from comment; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from comment' -l author  -d 'Comment author' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from comment' -l content -d 'Comment content' -r
+
+# --- bulletin: nested subcommands ---
+complete -c pa -n '__fish_seen_subcommand_from bulletin; and not __fish_seen_subcommand_from create list resolve' -a 'create list resolve'
+
+# bulletin create
+complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from create' -l title   -d 'Bulletin title' -r
+complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from create' -l block   -d 'Teams to block ("all" or comma-separated)' -r -a 'all (__pa_teams)'
+complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from create' -l except  -d 'Comma-separated teams exempt from bulletin' -r -a '(__pa_teams)'
+complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from create' -l message -d 'Bulletin body message' -r
+
+# bulletin resolve <ID>
+complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from resolve; and not __fish_seen_subcommand_from (__pa_bulletin_ids)' -a '(__pa_bulletin_ids)' -d 'Bulletin ID'
