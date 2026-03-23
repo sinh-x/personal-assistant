@@ -214,7 +214,7 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l title    -d 'Ticket title' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l type     -d 'Ticket type' -r -a 'feature bug task review-request work-report fyi idea question'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l assignee -d 'Assignee' -r -a '(__pa_assignees)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l priority -d 'Priority' -r -a 'critical high normal low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l priority -d 'Priority' -r -a 'critical high medium low'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l estimate -d 'Effort estimate' -r -a 'XS S M L XL'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l summary  -d 'Short summary' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l tags     -d 'Comma-separated tags' -r
@@ -226,7 +226,7 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l status   -d 'New status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l assignee -d 'New assignee' -r -a '(__pa_assignees)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l priority -d 'New priority' -r -a 'critical high normal low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l priority -d 'New priority' -r -a 'critical high medium low'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l estimate -d 'New estimate' -r -a 'XS S M L XL'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l tags     -d 'Comma-separated tags (replaces existing)' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l blocked-by -d 'Comma-separated blocking ticket IDs (empty to clear)' -r
@@ -237,7 +237,7 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l project  -d 'Filter by project' -r -a '(__pa_projects)'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l status   -d 'Filter by status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l assignee -d 'Filter by assignee' -r -a '(__pa_assignees)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority -d 'Filter by priority' -r -a 'critical high normal low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority -d 'Filter by priority' -r -a 'critical high medium low'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l type     -d 'Filter by type' -r -a 'feature bug task review-request work-report fyi idea question'
 
 # ticket show <ID>

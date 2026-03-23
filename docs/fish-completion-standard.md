@@ -136,7 +136,7 @@ Key rules for dynamic helpers:
 |------|-------------|
 | `--type` (ticket create) | `feature` `bug` `task` `review-request` `work-report` `fyi` `idea` `question` |
 | `--status` (ticket update/list) | `idea` `requirement-review` `pending-approval` `pending-implementation` `implementing` `review-uat` `done` `rejected` `cancelled` |
-| `--priority` | `critical` `high` `normal` `low` |
+| `--priority` | `critical` `high` `medium` `low` |
 | `--estimate` | `XS` `S` `M` `L` `XL` |
 | `--mode` (deploy) | dynamic via `__pa_modes` |
 | `--team-model` / `--agent-model` | `haiku` `sonnet` `opus` |
