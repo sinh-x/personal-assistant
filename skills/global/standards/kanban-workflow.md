@@ -31,7 +31,7 @@ No team may skip to `done` except Sinh (via UAT sign-off). The correct advanceme
 When advancing a ticket's status, the actor **MUST** also set `team` and/or `assignee` to the next owner.
 If status is advanced without setting team/assignee, the CLI warns: `"Status advanced without setting team/assignee — ticket may be orphaned."`
 
-**Additionally:** When advancing to `pending-approval` or `review-uat`, the actor **MUST** set `--doc-ref` pointing to the requirements doc or implementation artifact. If `doc_ref` is empty at these gates, the CLI warns to stderr and adds the `needs-doc-ref` tag automatically. The transition still succeeds (soft enforcement) — but the tag signals the gap to sprint-master.
+**Additionally:** When advancing to `pending-approval` or `review-uat`, the actor **MUST** add a `--doc-ref` pointing to the requirements doc or implementation artifact. If `doc_refs` is empty at these gates, the CLI warns to stderr and adds the `needs-doc-ref` tag automatically. The transition still succeeds (soft enforcement) — but the tag signals the gap to sprint-master.
 
 Every active ticket must have an owner. Sprint-master flags unowned active tickets during triage.
 
@@ -85,7 +85,7 @@ Raw thought, request, or signal. Not yet scoped or committed.
 The idea is being elaborated into a scoped, actionable requirement.
 - Requirements team writes a requirements doc → saves to `agent-teams/requirements/artifacts/`
 - If the ticket is unclear: add a comment, assign back to author — do NOT guess intent
-- When complete: attach `doc_ref`, create a review-request ticket, move to `pending-approval`
+- When complete: add a `doc_ref` entry, create a review-request ticket, move to `pending-approval`
 
 **Sinh gate — required before leaving this status.** Requirements team does not self-advance.
 

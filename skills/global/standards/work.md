@@ -71,28 +71,28 @@ pa ticket update <ticket-id> --status implementing --assignee <team>/<agent-name
 
 ```bash
 # Builder / maintenance / house-chores → advance to UAT review
-# Always include --doc-ref pointing to implementation artifact
+# Always include --doc-ref pointing to implementation artifact (type: implementation)
 pa ticket update <ticket-id> --status review-uat --assignee sinh \
-  --doc-ref "agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"
+  --doc-ref "implementation:agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"
 
 # Requirements team → advance to approval gate
-# Always include --doc-ref pointing to requirements document
+# Always include --doc-ref pointing to requirements document (type: requirements)
 pa ticket update <ticket-id> --status pending-approval --assignee sinh \
-  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"
+  --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"
 ```
 
 ### Doc-ref requirement on handoff (mandatory)
 
 **Always set `--doc-ref` when advancing to `pending-approval` or `review-uat`.** This ensures downstream teams and Sinh can access the full context — plan document, requirements doc, or implementation artifact — without searching.
 
-If you advance without `--doc-ref` and the ticket has no `doc_ref` already set:
+If you advance without `--doc-ref` and the ticket has no `doc_refs` already:
 - The CLI prints a warning to stderr (transition still succeeds — soft enforcement)
 - The `needs-doc-ref` tag is automatically added to the ticket
 - Sprint-master monitors `needs-doc-ref` tickets during triage and escalates
 
-Attach the document retroactively if you forgot:
+Add the document retroactively if you forgot:
 ```bash
-pa ticket update <ticket-id> --doc-ref "path/to/doc.md"
+pa ticket update <ticket-id> --doc-ref "[type:]path/to/doc.md"
 ```
 
 ---
@@ -161,9 +161,10 @@ Before advancing a ticket to `pending-approval` or `review-uat`, complete these 
 cp <draft-output> ~/Documents/ai-usage/agent-teams/<team>/artifacts/YYYY-MM-DD-<descriptive-name>.md
 ```
 
-**Step 2 — Attach to the ticket:**
+**Step 2 — Add to the ticket's doc_refs:**
 ```bash
-pa ticket update <ticket-id> --doc-ref "agent-teams/<team>/artifacts/YYYY-MM-DD-<descriptive-name>.md"
+# Use typed format: requirements:, spike:, implementation:, review-report:, or attachment:
+pa ticket update <ticket-id> --doc-ref "[type]:agent-teams/<team>/artifacts/YYYY-MM-DD-<descriptive-name>.md"
 ```
 
 **Step 3 — Advance the ticket (only after Steps 1 and 2):**
@@ -175,7 +176,7 @@ pa ticket update <ticket-id> --status review-uat --assignee sinh         # build
 
 **Why this order matters:** Advancing first and saving later risks leaving the ticket pointing to nothing if the session is interrupted. Always: save → attach → advance.
 
-> If you forgot: run `pa ticket update <id> --doc-ref <path>` retroactively. The CLI warns and adds the `needs-doc-ref` tag automatically if you skip this step.
+> If you forgot: run `pa ticket update <id> --doc-ref [type:]<path>` retroactively. The CLI warns and adds the `needs-doc-ref` tag automatically if you skip this step.
 
 ---
 
@@ -303,7 +304,7 @@ Save to `sessions/YYYY/MM/agent-team/` with ticket ID in filename. The log prese
 
 **Artifacts** (deliverables, analysis reports, requirements docs):
 - Save to `agent-teams/<team>/artifacts/YYYY-MM-DD-<descriptive-name>.md`
-- Link from ticket via `--doc-ref` or `pa ticket attach`
+- Link from ticket via `--doc-ref [type:]<path>` (additive — does not overwrite existing doc_refs)
 
 **Do NOT write standalone work-report files to `sinh-inputs/inbox/`.** That protocol is deprecated. All reporting happens through ticket comments and linked artifacts.
 
@@ -328,13 +329,13 @@ pa ticket create \
   --assignee <downstream-team-if-approved> \
   --priority high \
   --estimate M \
-  --doc-ref "agent-teams/<team_name>/artifacts/YYYY-MM-DD-<descriptive-name>.md" \
+  --doc-ref "[type]:agent-teams/<team_name>/artifacts/YYYY-MM-DD-<descriptive-name>.md" \
   --summary "<what was built; what Sinh needs to review; what happens if approved>"
 ```
 
 The `--assignee` field is the downstream team that receives the work if Sinh approves. Sinh updates ticket status to route it.
 
-The `--doc-ref` points to the full deliverable in `artifacts/`. Sinh reads the ticket summary first, then opens the artifact for details.
+The `--doc-ref` adds an entry to `doc_refs[]` pointing to the full deliverable in `artifacts/`. Sinh reads the ticket summary first, then opens the artifact for details.
 
 **Use this flow for:** requirements docs, implementation plans, analysis reports, any output needing human review.
 **Do NOT use for:** routine session completions — add a ticket comment instead (see §Ticket-centric Output Flow).
@@ -414,12 +415,12 @@ pa ticket comment <ticket-id> --content "BLOCKED: <reason>. Waiting on: <depende
 # When implementation complete — builder / maintenance / house-chores → UAT
 # Always include --doc-ref (see §Doc-ref requirement on handoff)
 pa ticket update <ticket-id> --status review-uat --assignee sinh \
-  --doc-ref "agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"
+  --doc-ref "implementation:agent-teams/<team>/artifacts/YYYY-MM-DD-<topic>.md"
 
 # When requirements complete — requirements team → approval gate
 # Always include --doc-ref (see §Doc-ref requirement on handoff)
 pa ticket update <ticket-id> --status pending-approval --assignee sinh \
-  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"
+  --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"
 ```
 
 ### Create tickets for discovered work

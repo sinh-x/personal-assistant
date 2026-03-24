@@ -60,7 +60,7 @@ pa ticket show <TICKET-ID>
 
 Read the full ticket to understand:
 - Type (work-report, review-request, fyi, bug-report, feature, task)
-- Content and doc_ref
+- Content and doc_refs
 - Current team assignment (if any)
 - Priority and estimate
 
@@ -209,7 +209,7 @@ For each ticket tagged `needs-doc-ref`:
 2. **Add a comment requesting the missing document:**
    ```bash
    pa ticket comment <id> --author sprint-master \
-     --content "Missing doc_ref at <status> gate. <team>: please attach document with 'pa ticket update <id> --doc-ref <path>'."
+     --content "Missing doc_refs at <status> gate. <team>: please attach document with 'pa ticket update <id> --doc-ref [type:]<path>'."
    ```
 3. **Do NOT block the ticket status** — the team can still work; the tag surfaces the gap
 4. **Once attached:** the originating team should remove the tag via `pa ticket update <id> --tags ""` (or update tags list without `needs-doc-ref`). Sprint-master confirms removal during the next triage run.

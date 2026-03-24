@@ -1,13 +1,13 @@
 # Impact Analysis — Standard Practice
 
-Use this practice when a ticket has a `doc_ref` pointing to a plan or requirements document. Identifying impact before implementation prevents surprises and focuses the implementation on the right scope.
+Use this practice when a ticket has `doc_refs` pointing to a plan or requirements document. Identifying impact before implementation prevents surprises and focuses the implementation on the right scope.
 
 ---
 
 ## When to Run
 
 Run impact analysis **after reading the plan/ticket** and **before writing any code**:
-- Requirements phase: during Phase 3 (technical exploration) when the ticket has `doc_ref`
+- Requirements phase: during Phase 3 (technical exploration) when the ticket has `doc_refs`
 - Builder phase: during pre-flight, before executing the first phase
 
 ---

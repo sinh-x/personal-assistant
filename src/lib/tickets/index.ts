@@ -5,6 +5,8 @@ export type {
   Estimate,
   Comment,
   AuditEntry,
+  DocRef,
+  AddDocRefInput,
   Ticket,
   CreateTicketInput,
   UpdateTicketInput,
