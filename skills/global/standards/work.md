@@ -522,3 +522,37 @@ Good example:
 | `prompt` | The primer or objective wording needs tuning | Edit deploy.sh or daily.sh |
 
 These suggestions are aggregated by the daily-end summary team into the daily report for review and action.
+
+---
+
+## 10. Living Document Convention
+
+Requirements documents produced by the requirements team are **living documents** — builders update them during implementation to reflect actual progress.
+
+**Who updates them:** Builder and orchestrator teams, during implementation phases.
+
+**What gets updated:**
+- `§4 In Scope` — items checked off with `[!NOTE]` verification callouts as they are implemented
+- `§10 Acceptance Criteria` — items checked off with `[!NOTE]` callouts when satisfied, or `[!CAUTION]` when not verifiable
+
+**What does NOT change:** §1–§3, §5–§9, §11–§13. §12 Implementation Plan phases use the existing `- [ ] Phase N` → `- [x] Phase N` convention (unchanged).
+
+**Update pattern (verified item):**
+```markdown
+- [x] Item
+
+> [!NOTE] **Implementation Note** (<agent>, <deployment_id>, <date>)
+> Verified: <evidence>.
+```
+
+**Update pattern (unverified item):**
+```markdown
+- [ ] Item
+
+> [!CAUTION] **Not Verified** (<agent>, <deployment_id>, <date>)
+> Could not verify: <reason>.
+```
+
+**Purpose:** When Sinh opens a requirements doc at `review-uat`, the checked/unchecked items and verification callouts provide immediate UAT evidence — no need to cross-reference commit logs.
+
+**Full protocol:** See `skills/builder.md` §6 — Living Document Protocol.

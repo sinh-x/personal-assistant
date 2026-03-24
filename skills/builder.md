@@ -149,6 +149,56 @@ After verification passes:
 - **Check done condition** — see §Multi-Phase Completion Logic below
 - Add a brief completion comment on the ticket: `pa ticket comment <id> --author team-manager --content "Completed phase N: <summary>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"`
 
+### 6. Living Document Protocol
+
+After completing each phase, update the requirements doc to reflect what was implemented.
+
+**Find the requirements doc:**
+```bash
+# The requirements doc is in doc_refs[] with type: 'requirements'
+pa ticket show <id>
+# Look for the entry with "type": "requirements" — read that path
+```
+
+Read the doc from the path listed. If no `requirements`-type `doc_ref` exists, skip this step — no error.
+
+**For each In Scope item (§4) addressed by this phase**, change `- [ ]` → `- [x]` and add a callout directly below:
+
+```markdown
+- [x] Item description
+
+> [!NOTE] **Implementation Note** (builder/team-manager, d-abc123, 2026-03-25)
+> Verified: <brief verification evidence>. Implemented in Phase N.
+```
+
+**For each Acceptance Criteria item (§10) now satisfied**, change `- [ ]` → `- [x]` and add a callout:
+
+```markdown
+- [x] AC1: Criterion description
+
+> [!NOTE] **Implementation Note** (builder/team-manager, d-abc123, 2026-03-25)
+> Verified: <evidence>. Implemented in Phase N.
+```
+
+**For items you could not verify** (leave unchecked), add a `[!CAUTION]` callout:
+
+```markdown
+- [ ] AC2: Criterion description
+
+> [!CAUTION] **Not Verified** (builder/team-manager, d-abc123, 2026-03-25)
+> Could not verify: <reason>. Requires: <what is needed to verify this>.
+```
+
+**Rules:**
+- Write the doc back **in-place** — overwrite the same path. Do NOT copy or rename.
+- **Only update §4 In Scope and §10 Acceptance Criteria.** Do not touch §1–§3, §5–§9, §11–§13.
+- §12 Implementation Plan phase checkboxes use the existing `- [ ] Phase N` → `- [x] Phase N` convention (unchanged, handled in §5 above).
+
+**At final handoff to `review-uat`**, add a summary comment on the ticket:
+```bash
+pa ticket comment <id> --author team-manager --content "Implementation complete. Scope: N/M items checked. AC: X/Y checked. Requirements doc updated in-place."
+```
+
 ## Workflow
 
 ### On Each Deployment
