@@ -63,7 +63,8 @@ program
   .option("--list-modes", "List available modes for the team and exit")
   .option("--repo <name>", "Target repo name from repos.yaml (overrides CWD-based detection)")
   .option("--ticket <id>", "Link deployment to a ticket")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string }) => {
+  .option("--validate", "Validate team config, skill files, mode files, and template variables without deploying")
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean }) => {
     deployCommand(team, opts);
   });
 

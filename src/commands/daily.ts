@@ -61,7 +61,7 @@ export function dailyCommand(
     DAILY_INBOX: dailyInbox,
     GATHER_REPORT: `${dailyInbox}/${today}-end-gather.md`,
     READY_MARKER: `${dailyInbox}/${today}-end-ready.md`,
-    DRAFT_PATH: `${home}/Documents/ai-usage/sinh-inputs/inbox/${today}-plan-draft.md`,
+    DRAFT_PATH: `${outputDir}/${today}-plan-draft.md`,
   };
 
   // Build deploy opts
