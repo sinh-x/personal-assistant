@@ -573,6 +573,7 @@ export class TicketStore {
     type?: string;
     tags?: string[];
     excludeTags?: string[];
+    search?: string;
   } = {}): Ticket[] {
     const files = readdirSync(this.dir).filter(
       (f) => f.endsWith(".json") && f !== "counter.json"
@@ -599,6 +600,11 @@ export class TicketStore {
       }
       if (filters.excludeTags?.length) {
         if (filters.excludeTags.some((tag) => t.tags.includes(tag))) return false;
+      }
+      if (filters.search) {
+        const needle = filters.search.toLowerCase();
+        const haystack = `${t.id} ${t.title} ${t.summary}`.toLowerCase();
+        if (!haystack.includes(needle)) return false;
       }
       return true;
     });
