@@ -127,6 +127,7 @@
               util-linux
               systemd
               git
+              git-cliff
               # TypeScript
               nodejs_22
               pnpm
