@@ -574,6 +574,7 @@ export class TicketStore {
     type?: string;
     tags?: string[];
     excludeTags?: string[];
+    excludeTypes?: string[];
     search?: string;
   } = {}): Ticket[] {
     const files = readdirSync(this.dir).filter(
@@ -601,6 +602,9 @@ export class TicketStore {
       }
       if (filters.excludeTags?.length) {
         if (filters.excludeTags.some((tag) => t.tags.includes(tag))) return false;
+      }
+      if (filters.excludeTypes?.length) {
+        if (filters.excludeTypes.includes(t.type)) return false;
       }
       if (filters.search) {
         const needle = filters.search.toLowerCase();

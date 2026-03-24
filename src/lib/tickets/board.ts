@@ -49,6 +49,7 @@ export function buildBoardView(
     assignee?: string;
     priority?: string;
     excludeTags?: string[];
+    excludeTypes?: string[];
   } = {}
 ): BoardView {
   const store = new TicketStore();
@@ -136,7 +137,7 @@ export function getTeamStatusSummaries(
  */
 export function getTeamBoard(
   team: string,
-  filters: { project?: string; excludeTags?: string[] } = {}
+  filters: { project?: string; excludeTags?: string[]; excludeTypes?: string[] } = {}
 ): BoardView & { team: string } {
   const store = new TicketStore();
   const tickets = store.list({ assignee: team, ...filters });

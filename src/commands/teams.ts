@@ -253,7 +253,7 @@ function showOneTeam(name: string, all = false): void {
 /** Show project-wide kanban board, optionally filtered by assignee */
 function showBoard(
   project?: string,
-  filters: { assignee?: string; excludeTags?: string[] } = {}
+  filters: { assignee?: string; excludeTags?: string[]; excludeTypes?: string[] } = {}
 ): void {
   let board: BoardView;
   try {
@@ -302,7 +302,7 @@ function showBoard(
  */
 export function boardCommand(
   project?: string,
-  filters: { assignee?: string; excludeTags?: string[] } = {}
+  filters: { assignee?: string; excludeTags?: string[]; excludeTypes?: string[] } = {}
 ): void {
   showBoard(project, filters);
 }
