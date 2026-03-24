@@ -26,10 +26,11 @@ program
 
 program
   .command("teams")
-  .description("Show agent team workflow status (inbox/ongoing/wfr counts). With [name]: show folder detail for one team.")
+  .description("Show agent team workflow status. Active tickets only by default. With [name]: show board for one team.")
   .argument("[name]", "Team name for detailed view")
-  .action((name?: string) => {
-    teamsCommand(name);
+  .option("--all", "Show all tickets including backlog, archived, and terminal")
+  .action((name: string | undefined, opts: { all?: boolean }) => {
+    teamsCommand(name, opts);
   });
 
 program
@@ -97,7 +98,9 @@ program
   .option("--report", "Show the work report for a deployment")
   .option("--artifacts", "List artifact files for a deployment")
   .option("--activity", "Show agent activity timeline for a deployment")
-  .action((deployId: string | undefined, opts: { running?: boolean; team?: string; wait?: boolean; report?: boolean; artifacts?: boolean; activity?: boolean }) => {
+  .option("--recent <n>", "Show only the N most recent deployments")
+  .option("--today", "Show only today's deployments")
+  .action((deployId: string | undefined, opts: { running?: boolean; team?: string; wait?: boolean; report?: boolean; artifacts?: boolean; activity?: boolean; recent?: string; today?: boolean }) => {
     const args: string[] = [];
     if (opts.running) {
       args.push("--running");
@@ -110,6 +113,8 @@ program
       else if (opts.artifacts) args.push("--artifacts");
       else if (opts.activity) args.push("--activity");
     }
+    if (opts.recent) args.push("--recent", opts.recent);
+    if (opts.today) args.push("--today");
     statusCommand(args);
   });
 

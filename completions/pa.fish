@@ -176,6 +176,8 @@ complete -c pa -n '__fish_seen_subcommand_from status' -l wait      -d 'Block un
 complete -c pa -n '__fish_seen_subcommand_from status' -l report    -d 'Show the work report for a deployment'
 complete -c pa -n '__fish_seen_subcommand_from status' -l artifacts -d 'List artifact files for a deployment'
 complete -c pa -n '__fish_seen_subcommand_from status' -l activity  -d 'Show agent activity timeline for a deployment'
+complete -c pa -n '__fish_seen_subcommand_from status' -l recent    -d 'Show only the N most recent deployments' -r
+complete -c pa -n '__fish_seen_subcommand_from status' -l today     -d 'Show only today\'s deployments'
 
 # --- schedule: <spec> <repeat> ---
 complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (commandline -opc)) -eq 2' -a '(__pa_teams) daily:plan daily:progress daily:end' -d 'Team or daily:<mode>'
@@ -184,8 +186,9 @@ complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (comman
 # --- remove-timer: <name> ---
 complete -c pa -n '__fish_seen_subcommand_from remove-timer' -a '(__pa_timer_names)' -d 'Timer to remove'
 
-# --- teams: <name> ---
+# --- teams: <name> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from teams; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
+complete -c pa -n '__fish_seen_subcommand_from teams' -l all -d 'Show all tickets including backlog, archived, and terminal'
 
 # --- repos: <subcommand> ---
 complete -c pa -n '__fish_seen_subcommand_from repos; and not __fish_seen_subcommand_from list' -a 'list' -d 'List registered repos'

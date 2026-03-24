@@ -167,16 +167,48 @@ function showDetail(did: string, rec: DeploymentRecord): void {
   }
 }
 
+/** Build today's local date string as YYYY-MM-DD */
+function todayLocalDate(): string {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+/** Convert an ISO timestamp to its local date string YYYY-MM-DD */
+function toLocalDate(ts: string): string {
+  const d = new Date(ts);
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
 /** Show list view of deployments */
 function showList(
   deployments: Map<string, DeploymentRecord>,
   filterMode: string,
-  filterValue: string
+  filterValue: string,
+  opts: { recent?: number; today?: boolean } = {}
 ): void {
   // Sort by start time, most recent first
-  const sorted = [...deployments.entries()].sort((a, b) =>
+  let sorted = [...deployments.entries()].sort((a, b) =>
     b[1].started.localeCompare(a[1].started)
   );
+
+  // Apply --today filter: keep only deployments started today (local date)
+  if (opts.today) {
+    const today = todayLocalDate();
+    sorted = sorted.filter(([, rec]) => toLocalDate(rec.started) === today);
+  }
+
+  // Apply --recent N filter: keep only the N most recent
+  if (opts.recent !== undefined && opts.recent > 0) {
+    sorted = sorted.slice(0, opts.recent);
+  }
 
   // Header — matches bash printf format
   console.log(
@@ -449,8 +481,32 @@ export function statusCommand(args: string[]): void {
     return;
   }
 
-  const filterMode = args[0] ?? "all";
-  const filterValue = args[1] ?? "";
+  // Extract --recent N and --today, build clean args for existing logic
+  let recent: number | undefined;
+  const recentIdx = args.indexOf("--recent");
+  if (recentIdx >= 0) {
+    const val = parseInt(args[recentIdx + 1] ?? "", 10);
+    if (!isNaN(val) && val > 0) recent = val;
+  }
+  const today = args.includes("--today");
+
+  if (recent !== undefined && today) {
+    console.error("Error: --recent and --today are mutually exclusive.");
+    process.exit(1);
+  }
+
+  const cleanArgs: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--recent") {
+      i++; // skip value
+      continue;
+    }
+    if (args[i] === "--today") continue;
+    cleanArgs.push(args[i]);
+  }
+
+  const filterMode = cleanArgs[0] ?? "all";
+  const filterValue = cleanArgs[1] ?? "";
 
   // Check for new flags: <deploy-id> --wait | --report | --artifacts
   if (filterValue === "--wait") {
@@ -487,5 +543,5 @@ export function statusCommand(args: string[]): void {
   }
 
   // List view
-  showList(deployments, filterMode, filterValue);
+  showList(deployments, filterMode, filterValue, { recent, today });
 }
