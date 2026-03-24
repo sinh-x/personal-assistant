@@ -38,6 +38,18 @@ function formatDate(d: Date): string {
 }
 
 /**
+ * Scan primer content for unresolved {{KEY}} template variables and emit stderr warnings.
+ * Soft warning only — does not modify or reject the primer.
+ */
+function scanUnresolvedVars(primer: string): void {
+  const matches = primer.match(/\{\{[A-Z_]+\}\}/g);
+  if (!matches) return;
+  for (const v of [...new Set(matches)]) {
+    process.stderr.write(`Warning: unresolved template variable ${v} in primer\n`);
+  }
+}
+
+/**
  * Apply {{KEY}} template variable substitution to content.
  * Backward compatible — files without {{VAR}} placeholders pass through unchanged.
  */
@@ -136,6 +148,7 @@ export function generatePrimer(opts: PrimerOptions): string {
     MODE_ID: deployMode ?? "",
     DEPLOY_ID: deployId,
     ...(expandedOutputDir ? { OUTPUT_DIR: `${expandedOutputDir}/${yearStr}/${monthStr}` } : {}),
+    ...(repoRoot ? { REPO_KEY: resolveRepoSlug(repoRoot) } : {}),
   };
   // Caller-provided vars override standard vars (e.g. daily.ts sets TODAY to a custom date)
   const allTemplateVars: Record<string, string> = { ...standardVars, ...(opts.templateVars ?? {}) };
@@ -430,5 +443,6 @@ When spawning unplanned sub-agents, use this policy:
 `;
   }
 
+  scanUnresolvedVars(primer);
   return primer;
 }

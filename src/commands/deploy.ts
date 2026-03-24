@@ -109,6 +109,7 @@ export function deployCommand(
     listModes?: boolean;
     repo?: string;
     ticket?: string;
+    validate?: boolean;
     /** Template variables to substitute in mode objective files */
     templateVars?: Record<string, string>;
   }
@@ -169,6 +170,95 @@ export function deployCommand(
   if (opts.listModes) {
     printModesTable(teamConfig.name, teamConfig.deploy_modes);
     return;
+  }
+
+  // Handle --validate: check skill files, mode objective files, and template vars without deploying
+  if (opts.validate) {
+    let allOk = true;
+    const rows: Array<{ status: string; path: string; note: string }> = [];
+
+    // Check each agent skill file
+    for (const agent of teamConfig.agents) {
+      if (agent.skill) {
+        const skillPath = resolveFile(agent.skill);
+        if (skillPath && existsSync(skillPath)) {
+          rows.push({ status: "OK", path: agent.skill, note: `agent:${agent.name} skill` });
+        } else {
+          rows.push({ status: "MISSING", path: agent.skill, note: `agent:${agent.name} skill` });
+          allOk = false;
+        }
+      }
+    }
+
+    // Check each mode objective file
+    const modes = teamConfig.deploy_modes ?? [];
+    if (opts.mode !== undefined) {
+      const singleMode = modes.find((m) => m.id === opts.mode);
+      if (!singleMode) {
+        console.error(`Error: Invalid mode "${opts.mode}" for team: ${teamConfig.name}`);
+        printModesTable(teamConfig.name, modes);
+        process.exit(1);
+      }
+    }
+    for (const m of modes) {
+      if (m.objective) {
+        const objPath = resolveFile(m.objective);
+        if (objPath && existsSync(objPath)) {
+          rows.push({ status: "OK", path: m.objective, note: `mode:${m.id} objective` });
+        } else {
+          rows.push({ status: "MISSING", path: m.objective, note: `mode:${m.id} objective` });
+          allOk = false;
+        }
+      }
+    }
+
+    // Generate primer with dummy vars and scan for unresolved template variables
+    const dummyVars: Record<string, string> = {
+      TODAY: "YYYY-MM-DD", YEAR: "YYYY", MONTH: "MM",
+      HOME: "/home/user", TEAM_NAME: teamName, MODE_ID: opts.mode ?? "",
+      DEPLOY_ID: "d-000000", OUTPUT_DIR: "/home/user/Documents/ai-usage/output",
+      REPO_KEY: "repo",
+    };
+    const primerForValidation = generatePrimer({
+      deployId: "d-000000",
+      teamName,
+      teamConfig,
+      teamFile,
+      deployTs: new Date().toISOString(),
+      registryFile,
+      registryLock,
+      deploymentsDir,
+      deployMode: opts.mode,
+      cwd: process.cwd(),
+      repoRoot: undefined,
+      resolveFile,
+      configDir: config.configDir,
+      homeDir: paHome,
+      effectiveModels: undefined,
+      templateVars: dummyVars,
+    });
+    const unresolvedMatches = primerForValidation.match(/\{\{[A-Z_]+\}\}/g);
+    const unresolved = [...new Set(unresolvedMatches ?? [])];
+
+    // Print summary
+    console.log(`\nValidation: ${teamConfig.name}`);
+    console.log(`${"─".repeat(60)}`);
+    const statusWidth = 7;
+    const noteWidth = 30;
+    for (const row of rows) {
+      const s = row.status.padEnd(statusWidth);
+      const n = row.note.padEnd(noteWidth);
+      console.log(`  ${s}  ${n}  ${row.path}`);
+    }
+    if (unresolved.length > 0) {
+      console.log(`\n  WARN    Unresolved template variables:`);
+      for (const v of unresolved) {
+        console.log(`           ${v}`);
+      }
+      allOk = false;
+    }
+    console.log(`\n${allOk ? "  ✓ All checks passed." : "  ✗ Validation failed — see MISSING/WARN above."}`);
+    process.exit(allOk ? 0 : 1);
   }
 
   // Validate --mode before workspace creation, primer generation, or registry write
