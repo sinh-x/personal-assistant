@@ -13,11 +13,13 @@ import { getTicketsDir } from "../paths.js";
 import { matchAssignee } from "./validate.js";
 import type {
   Ticket,
+  DocRef,
   AuditEntry,
   Comment,
   CounterStore,
   CreateTicketInput,
   UpdateTicketInput,
+  AddDocRefInput,
 } from "./types.js";
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
 import { resolveProject } from "../repos.js";
@@ -258,7 +260,7 @@ export class TicketStore {
 
     // F1: Remind about doc_ref for types that benefit from review context
     const typesNeedingDocRef = ["task", "feature", "review-request"];
-    if (typesNeedingDocRef.includes(ticket.type) && !ticket.doc_ref) {
+    if (typesNeedingDocRef.includes(ticket.type) && ticket.doc_refs.length === 0) {
       process.stderr.write("Reminder: Consider attaching --doc-ref for review context\n");
     }
 
@@ -300,29 +302,35 @@ export class TicketStore {
       }
     }
 
-    // Step 0b: Warn when advancing to a review gate without doc_ref
+    // Extract special doc_ref operation fields (not spread into ticket data)
+    const addDocRefInput: AddDocRefInput | undefined = (input as Record<string, unknown>).add_doc_ref as AddDocRefInput | undefined;
+    const removeDocRefPath: string | undefined = (input as Record<string, unknown>).remove_doc_ref as string | undefined;
+    const { add_doc_ref: _addDocRef, remove_doc_ref: _removeDocRef, ...restInput } = input as Record<string, unknown>;
+
+    const hasDocRefs = (ticket.doc_refs?.length ?? 0) > 0 || !!addDocRefInput;
+
+    // Step 0b: Warn when advancing to a review gate without doc_refs
     if (
       (input.status === "pending-approval" || input.status === "review-uat") &&
-      !input.doc_ref &&
-      !ticket.doc_ref
+      !hasDocRefs
     ) {
       process.stderr.write(
         `Warning: Advancing to ${input.status} without doc_ref — ticket may lack review context\n`
       );
       // Inject needs-doc-ref tag (additive — preserves existing tags)
-      const existingTags = input.tags ?? ticket.tags ?? [];
+      const existingTags = (restInput.tags as string[] | undefined) ?? ticket.tags ?? [];
       if (!existingTags.includes("needs-doc-ref")) {
-        input.tags = [...existingTags, "needs-doc-ref"];
+        restInput.tags = [...existingTags, "needs-doc-ref"];
       }
     }
 
-    // Step 0c: Remind + suggest artifacts for ANY status advancement without doc_ref (F2, F3)
+    // Step 0c: Remind + suggest artifacts for ANY status advancement without doc_refs (F2, F3)
     if (input.status !== undefined) {
       const oldPos = PIPELINE_ORDER[ticket.status] ?? -1;
       const newPos = PIPELINE_ORDER[input.status] ?? -1;
-      if (newPos > oldPos && !input.doc_ref && !ticket.doc_ref) {
+      if (newPos > oldPos && !hasDocRefs) {
         process.stderr.write("Reminder: doc_ref not set. Consider attaching a document for review context.\n");
-        const suggestions = this.suggestArtifacts(input.assignee ?? ticket.assignee);
+        const suggestions = this.suggestArtifacts((restInput.assignee as string | undefined) ?? ticket.assignee);
         if (suggestions.length > 0) {
           let msg = "Suggested artifacts:\n";
           suggestions.forEach((s, i) => { msg += `  ${i + 1}. ${s.path} (${this.relativeDate(s.mtime)})\n`; });
@@ -335,7 +343,7 @@ export class TicketStore {
     const now = new Date().toISOString();
     const changes: Record<string, [unknown, unknown]> = {};
 
-    for (const [key, newVal] of Object.entries(input)) {
+    for (const [key, newVal] of Object.entries(restInput)) {
       const oldVal = ticket[key as keyof Ticket];
       if (JSON.stringify(oldVal) !== JSON.stringify(newVal)) {
         changes[key] = [oldVal, newVal];
@@ -343,7 +351,7 @@ export class TicketStore {
     }
 
     // Set resolvedAt when moving to a terminal status
-    const newStatus = input.status;
+    const newStatus = restInput.status as string | undefined;
     if (
       newStatus === "done" ||
       newStatus === "rejected" ||
@@ -351,23 +359,66 @@ export class TicketStore {
     ) {
       if (!ticket.resolvedAt) {
         changes["resolvedAt"] = [null, now];
-        (input as Record<string, unknown>)["resolvedAt"] = now;
+        restInput["resolvedAt"] = now;
       }
     }
 
     // Auto-manage `blocked` tag based on blockedBy field changes
-    if (input.blockedBy !== undefined) {
-      const currentTags: string[] = input.tags ?? ticket.tags ?? [];
-      const hasBlockedBy = input.blockedBy.length > 0;
+    const blockedByInput = restInput.blockedBy as string[] | undefined;
+    if (blockedByInput !== undefined) {
+      const currentTags: string[] = (restInput.tags as string[] | undefined) ?? ticket.tags ?? [];
+      const hasBlockedBy = blockedByInput.length > 0;
       const hasTag = currentTags.includes("blocked");
       if (hasBlockedBy && !hasTag) {
-        input.tags = [...currentTags, "blocked"];
+        restInput.tags = [...currentTags, "blocked"];
       } else if (!hasBlockedBy && hasTag) {
-        input.tags = currentTags.filter((t) => t !== "blocked");
+        restInput.tags = currentTags.filter((t) => t !== "blocked");
       }
     }
 
-    const updated: Ticket = { ...ticket, ...input, updatedAt: now };
+    // Process doc_ref mutations
+    let docRefs: DocRef[] = ticket.doc_refs ?? [];
+
+    if (removeDocRefPath) {
+      const before = docRefs;
+      docRefs = docRefs.filter((r) => r.path !== removeDocRefPath);
+      if (docRefs.length !== before.length) {
+        changes["doc_refs"] = [before, docRefs];
+        this.appendAudit({
+          ticket_id: id,
+          action: "doc_ref_removed",
+          actor,
+          timestamp: now,
+          changes: { doc_ref: [removeDocRefPath, null] },
+        });
+      }
+    }
+
+    if (addDocRefInput) {
+      const newRef: DocRef = {
+        type: addDocRefInput.type ?? "attachment",
+        path: addDocRefInput.path,
+        primary: addDocRefInput.primary ?? false,
+        addedAt: now,
+        addedBy: addDocRefInput.addedBy ?? actor,
+      };
+      // Demote existing primary if the new one is primary
+      if (newRef.primary) {
+        docRefs = docRefs.map((r) => ({ ...r, primary: false }));
+      }
+      const before = ticket.doc_refs ?? [];
+      docRefs = [...docRefs, newRef];
+      changes["doc_refs"] = [before, docRefs];
+      this.appendAudit({
+        ticket_id: id,
+        action: "doc_ref_added",
+        actor,
+        timestamp: now,
+        changes: { doc_ref: [null, newRef] },
+      });
+    }
+
+    const updated: Ticket = { ...ticket, ...(restInput as Partial<Ticket>), doc_refs: docRefs, updatedAt: now };
     writeFileSync(this.ticketPath(id), JSON.stringify(updated, null, 2));
 
     if (Object.keys(changes).length > 0) {
@@ -535,30 +586,11 @@ export class TicketStore {
   }
 
   /**
-   * Attach a file or doc_ref to a ticket.
+   * Attach a file or doc_ref to a ticket (adds a DocRef with type: 'attachment').
+   * Delegates to the additive doc_ref update path.
    */
   attach(id: string, attachment: string, actor: string): Ticket {
-    const ticket = this.get(id);
-    if (!ticket) throw new Error(`Ticket not found: ${id}`);
-
-    const now = new Date().toISOString();
-    const updated: Ticket = {
-      ...ticket,
-      attachments: [...ticket.attachments, attachment],
-      updatedAt: now,
-    };
-
-    writeFileSync(this.ticketPath(id), JSON.stringify(updated, null, 2));
-
-    this.appendAudit({
-      ticket_id: id,
-      action: "attached",
-      actor,
-      timestamp: now,
-      changes: { attachment: [null, attachment] },
-    });
-
-    return updated;
+    return this.update(id, { add_doc_ref: { type: "attachment", path: attachment } }, actor);
   }
 
   // ── Listing & filtering ───────────────────────────────────────────────────

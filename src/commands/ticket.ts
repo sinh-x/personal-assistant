@@ -7,6 +7,8 @@ import type {
   TicketPriority,
   TicketType,
   UpdateTicketInput,
+  AddDocRefInput,
+  DocRef,
 } from "../lib/tickets/index.js";
 
 const ESTIMATES: Estimate[] = ["XS", "S", "M", "L", "XL"];
@@ -30,6 +32,30 @@ function validateEstimate(value: string): Estimate {
     process.exit(1);
   }
   return value as Estimate;
+}
+
+/**
+ * Parse --doc-ref value: "[type:]path"
+ * - With colon: type is before colon, path is after
+ * - Without colon: type defaults to 'attachment' (backward compat — F15)
+ */
+function parseDocRef(raw: string, primary: boolean): AddDocRefInput {
+  const colonIdx = raw.indexOf(":");
+  if (colonIdx > 0) {
+    return { type: raw.slice(0, colonIdx), path: raw.slice(colonIdx + 1), primary };
+  }
+  return { type: "attachment", path: raw, primary };
+}
+
+/** Format a doc_refs table for show command */
+function formatDocRefsTable(docRefs: DocRef[]): string {
+  if (docRefs.length === 0) return "  (none)";
+  const header = "  TYPE".padEnd(22) + "PATH".padEnd(60) + "PRIMARY";
+  const sep = "  " + "-".repeat(80);
+  const rows = docRefs.map((r) =>
+    "  " + r.type.padEnd(20) + r.path.padEnd(60) + (r.primary ? "✓" : "")
+  );
+  return [header, sep, ...rows].join("\n");
 }
 
 /** Format a ticket row for the list view */
@@ -109,6 +135,17 @@ export function createTicketCommand(): Command {
         }
 
         const store = new TicketStore();
+        const initialDocRefs: DocRef[] = [];
+        if (opts.docRef) {
+          const parsed = parseDocRef(opts.docRef, true);
+          initialDocRefs.push({
+            type: parsed.type ?? "attachment",
+            path: parsed.path,
+            primary: true,
+            addedAt: new Date().toISOString(),
+            addedBy: opts.actor,
+          });
+        }
         const ticket = store.create(
           {
             project: opts.project,
@@ -121,11 +158,10 @@ export function createTicketCommand(): Command {
             description: "",
             assignee: opts.assignee,
             tags,
-            doc_ref: opts.docRef,
+            doc_refs: initialDocRefs,
             from: opts.from,
             to: opts.to,
             blockedBy: [],
-            attachments: [],
             comments: [],
           },
           opts.actor
@@ -147,7 +183,9 @@ export function createTicketCommand(): Command {
     .option("--tags <tags>", "Comma-separated tags (replaces existing)")
     .option("--blocked-by <ids>", "Comma-separated ticket IDs that block this ticket (replaces existing; empty string to clear)")
     .option("--estimate <size>", "New effort estimate (XS|S|M|L|XL)")
-    .option("--doc-ref <path>", "Document reference path (plan doc, requirements doc, etc.)")
+    .option("--doc-ref <value>", "Add document reference: [type:]path (ADDS to array, does not replace). Type defaults to 'attachment'.")
+    .option("--doc-ref-primary", "Mark the added doc-ref as primary (demotes any existing primary)")
+    .option("--remove-doc-ref <path>", "Remove a doc-ref by exact path match")
     .option("--actor <name>", "Actor for audit log", "cli-user")
     .action(
       (
@@ -160,6 +198,8 @@ export function createTicketCommand(): Command {
           blockedBy?: string;
           estimate?: string;
           docRef?: string;
+          docRefPrimary?: boolean;
+          removeDocRef?: string;
           actor: string;
         }
       ) => {
@@ -186,7 +226,12 @@ export function createTicketCommand(): Command {
         if (opts.estimate) {
           input.estimate = validateEstimate(opts.estimate);
         }
-        if (opts.docRef !== undefined) input.doc_ref = opts.docRef;
+        if (opts.docRef !== undefined) {
+          input.add_doc_ref = parseDocRef(opts.docRef, opts.docRefPrimary ?? false);
+        }
+        if (opts.removeDocRef !== undefined) {
+          input.remove_doc_ref = opts.removeDocRef;
+        }
         const ticket = store.update(id, input, opts.actor);
         console.log(`Updated: ${ticket.id}`);
         console.log(JSON.stringify(ticket, null, 2));
@@ -257,6 +302,10 @@ export function createTicketCommand(): Command {
         process.exit(1);
       }
       console.log(JSON.stringify(ticket, null, 2));
+      // F6: Display doc_refs as a formatted table
+      const docRefs = ticket.doc_refs ?? [];
+      console.log("\n── Document References ──────────────────────────────────────────────");
+      console.log(formatDocRefsTable(docRefs));
     });
 
   // ── attach ─────────────────────────────────────────────────────────────────
@@ -291,10 +340,10 @@ export function createTicketCommand(): Command {
       const store = new TicketStore();
       const { ticket } = store.addComment(id, opts.author, opts.content);
       console.log(`Comment added to ${ticket.id}`);
-      // F4: Hint if comment references an artifact path and doc_ref is not set
+      // F4: Hint if comment references an artifact path and no doc_refs are set
       const artifactPattern = /agent-teams\/[^\s]+\/artifacts\/[^\s]+|deployments\/[^\s]+/;
       const match = artifactPattern.exec(opts.content);
-      if (match && !ticket.doc_ref) {
+      if (match && (ticket.doc_refs ?? []).length === 0) {
         process.stderr.write(
           `Hint: This comment references an artifact path. Attach it? pa ticket update ${ticket.id} --doc-ref ${match[0]}\n`
         );
