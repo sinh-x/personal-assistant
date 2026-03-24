@@ -58,7 +58,7 @@ Run a diagnostic pass on the system:
 
 When you start working on an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee maintenance --status pending-implementation`
-2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
+2. Claim the ticket: `pa ticket update <id> --status implementing --assignee maintenance/team-manager`
 3. Work on it
 4. On completion: `pa ticket update <id> --status review-uat --assignee sinh`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket

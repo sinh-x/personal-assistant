@@ -103,8 +103,7 @@ All tickets MUST have an effort estimate. If missing, infer from content:
 ```bash
 pa ticket update <TICKET-ID> \
   --priority <priority> \
-  --assignee <team> \
-  --assignee team-manager \
+  --assignee <team>/team-manager \
   --estimate <XS|S|M|L|XL>
 ```
 

@@ -22,7 +22,7 @@ No team may skip to `done` except Sinh (via UAT sign-off). The correct advanceme
 | Sprint-master | `idea` | `requirement-review` | `--assignee requirements` |
 | Requirements team | `requirement-review` | `pending-approval` | `--assignee sinh`, `--doc-ref <requirements-doc>` |
 | Sinh | `pending-approval` | `pending-implementation` | `--assignee builder` or `--assignee orchestrator` |
-| Builder / Orchestrator | `pending-implementation` | `implementing` | `--assignee <agent-name>` |
+| Builder / Orchestrator | `pending-implementation` | `implementing` | `--assignee <team>/<agent-name>` |
 | Builder / Orchestrator | `implementing` | `review-uat` | `--assignee sinh`, `--doc-ref <artifact>` |
 | Sinh | `review-uat` | `done` | — (terminal) |
 
@@ -44,7 +44,7 @@ When Sinh (or any gate owner) rejects or requests changes, the actor **MUST**:
 
 **Example — Sinh sends back for rework:**
 ```bash
-pa ticket update PA-042 --status implementing --assignee builder --assignee team-manager
+pa ticket update PA-042 --status implementing --assignee builder/team-manager
 pa ticket comment PA-042 --author sinh --content "REWORK: API response schema is wrong. Expected { data: [] }, got { results: [] }. Fix before re-submitting for UAT."
 ```
 

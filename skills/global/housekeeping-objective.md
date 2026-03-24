@@ -8,7 +8,7 @@ Your job is to process all inbox and workflow state for your team. Follow the st
 
 2. **Check assigned tickets** — `pa ticket list --assignee <team_name> --status pending-implementation`. For each ticket:
    - Single-step tickets: claim and complete immediately (`pa ticket update <id> --status review-uat --assignee sinh`)
-   - Multi-step tickets: claim with `pa ticket update <id> --status implementing --assignee team-manager` before starting work
+   - Multi-step tickets: claim with `pa ticket update <id> --status implementing --assignee <team_name>/team-manager` before starting work
 
 3. **Review-request resolution** — `pa ticket list --assignee <team_name> --status pending-approval`:
    - Check if Sinh has updated the status (approved → pending-implementation for downstream, or rejected)

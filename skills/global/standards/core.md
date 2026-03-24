@@ -22,6 +22,7 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 - Always identify yourself by agent_name + team_name in logs and messages
 - Pass your full identity chain when spawning sub-agents (see §3 in work.md)
 - Include `ticket_id` when passing identity to sub-agents — it provides work context
+- **Team-qualified assignee convention:** When setting `--assignee` on tickets, always use `<team>/<agent>` format (e.g., `builder/team-manager`, `requirements/researcher`). Bare team names (e.g., `builder`) are valid for team-level assignment. Whitelisted names (`sinh`) need no prefix. Bare agent names (e.g., `team-manager`) are deprecated and will print a warning.
 
 ---
 

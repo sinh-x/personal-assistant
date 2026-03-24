@@ -20,7 +20,7 @@ This file described the file-based inbox communication protocol:
 | Write review-request file to `sinh-inputs/inbox/` | `pa ticket create --type review-request --assignee <downstream>` |
 | Write FYI file to `<team>/inbox/` | `pa ticket create --type fyi --assignee <recipient>` |
 | Check `<team>/inbox/` for pending work | `pa ticket list --assignee <team-name> --status pending-implementation` |
-| Move item `inbox/ → ongoing/` to claim | `pa ticket update <id> --status implementing --assignee <agent>` |
+| Move item `inbox/ → ongoing/` to claim | `pa ticket update <id> --status implementing --assignee <team>/<agent>` |
 | Move item `ongoing/ → done/` on completion | `pa ticket update <id> --status done` |
 
 **For full ticket workflow documentation**, see:

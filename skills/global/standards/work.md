@@ -61,8 +61,10 @@ pa ticket list --assignee <team-name> --status pending-implementation
 
 **Claim a ticket before starting:**
 
+Always use team-qualified `<team>/<agent>` format for `--assignee` (e.g., `builder/team-manager`). Bare agent names are deprecated.
+
 ```bash
-pa ticket update <ticket-id> --status implementing --assignee <agent-name>
+pa ticket update <ticket-id> --status implementing --assignee <team>/<agent-name>
 ```
 
 **On completion — role-specific status transitions:**
@@ -398,7 +400,7 @@ pa ticket list --assignee requirements --status requirement-review
 ### Claim a ticket
 
 ```bash
-pa ticket update <ticket-id> --status implementing --assignee <agent-name>
+pa ticket update <ticket-id> --status implementing --assignee <team>/<agent-name>
 ```
 
 ### Update as you work
