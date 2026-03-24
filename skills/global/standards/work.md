@@ -35,7 +35,7 @@ The deployment registry tracks all team deployments:
 After all agents finish and all session logs are written, the team manager writes:
 
 ```bash
-flock -w 5 ~/Documents/ai-usage/deployments/.registry.lock bash -c "echo '{\"deployment_id\":\"<DEPLOYMENT_ID>\",\"team\":\"<TEAM_NAME>\",\"event\":\"completed\",\"timestamp\":\"'$(date -Iseconds)'\",\"status\":\"<success|partial|failed>\",\"summary\":\"<one-line summary>\"}' >> ~/Documents/ai-usage/deployments/registry.jsonl"
+pa registry complete <DEPLOYMENT_ID> --status <success|partial|failed> --summary "<one-line summary>"
 ```
 
 **Status values:**

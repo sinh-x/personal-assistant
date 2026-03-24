@@ -146,6 +146,7 @@ complete -c pa -n __fish_use_subcommand -a requirements -d 'Requirements lifecyc
 complete -c pa -n __fish_use_subcommand -a serve        -d 'Start the agent API server'
 complete -c pa -n __fish_use_subcommand -a ticket       -d 'Manage tickets'
 complete -c pa -n __fish_use_subcommand -a bulletin     -d 'Manage bulletins (deploy-time blockers)'
+complete -c pa -n __fish_use_subcommand -a registry     -d 'Manage deployment registry'
 
 # --- deploy: <team> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
@@ -267,3 +268,12 @@ complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcomm
 
 # bulletin resolve <ID>
 complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from resolve; and not __fish_seen_subcommand_from (__pa_bulletin_ids)' -a '(__pa_bulletin_ids)' -d 'Bulletin ID'
+
+# --- registry: nested subcommands ---
+complete -c pa -n '__fish_seen_subcommand_from registry; and not __fish_seen_subcommand_from complete' -a 'complete'
+
+# registry complete <deploy-id>
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete; and not __fish_seen_subcommand_from (__pa_deploy_ids)' -a '(__pa_deploy_ids)' -d 'Deployment ID'
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l status   -d 'Completion status' -r -a 'success partial failed'
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l summary  -d 'One-line summary of what was done' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l log-file -d 'Session log file path (optional)' -r

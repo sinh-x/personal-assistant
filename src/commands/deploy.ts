@@ -10,6 +10,7 @@ import { generatePrimer } from "../lib/primer.js";
 import { isTeamBlocked } from "../lib/bulletins/index.js";
 import { spawnDetached } from "../utils/process.js";
 import { resolveRepo } from "../lib/repos.js";
+import { localISOTimestamp } from "../lib/time.js";
 import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
 
 const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
@@ -50,16 +51,6 @@ function generateDeployId(): string {
   return "d-" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** Generate an ISO timestamp in local time with timezone offset (matches `date -Iseconds`) */
-function localISOTimestamp(): string {
-  const now = new Date();
-  const off = -now.getTimezoneOffset();
-  const sign = off >= 0 ? "+" : "-";
-  const hh = String(Math.floor(Math.abs(off) / 60)).padStart(2, "0");
-  const mm = String(Math.abs(off) % 60).padStart(2, "0");
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}${sign}${hh}:${mm}`;
-}
 
 /** Resolve a relative path from PA_CONFIG first, then PA_HOME */
 function makeResolver(configDir: string, homeDir: string) {
