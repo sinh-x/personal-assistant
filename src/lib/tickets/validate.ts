@@ -3,10 +3,10 @@ import { resolve } from "node:path";
 import yaml from "js-yaml";
 import { getTeamsDir } from "../paths.js";
 
-const AUTHOR_WHITELIST = ["sinh"];
+const BARE_NAME_WHITELIST = ["sinh"];
 
 /** Reads all team names from the `name:` field in teams/*.yaml files */
-function getValidTeamNames(): Set<string> {
+export function getValidTeamNames(): Set<string> {
   const teamsDir = getTeamsDir();
   const names = new Set<string>();
   try {
@@ -29,6 +29,39 @@ function getValidTeamNames(): Set<string> {
 }
 
 /**
+ * Validates a team-qualified name (team/agent or bare team).
+ * Shared logic for both author and assignee validation.
+ *
+ * Returns void on success. Throws an Error with actionable message on invalid input.
+ */
+function validateTeamQualifiedName(
+  value: string,
+  fieldName: string,
+  validTeams: Set<string>,
+): void {
+  const slashIndex = value.indexOf("/");
+
+  if (slashIndex === -1) {
+    // No slash — must be a valid team name
+    if (!validTeams.has(value)) {
+      const teamList = [...validTeams].sort().join(", ");
+      throw new Error(
+        `Invalid ${fieldName} '${value}'. Must be '<team>' or '<team>/<agent>' where team matches teams/*.yaml. Valid teams: ${teamList}. Allowed bare names: ${BARE_NAME_WHITELIST.join(", ")}`
+      );
+    }
+  } else {
+    // Has slash — prefix must be a valid team name
+    const teamPrefix = value.slice(0, slashIndex);
+    if (!validTeams.has(teamPrefix)) {
+      const teamList = [...validTeams].sort().join(", ");
+      throw new Error(
+        `Invalid ${fieldName} '${value}'. Team '${teamPrefix}' not found. Valid teams: ${teamList}. Allowed bare names: ${BARE_NAME_WHITELIST.join(", ")}`
+      );
+    }
+  }
+}
+
+/**
  * Validates the comment author field.
  *
  * Valid formats:
@@ -39,25 +72,67 @@ function getValidTeamNames(): Set<string> {
  * Throws an Error with an actionable message on invalid input.
  */
 export function validateAuthor(author: string): void {
-  if (AUTHOR_WHITELIST.includes(author)) return;
+  if (BARE_NAME_WHITELIST.includes(author)) return;
+  validateTeamQualifiedName(author, "author", getValidTeamNames());
+}
+
+/**
+ * Validates the ticket assignee field.
+ *
+ * Valid formats:
+ *   - Whitelisted bare name: "sinh" — no team prefix required
+ *   - Team-only: "<team>" (e.g., "requirements") — team-level assignment
+ *   - Team + agent: "<team>/<agent>" (e.g., "requirements/team-manager") — validate team prefix
+ *   - Bare agent name: "team-manager" — prints deprecation warning but ACCEPTS (soft warning)
+ *
+ * Throws an Error when team prefix is invalid (not found in teams/*.yaml).
+ */
+export function validateAssignee(assignee: string): void {
+  if (BARE_NAME_WHITELIST.includes(assignee)) return;
 
   const validTeams = getValidTeamNames();
-  const slashIndex = author.indexOf("/");
+  const slashIndex = assignee.indexOf("/");
 
   if (slashIndex === -1) {
-    // No slash — must be a valid team name
-    if (!validTeams.has(author)) {
-      throw new Error(
-        `Invalid author '${author}'. Must be '<team>' or '<team>/<agent>' where team matches teams/*.yaml. Allowed bare names: ${AUTHOR_WHITELIST.join(", ")}`
-      );
-    }
-  } else {
-    // Has slash — prefix must be a valid team name
-    const teamPrefix = author.slice(0, slashIndex);
-    if (!validTeams.has(teamPrefix)) {
-      throw new Error(
-        `Invalid author '${author}'. Must be '<team>' or '<team>/<agent>' where team matches teams/*.yaml. Allowed bare names: ${AUTHOR_WHITELIST.join(", ")}`
-      );
-    }
+    // Bare name — could be team-only or bare agent (deprecated)
+    if (validTeams.has(assignee)) return; // team-only assignment: ok
+
+    // Bare agent name: warn (deprecation) but accept
+    const teamList = [...validTeams].sort().join(", ");
+    process.stderr.write(
+      `Warning: Bare assignee '${assignee}' is deprecated. Use '<team>/${assignee}' format. Valid teams: ${teamList}\n`
+    );
+    return; // soft warning, not an error
   }
+
+  // team/agent format — validate team prefix
+  const teamPrefix = assignee.slice(0, slashIndex);
+  if (!validTeams.has(teamPrefix)) {
+    const teamList = [...validTeams].sort().join(", ");
+    throw new Error(
+      `Invalid assignee '${assignee}'. Team '${teamPrefix}' not found. Valid teams: ${teamList}. Allowed bare names: ${BARE_NAME_WHITELIST.join(", ")}`
+    );
+  }
+}
+
+/**
+ * Smart assignee matching for ticket list filtering.
+ * Supports exact match, team-prefix match, and bare-agent-suffix match.
+ */
+export function matchAssignee(ticketAssignee: string, filterAssignee: string): boolean {
+  // Exact match
+  if (ticketAssignee === filterAssignee) return true;
+
+  // Filter has no slash — could be team or bare agent name
+  if (!filterAssignee.includes("/")) {
+    const validTeams = getValidTeamNames();
+    if (validTeams.has(filterAssignee)) {
+      // Team filter: match any ticket starting with "filterAssignee/"
+      return ticketAssignee.startsWith(filterAssignee + "/");
+    }
+    // Bare agent filter: match any ticket ending with "/filterAssignee"
+    return ticketAssignee.endsWith("/" + filterAssignee);
+  }
+
+  return false;
 }

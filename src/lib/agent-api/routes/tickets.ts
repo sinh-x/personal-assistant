@@ -21,7 +21,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { TicketStore } from "../../tickets/index.js";
-import { validateAuthor } from "../../tickets/validate.js";
+import { validateAuthor, validateAssignee } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
 import type { CreateTicketInput, UpdateTicketInput } from "../../tickets/types.js";
 import { listRepos } from "../../repos.js";
@@ -82,6 +82,17 @@ export function ticketRoutes(): Hono {
     const actor = body.actor ?? "api";
     const { actor: _actor, ...input } = body;
 
+    if (input.assignee) {
+      try {
+        validateAssignee(input.assignee);
+      } catch (err) {
+        return c.json(
+          { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
+          400
+        );
+      }
+    }
+
     try {
       const ticket = store.create(input as CreateTicketInput, actor);
       return c.json({ ticket }, 201);
@@ -129,6 +140,17 @@ export function ticketRoutes(): Hono {
 
     const actor = body.actor ?? "api";
     const { actor: _actor, ...input } = body;
+
+    if ((input as UpdateTicketInput).assignee) {
+      try {
+        validateAssignee((input as UpdateTicketInput).assignee!);
+      } catch (err) {
+        return c.json(
+          { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
+          400
+        );
+      }
+    }
 
     try {
       const ticket = store.update(id, input as UpdateTicketInput, actor);
