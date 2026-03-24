@@ -5,12 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-03-24
 
 ### Added
 
 - **chore**: Phase 1 - version strategy foundation  ([`3cd4ba8`])
 - **chore**: Phase 2 - enhance version_bump.sh  ([`f483baf`])
+- **docs**: Phase 3 - retroactive tags and changelog backfill  ([`3a552d9`])
+- **docs**: Phase 4 - version roadmap and milestone tags  ([`cbcd9ab`])
+- **tickets**: Add --tags, --exclude-tags, --search to pa ticket list  ([`dc473ab`])
+- **registry**: Add pa registry complete command  ([`25a9e56`])
+- **tickets**: Add team/agent assignee validation and smart filtering  ([`3f82140`])
+- **tickets**: Add assignee format migration script  ([`90bc511`])
+- **primer**: PA-931 — primer template system fixes (F1-F5) ([`c4bb8de`])
+- **teams,status**: PA-934 — board & teams display filters (F1-F5) ([`c8a5aed`])
+- **tickets,board**: PA-936 — FYI ticket lifecycle fixes (F1-F5) ([`18bc6c3`])
+
+### Documentation
+
+- **skills**: Update --assignee examples to team/agent format  ([`1580418`])
 
 ## [0.3.8] - 2026-03-23
 
