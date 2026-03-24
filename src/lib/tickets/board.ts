@@ -94,10 +94,23 @@ export function buildBoardView(
 /**
  * Get a summary of ticket counts per team, broken down by status.
  * Used by `pa teams` to show ticket health per team.
+ *
+ * @param project - Filter by project name. Omit to show all projects.
+ * @param filters - Optional filters: excludeTags and excludeStatuses
  */
-export function getTeamStatusSummaries(project?: string): TeamStatusSummary[] {
+export function getTeamStatusSummaries(
+  project?: string,
+  filters: { excludeTags?: string[]; excludeStatuses?: TicketStatus[] } = {}
+): TeamStatusSummary[] {
   const store = new TicketStore();
-  const tickets = store.list(project ? { project } : {});
+  const allTickets = store.list({
+    ...(project ? { project } : {}),
+    ...(filters.excludeTags?.length ? { excludeTags: filters.excludeTags } : {}),
+  });
+
+  const tickets = filters.excludeStatuses?.length
+    ? allTickets.filter((t) => !filters.excludeStatuses!.includes(t.status))
+    : allTickets;
 
   const byTeam = new Map<string, Record<TicketStatus, number>>();
 
@@ -123,7 +136,7 @@ export function getTeamStatusSummaries(project?: string): TeamStatusSummary[] {
  */
 export function getTeamBoard(
   team: string,
-  filters: { project?: string } = {}
+  filters: { project?: string; excludeTags?: string[] } = {}
 ): BoardView & { team: string } {
   const store = new TicketStore();
   const tickets = store.list({ assignee: team, ...filters });
