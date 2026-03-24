@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { TicketStore } from "../lib/tickets/index.js";
-import { validateAuthor } from "../lib/tickets/validate.js";
+import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import type {
   Estimate,
   TicketStatus,
@@ -84,6 +84,13 @@ export function createTicketCommand(): Command {
       }) => {
         const estimate = validateEstimate(opts.estimate);
 
+        try {
+          validateAssignee(opts.assignee);
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+
         // Compute tags — may be augmented by summary template check
         const tags: string[] = opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
 
@@ -156,6 +163,15 @@ export function createTicketCommand(): Command {
           actor: string;
         }
       ) => {
+        if (opts.assignee !== undefined) {
+          try {
+            validateAssignee(opts.assignee);
+          } catch (err) {
+            console.error(err instanceof Error ? err.message : String(err));
+            process.exit(1);
+          }
+        }
+
         const store = new TicketStore();
         const input: UpdateTicketInput = {};
         if (opts.status) input.status = opts.status as TicketStatus;

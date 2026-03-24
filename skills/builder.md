@@ -100,7 +100,7 @@ Each deployment starts by checking your assigned tickets with `pa ticket list --
 
 When you start working on an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee builder --status pending-implementation`
-2. Claim the ticket: `pa ticket update <id> --status implementing --assignee team-manager`
+2. Claim the ticket: `pa ticket update <id> --status implementing --assignee builder/team-manager`
 3. Work on it
 4. On completion — **artifact finalization first, then advance:**
    ```bash
@@ -155,7 +155,7 @@ After verification passes:
 
 1. **Check in-progress tickets first** — `pa ticket list --assignee builder --status implementing`. If found, resume that ticket before picking up anything new.
 2. **Check new tickets** — If nothing in-progress, run `pa ticket list --assignee builder --status pending-implementation` to find the next work item.
-3. **Claim ticket** — `pa ticket update <id> --status implementing --assignee team-manager` before starting any work (see §Ticket Claim Protocol)
+3. **Claim ticket** — `pa ticket update <id> --status implementing --assignee builder/team-manager` before starting any work (see §Ticket Claim Protocol)
 4. **Read plan document** — Read `doc_ref` from the ticket to identify repo path, feature branch, and full scope
 5. **Pre-flight checks** — Switch to repo, check branch, create feature branch (§Pre-flight Checks). Stop here if check fails.
 6. **Check progress** — `git log --oneline | grep 'feat('` to find completed phases

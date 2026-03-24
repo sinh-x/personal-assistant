@@ -10,6 +10,7 @@ import {
 import { resolve, join } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { getTicketsDir } from "../paths.js";
+import { matchAssignee } from "./validate.js";
 import type {
   Ticket,
   AuditEntry,
@@ -592,7 +593,7 @@ export class TicketStore {
     return tickets.filter((t) => {
       if (filters.project && t.project !== filters.project) return false;
       if (filters.status && t.status !== filters.status) return false;
-      if (filters.assignee && t.assignee !== filters.assignee) return false;
+      if (filters.assignee && !matchAssignee(t.assignee, filters.assignee)) return false;
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.type && t.type !== filters.type) return false;
       if (filters.tags?.length) {

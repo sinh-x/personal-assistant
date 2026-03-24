@@ -8,7 +8,7 @@ This is a **non-interactive** skill. Do not ask questions — read, analyze, and
 
 When starting from an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee requirements --status requirement-review`
-2. Claim the ticket: `pa ticket update <id> --assignee team-manager` (keep status as `requirement-review`)
+2. Claim the ticket: `pa ticket update <id> --assignee requirements/team-manager` (keep status as `requirement-review`)
 3. Work on it
 4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
