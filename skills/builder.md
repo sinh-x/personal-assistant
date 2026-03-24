@@ -94,7 +94,7 @@ Now you are on the correct branch. Proceed with the plan.
 
 ### 1. Read the Plan
 
-Each deployment starts by checking your assigned tickets with `pa ticket list --assignee builder --status pending-implementation`. The ticket's `doc_ref` field references the detailed plan document. Read the full plan before doing anything.
+Each deployment starts by checking your assigned tickets with `pa ticket list --assignee builder --status pending-implementation`. The ticket's `doc_refs` array references the detailed plan document (look for the primary or `requirements` type entry). Read the full plan before doing anything.
 
 ### Ticket Claim Protocol
 
@@ -108,8 +108,8 @@ When you start working on an assigned ticket:
    # (e.g., the plan doc, migration guide, or implementation summary)
    cp <output> ~/Documents/ai-usage/agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md
 
-   # Step 2: attach doc_ref BEFORE advancing status
-   pa ticket update <id> --doc-ref "agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"
+   # Step 2: add doc_ref BEFORE advancing status
+   pa ticket update <id> --doc-ref "implementation:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"
 
    # Step 3: advance to UAT
    pa ticket update <id> --status review-uat --assignee sinh
@@ -121,7 +121,7 @@ Short single-step work may go directly `pending-implementation → review-uat --
 ### 2. Identify Next Phase
 
 Cross-reference two sources to determine which phase to execute next:
-1. **Ticket checklist** (primary) — read the plan doc referenced by `doc_ref` in the claimed ticket and find the first unchecked `- [ ]` phase
+1. **Ticket checklist** (primary) — read the plan doc referenced in `doc_refs` (primary or `requirements` type) in the claimed ticket and find the first unchecked `- [ ]` phase
 2. **Git log** (verification) — `git log --oneline | grep 'feat('` to confirm completed phases match checked items
 
 If the checklist and git log disagree, trust the checklist — it is the ground truth. Execute only the next incomplete phase.
@@ -156,14 +156,14 @@ After verification passes:
 1. **Check in-progress tickets first** — `pa ticket list --assignee builder --status implementing`. If found, resume that ticket before picking up anything new.
 2. **Check new tickets** — If nothing in-progress, run `pa ticket list --assignee builder --status pending-implementation` to find the next work item.
 3. **Claim ticket** — `pa ticket update <id> --status implementing --assignee builder/team-manager` before starting any work (see §Ticket Claim Protocol)
-4. **Read plan document** — Read `doc_ref` from the ticket to identify repo path, feature branch, and full scope
+4. **Read plan document** — Read `doc_refs` from the ticket (use primary or `requirements` type entry) to identify repo path, feature branch, and full scope
 5. **Pre-flight checks** — Switch to repo, check branch, create feature branch (§Pre-flight Checks). Stop here if check fails.
 6. **Check progress** — `git log --oneline | grep 'feat('` to find completed phases
 7. **Read existing code** — Always read files before modifying them
 8. **Execute phase** — Create/modify files as the plan specifies
 9. **Verify** — Run all verification steps from the plan
 10. **Commit** — Conventional commit with phase number
-11. **Update ticket** — Check off completed phase in plan doc; if ALL phases done, attach artifact and advance: `pa ticket update <id> --doc-ref "agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"` then `pa ticket update <id> --status review-uat --assignee sinh`. Otherwise leave as `implementing`.
+11. **Update ticket** — Check off completed phase in plan doc; if ALL phases done, add implementation artifact and advance: `pa ticket update <id> --doc-ref "implementation:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"` then `pa ticket update <id> --status review-uat --assignee sinh`. Otherwise leave as `implementing`.
 12. **Report** — Add brief completion comment: `pa ticket comment <id> --author team-manager --content "Phase complete: <summary>"`
 
 ## Rules
@@ -192,7 +192,7 @@ Phase N committed successfully:
   → Are ALL phases in checklist now [x]?
      YES → Artifact finalization (REQUIRED):
              1. Save implementation artifact to agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md
-             2. Attach: pa ticket update <id> --doc-ref "agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"
+             2. Add: pa ticket update <id> --doc-ref "implementation:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>.md"
              3. Advance: pa ticket update <id> --status review-uat --assignee sinh
      NO  → leave ticket as "implementing", stop deployment
 ```
@@ -201,7 +201,7 @@ Phase N committed successfully:
 
 ### Items without a checklist
 
-If the ticket has no phase checklist in its doc_ref, use git log only to detect completed phases. In this case, never update to `review-uat` automatically — leave as `implementing` and add a comment noting that manual review is needed to determine completion.
+If the ticket has no phase checklist in its doc_refs, use git log only to detect completed phases. In this case, never update to `review-uat` automatically — leave as `implementing` and add a comment noting that manual review is needed to determine completion.
 
 ### Failure handling
 

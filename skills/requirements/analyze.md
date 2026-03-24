@@ -52,7 +52,7 @@ Before asking more questions, **explore the codebase and existing systems yourse
 - Identify technical constraints or opportunities
 - Look at related issues, PRs, or prior work
 
-**Impact analysis (when ticket has `doc_ref`):** If the ticket you are working on has a `doc_ref` pointing to a plan or prior requirements document, follow the `impact-analysis` global skill (injected in your primer). Run Steps 1–4 to identify the change surface, downstream consumers, risk levels, and hidden dependencies. Add an `## Impact Analysis` section to the requirements document you produce.
+**Impact analysis (when ticket has `doc_refs`):** If the ticket you are working on has `doc_refs` pointing to a plan or prior requirements document, follow the `impact-analysis` global skill (injected in your primer). Run Steps 1–4 to identify the change surface, downstream consumers, risk levels, and hidden dependencies. Add an `## Impact Analysis` section to the requirements document you produce.
 
 Report back to the user: "Here's what I found in the codebase..." — then ask:
 
@@ -180,11 +180,11 @@ Save the requirements document in three places:
    ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md
    ```
 
-   **REQUIRED — attach doc_ref immediately after saving to artifacts:**
+   **REQUIRED — add doc_ref immediately after saving to artifacts:**
    ```bash
-   pa ticket update <ticket-id> --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
+   pa ticket update <ticket-id> --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
    ```
-   Do this **before** advancing ticket status. If you advance without setting `doc-ref`, the CLI will warn and add a `needs-doc-ref` tag automatically.
+   Do this **before** advancing ticket status. If you advance without a `doc_refs` entry, the CLI will warn and add a `needs-doc-ref` tag automatically.
 
 3. **Ticket update (conditional):**
 
@@ -221,4 +221,4 @@ Save the requirements document in three places:
 - **Keep it scannable** — tables, checkboxes, short bullets. No walls of text.
 - **Challenge assumptions** — if something sounds vague ("make it better"), push for specifics.
 - **Flag scope creep** — if the user keeps adding things, note it and suggest phasing.
-- **Always set doc_ref on handoff** — when advancing to `pending-approval`, always include `--doc-ref` pointing to the requirements artifact. A ticket advancing without doc_ref will be automatically tagged `needs-doc-ref` by the CLI. Use `pa ticket update <id> --doc-ref <path>` to attach retroactively if needed.
+- **Always add doc_ref on handoff** — when advancing to `pending-approval`, always include `--doc-ref requirements:<path>` pointing to the requirements artifact. A ticket advancing without any `doc_refs` will be automatically tagged `needs-doc-ref` by the CLI. Use `pa ticket update <id> --doc-ref requirements:<path>` to add retroactively if needed.

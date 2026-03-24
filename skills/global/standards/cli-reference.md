@@ -28,10 +28,10 @@ deployment, and system operations.
 | Subcommand | Purpose | Key Flags |
 |-----------|---------|-----------|
 | `ticket create` | Create a ticket | `--project`* `--title`* `--type`* `--priority`* `--estimate`* `--assignee`* `--summary` `--doc-ref` `--tags` |
-| `ticket update <id>` | Update ticket fields | `--status` `--assignee` `--priority` `--tags` `--blocked-by` `--doc-ref` `--estimate` |
+| `ticket update <id>` | Update ticket fields | `--status` `--assignee` `--priority` `--tags` `--blocked-by` `--doc-ref` `--doc-ref-primary` `--remove-doc-ref` `--estimate` |
 | `ticket list` | List/filter tickets | `--project` `--status` `--assignee` `--priority` `--type` |
 | `ticket show <id>` | Show full ticket details | — |
-| `ticket attach <id>` | Attach a file/doc-ref | `--file`* |
+| `ticket attach <id>` | Attach a file as doc_ref (type: attachment) | `--file`* |
 | `ticket comment <id>` | Add a comment | `--author`* `--content`* |
 
 ## Bulletin Subcommands

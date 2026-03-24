@@ -34,7 +34,7 @@ Use when asking Sinh (or another team) to review and approve a deliverable befor
 **Required fields:**
 ```
 WHAT: <what was produced — document type + topic>
-DOC: <doc_ref path to full artifact>
+DOC: <doc_refs path to full artifact (use [type:]path format)>
 REVIEW: <what to look for — approve/reject criteria>
 NEXT: <what happens if approved — e.g., "route to builder for implementation">
 ```
@@ -136,7 +136,7 @@ Use for daily or weekly plans emitted by the daily team. Contains a structured t
 **Required fields:**
 ```
 WHAT: <plan period and goals>
-DOC: <doc_ref path to full plan>
+DOC: <doc_refs path to full plan>
 BUDGET: <time budget summary>
 ```
 

@@ -121,7 +121,7 @@ Tickets tagged `inbox-sweep` were bulk-created during the PA-002 inbox migration
    # or
    pa ticket comment <id> --author <agent> --content "Cancelled: duplicate of <canonical-id> (backlog, requirements team). Inbox-sweep artifact."
    ```
-4. **Do not cancel** if no canonical ticket exists and the work is still valid — leave it and ensure `doc_ref` is populated.
+4. **Do not cancel** if no canonical ticket exists and the work is still valid — leave it and ensure `doc_refs` is populated.
 
 ### 7b. Misrouted Tickets (Wrong Project)
 
@@ -144,35 +144,35 @@ A ticket belongs to the wrong project when its subject clearly targets a repo ot
    ```
 4. If the correct project key is unknown, do not guess — ask Sinh.
 
-### 7c. Missing `doc_ref` Tickets
+### 7c. Missing `doc_refs` Tickets
 
-A ticket advancing through key gates should always have `doc_ref` populated so downstream teams and Sinh have full context without searching.
+A ticket advancing through key gates should always have `doc_refs` populated so downstream teams and Sinh have full context without searching.
 
 **At `pending-implementation` (unexecutable without a plan):**
 
-1. For each `pending-implementation` ticket with empty `doc_ref`:
-   - If the summary contains enough detail to act (clear WHAT/steps) → leave it, add a comment noting the missing doc_ref
+1. For each `pending-implementation` ticket with empty `doc_refs`:
+   - If the summary contains enough detail to act (clear WHAT/steps) → leave it, add a comment noting the missing doc_refs
    - If the summary is too thin to execute → add `backlog` tag with a comment:
      ```bash
      pa ticket update <id> --tags backlog --actor <agent>
      pa ticket comment <id> --author <agent> \
-       --content "Tagged backlog: no doc_ref and summary insufficient to execute. Needs a plan document before implementation can start."
+       --content "Tagged backlog: no doc_refs and summary insufficient to execute. Needs a plan document before implementation can start."
      ```
-2. **Never attempt to implement** a ticket without either a `doc_ref` or a self-contained summary.
+2. **Never attempt to implement** a ticket without either `doc_refs` or a self-contained summary.
 
 **At `pending-approval` and `review-uat` (handoff gates):**
 
-When the CLI detects a transition to `pending-approval` or `review-uat` without `doc_ref`, it emits a stderr warning and adds the `needs-doc-ref` tag automatically. The transition still succeeds (soft enforcement).
+When the CLI detects a transition to `pending-approval` or `review-uat` without `doc_refs`, it emits a stderr warning and adds the `needs-doc-ref` tag automatically. The transition still succeeds (soft enforcement).
 
 Sprint-master action for tickets tagged `needs-doc-ref`:
 1. Identify the team that last advanced the ticket (check ticket comments or assignee history)
 2. Add a comment requesting the missing document:
    ```bash
    pa ticket comment <id> --author sprint-master \
-     --content "Missing doc_ref at <status> gate. <team>: please attach document with 'pa ticket update <id> --doc-ref <path>'."
+     --content "Missing doc_refs at <status> gate. <team>: please attach document with 'pa ticket update <id> --doc-ref [type:]<path>'."
    ```
 3. Do NOT block the ticket status — the team can still work. The tag surfaces the gap.
-4. Once doc_ref is attached, remove the `needs-doc-ref` tag via `pa ticket update <id> --tags ""` (or update tags list without it)
+4. Once doc_refs are attached, remove the `needs-doc-ref` tag via `pa ticket update <id> --tags ""` (or update tags list without it)
 
 ### 7d. Cleanup Cadence
 
