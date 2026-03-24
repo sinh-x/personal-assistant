@@ -234,11 +234,14 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l actor    -d 'Actor for audit log' -r
 
 # ticket list
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l project  -d 'Filter by project' -r -a '(__pa_projects)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l status   -d 'Filter by status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l assignee -d 'Filter by assignee' -r -a '(__pa_assignees)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority -d 'Filter by priority' -r -a 'critical high medium low'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l type     -d 'Filter by type' -r -a 'feature bug task review-request work-report fyi idea question'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l project       -d 'Filter by project' -r -a '(__pa_projects)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l status        -d 'Filter by status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l assignee      -d 'Filter by assignee' -r -a '(__pa_assignees)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority      -d 'Filter by priority' -r -a 'critical high medium low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l type          -d 'Filter by type' -r -a 'feature bug task review-request work-report fyi idea question'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l tags          -d 'Filter by tags (comma-separated, AND logic)' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l exclude-tags  -d 'Exclude tickets with any of these tags (comma-separated)' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l search        -d 'Free-text search on ticket ID, title, and summary' -r
 
 # ticket show <ID>
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'

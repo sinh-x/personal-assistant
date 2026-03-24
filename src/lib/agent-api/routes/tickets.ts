@@ -40,6 +40,7 @@ export function ticketRoutes(): Hono {
       type?: string;
       tags?: string[];
       excludeTags?: string[];
+      search?: string;
     } = {};
 
     const project = c.req.query("project");
@@ -49,6 +50,7 @@ export function ticketRoutes(): Hono {
     const type = c.req.query("type");
     const tagsParam = c.req.query("tags");
     const excludeTagsParam = c.req.query("excludeTags");
+    const search = c.req.query("search");
 
     if (project) filters.project = project;
     if (status) filters.status = status;
@@ -57,6 +59,7 @@ export function ticketRoutes(): Hono {
     if (type) filters.type = type;
     if (tagsParam) filters.tags = tagsParam.split(",").map((t) => t.trim()).filter(Boolean);
     if (excludeTagsParam) filters.excludeTags = excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean);
+    if (search) filters.search = search;
 
     try {
       const tickets = store.list(filters);
