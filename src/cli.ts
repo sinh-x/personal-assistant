@@ -45,6 +45,7 @@ program
       boardCommand(opts.project, {
         assignee: opts.assignee,
         excludeTags: ["backlog", "archived"],
+        excludeTypes: ["fyi", "work-report"],
       });
     }
   );

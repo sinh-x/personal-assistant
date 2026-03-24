@@ -306,13 +306,18 @@ export function ticketRoutes(): Hono {
     const project = c.req.query("project") || undefined;
 
     const DEFAULT_EXCLUDE_TAGS = ["backlog", "archived"];
-    const filters: { assignee?: string; excludeTags?: string[] } = {};
+    const DEFAULT_EXCLUDE_TYPES = ["fyi", "work-report"];
+    const filters: { assignee?: string; excludeTags?: string[]; excludeTypes?: string[] } = {};
     const assignee = c.req.query("assignee");
     const excludeTagsParam = c.req.query("excludeTags");
+    const excludeTypesParam = c.req.query("excludeTypes");
     if (assignee) filters.assignee = assignee;
     filters.excludeTags = excludeTagsParam
       ? excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean)
       : DEFAULT_EXCLUDE_TAGS;
+    filters.excludeTypes = excludeTypesParam !== undefined
+      ? excludeTypesParam.split(",").map((t) => t.trim()).filter(Boolean)
+      : DEFAULT_EXCLUDE_TYPES;
 
     try {
       const board = buildBoardView(project, filters);
