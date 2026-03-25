@@ -135,6 +135,7 @@ export function deployCommand(
     console.error(`  Add: minimax_api_key: <your-key>`);
     process.exit(1);
   }
+  const minimaxApiKey = config.minimax_api_key;
 
   const paHome = getHomeDir();
   const dataDir = getDataDir();
@@ -378,8 +379,12 @@ export function deployCommand(
   const minimaxEnv = provider === "minimax"
     ? {
         ANTHROPIC_BASE_URL: MINIMAX_BASE_URL,
-        ANTHROPIC_AUTH_TOKEN: config.minimax_api_key!,
+        ANTHROPIC_AUTH_TOKEN: minimaxApiKey ?? "",
         ANTHROPIC_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_SMALL_FAST_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_DEFAULT_SONNET_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_DEFAULT_OPUS_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: MINIMAX_MODEL,
         DISABLE_PROMPT_CACHING: "1",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       }
@@ -518,19 +523,29 @@ Agents:     ${agentNames.join(" ")}
       bashPath = "/usr/bin/env bash";
     }
 
-    // Build Minimax env exports for background script
-    const minimaxExports = provider === "minimax"
-      ? `export ANTHROPIC_BASE_URL='${MINIMAX_BASE_URL}'
-export ANTHROPIC_AUTH_TOKEN='${config.minimax_api_key!}'
+    // Write sensitive env vars to a file (mode 0o600) — sourced and deleted by bgScript
+    const envFile = resolve(deployDir, "deploy.env");
+    if (provider === "minimax") {
+      const escapedKey = minimaxApiKey?.replace(/'/g, "'\\''") ?? "";
+      const envContent = `export ANTHROPIC_BASE_URL='${MINIMAX_BASE_URL}'
+export ANTHROPIC_AUTH_TOKEN='${escapedKey}'
 export ANTHROPIC_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_SMALL_FAST_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_DEFAULT_OPUS_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='${MINIMAX_MODEL}'
 export DISABLE_PROMPT_CACHING='1'
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
-`
-      : "";
+`;
+      writeFileSync(envFile, envContent, { mode: 0o600 });
+    }
 
     // Build background script
+    const sourceEnv = provider === "minimax"
+      ? `source '${envFile}' && rm -f '${envFile}'\n`
+      : "";
     const bgScript = `
-${minimaxExports}export PA_DEPLOYMENT_ID='${deployId}'
+${sourceEnv}export PA_DEPLOYMENT_ID='${deployId}'
 export PA_DEPLOYMENT_DIR='${deployDir}'
 export PA_ACTIVITY_LOG='${activityLog}'
 echo '[$(date -Iseconds)] claude starting...' >> '${logFile}'
