@@ -75,25 +75,6 @@ function resolveRepoSlug(repoRoot: string): string {
   return basename(repoRoot);
 }
 
-/**
- * Read cached repo context from knowledge-base and return as a primer section.
- * Returns empty string if repoRoot is not set.
- */
-function injectRepoContext(repoRoot: string): string {
-  const slug = resolveRepoSlug(repoRoot);
-  const contextPath = resolve(homedir(), 'Documents/ai-usage/knowledge-base/repo-context', `${slug}.md`);
-
-  let contextContent: string;
-  if (existsSync(contextPath)) {
-    contextContent = readFileSync(contextPath, 'utf-8');
-    if (!contextContent.endsWith('\n')) contextContent += '\n';
-  } else {
-    contextContent = 'No pre-computed codebase knowledge available for this repo. Agent will explore independently.\n';
-  }
-
-  return `\n## Repository Context\n\n${contextContent}`;
-}
-
 interface ReferenceDoc {
   name: string;
   path: string;
@@ -101,34 +82,57 @@ interface ReferenceDoc {
 }
 
 /**
- * Resolve a shared skill from ~/.claude/skills/<name>/SKILL.md and return it wrapped
- * in the XML tag specified by injectAs.
+ * Read a shared skill's SKILL.md frontmatter (name + description) and return
+ * a Markdown table row for the Available Skills summary table.
  *
  * @param name - Skill directory name (e.g., "pa-cli", "pa-session-log")
- * @param injectAs - How to wrap the content: 'global-skill', 'shared-skill', or 'reference'
- * @returns XML-wrapped skill content, or empty string if not found
+ * @returns Markdown table row string, or empty string if not found
  */
-function resolveSharedSkill(name: string, injectAs: 'global-skill' | 'shared-skill' | 'reference'): string {
+function resolveSkillSummary(name: string): string {
   const skillPath = resolve(homedir(), ".claude/skills", name, "SKILL.md");
   if (!existsSync(skillPath)) {
     process.stderr.write(`Warning: shared skill not found: ${skillPath}\n`);
     return "";
   }
   const content = readFileSync(skillPath, "utf-8");
-  // For 'reference' type, we inject as a named reference block rather than a skill tag
-  // The reference tag is used for Tier 3 on-demand docs
-  const tag = injectAs === 'reference' ? 'reference' : injectAs;
-  let wrapped = `<${tag} name="${name}">\n`;
-  wrapped += content;
-  if (!content.endsWith("\n")) wrapped += "\n";
-  wrapped += `</${tag}>\n`;
-  return wrapped;
+
+  // Extract YAML frontmatter between --- delimiters
+  const fmEnd = content.indexOf('\n---', 4);
+  if (!content.startsWith('---\n') || fmEnd === -1) {
+    return `| ${name} | (no description) | ~/.claude/skills/${name}/SKILL.md |\n`;
+  }
+  const frontmatter = content.slice(4, fmEnd);
+
+  // Parse description — handles both single-line and YAML block scalar (>)
+  const lines = frontmatter.split('\n');
+  let description = '';
+  let inDescBlock = false;
+
+  for (const line of lines) {
+    if (inDescBlock) {
+      if (line.startsWith('  ') || line.startsWith('\t')) {
+        description += (description ? ' ' : '') + line.trim();
+      } else {
+        break;
+      }
+    } else if (line.startsWith('description:')) {
+      const afterColon = line.slice('description:'.length).trim();
+      if (afterColon === '>' || afterColon === '|') {
+        inDescBlock = true;
+      } else {
+        description = afterColon;
+        break;
+      }
+    }
+  }
+
+  return `| ${name} | ${description} | ~/.claude/skills/${name}/SKILL.md |\n`;
 }
 
 /**
  * Returns the list of inline standards module names (Tier 1 only) to include for a given mode type.
  * Tier 1: core.md (always injected global base — identity, error handling, shutdown protocol)
- * Tier 2 (mode skills): handled separately via mode.skills[] array in generatePrimer()
+ * Tier 2 (mode skills): rendered as summary table via resolveSkillSummary()
  * Tier 3: kanban-workflow, workflow-policy, codebase-exploration, impact-analysis → on-demand reference
  */
 function selectModules(_modeType: string): string[] {
@@ -140,9 +144,21 @@ function selectModules(_modeType: string): string[] {
 /**
  * Returns the list of on-demand reference documents (Tier 3) for a given mode type.
  * These are listed in the Reference Documents section rather than injected inline.
+ * If repoRoot is set, repo context is added as the first entry.
  */
-function selectReferenceModules(_modeType: string): ReferenceDoc[] {
-  return [
+function selectReferenceModules(_modeType: string, repoRoot?: string): ReferenceDoc[] {
+  const refs: ReferenceDoc[] = [];
+
+  if (repoRoot) {
+    const slug = resolveRepoSlug(repoRoot);
+    refs.push({
+      name: 'repo context',
+      path: `knowledge-base/repo-context/${slug}.md`,
+      summary: 'Before modifying code — provides file tree, dependencies, and key patterns',
+    });
+  }
+
+  refs.push(
     {
       name: 'kanban-workflow',
       path: 'skills/global/standards/kanban-workflow.md',
@@ -163,12 +179,18 @@ function selectReferenceModules(_modeType: string): ReferenceDoc[] {
       path: 'skills/global/standards/impact-analysis.md',
       summary: 'When ticket has doc_refs to a plan — identifies change surface and downstream consumers',
     },
-  ];
+  );
+
+  return refs;
 }
 
 /**
  * Generate a deployment primer document.
- * Replaces the heredoc-based primer generation in deploy.sh.
+ * Structure follows WHO → WHY → WHAT → HOW:
+ *   WHO:  deployment-context, team description, hierarchy, agents
+ *   WHY:  objective, additional instructions
+ *   WHAT: available skills (summary table), model policy
+ *   HOW:  core standards (inline), reference docs, bulletins, deployment instructions
  */
 export function generatePrimer(opts: PrimerOptions): string {
   const {
@@ -250,6 +272,8 @@ export function generatePrimer(opts: PrimerOptions): string {
 
   const modeBlock = effectiveMode ? `\nmode: ${effectiveMode}` : "";
 
+  // ─── WHO AM I? ────────────────────────────────────────────────────────────
+
   let primer = `# Deployment Primer: ${teamConfig.name}
 
 You are being deployed as the team manager for "${teamConfig.name}".
@@ -266,15 +290,6 @@ team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
 ${cwd ? `cwd: ${cwd}\n` : ""}${repoRoot ? `repo_root: ${repoRoot}\n` : ""}agents:
 ${agentsList}${modelsBlock}${modeBlock}
 </deployment-context>
-`;
-
-  if (repoRoot) {
-    primer += injectRepoContext(repoRoot);
-  }
-
-  primer += `
-Your identity is **team-manager** (team: **${teamName}**, deployment: **${deployId}**).
-You MUST follow all rules in the **Global Skills** section below — especially \`standards.md\`.
 
 ## Team Description
 ${teamConfig.description}
@@ -324,7 +339,6 @@ ${teamConfig.description}
   if (activeAgents.length === 0) {
     primer += "_No agents — team-manager only for this mode._\n\n";
   } else {
-    // Add agent sections with skill files
     for (const agent of activeAgents) {
       primer += `### Agent: ${agent.name}\n`;
       primer += `Role: ${agent.role}\n`;
@@ -335,27 +349,54 @@ ${teamConfig.description}
         primer += `Model: ${agentEffectiveModel}\n`;
       }
 
-      if (agent.skill) {
-        const skillPath = resolveFile(agent.skill);
-        if (skillPath && existsSync(skillPath)) {
-          const skillContent = readFileSync(skillPath, "utf-8");
-          primer += `\n<skill-file name="${agent.name}">\n`;
-          primer += skillContent;
-          // skillContent typically ends with \n, so </skill-file> goes on next line
-          if (!skillContent.endsWith("\n")) primer += "\n";
-          primer += "</skill-file>\n";
+      // AC14 bug fix: check agent.instruction first, fall back to agent.skill
+      const instructionFile = agent.instruction ?? agent.skill;
+      if (instructionFile) {
+        const instPath = resolveFile(instructionFile);
+        if (instPath && existsSync(instPath)) {
+          const instContent = readFileSync(instPath, "utf-8");
+          const tag = agent.instruction ? "instruction-file" : "skill-file";
+          primer += `\n<${tag} name="${agent.name}">\n`;
+          primer += instContent;
+          if (!instContent.endsWith("\n")) primer += "\n";
+          primer += `</${tag}>\n`;
         }
       }
       primer += "\n";
     }
   }
 
-  // Add mode skills section if mode has skills
+  // ─── WHY AM I HERE? ───────────────────────────────────────────────────────
+
+  // Objective — use mode file content if available, else fall back to YAML objective
+  let objectiveContent: string = teamConfig.objective;
+  if (modeConfig?.objective) {
+    const objectivePath = resolveFile(modeConfig.objective);
+    if (objectivePath && existsSync(objectivePath)) {
+      objectiveContent = readFileSync(objectivePath, "utf-8");
+    }
+  }
+  // Apply template variable substitution (backward compatible — files without {{VAR}} pass through unchanged)
+  objectiveContent = applyTemplateVars(objectiveContent, allTemplateVars);
+  // objectiveContent typically ends with \n
+  primer += `## Objective\n\n${objectiveContent}`;
+
+  // Extra objective (if provided)
+  if (extraObjective) {
+    primer += `\n## Additional Instructions\n\n${extraObjective}\n`;
+  }
+
+  // ─── WHAT CAN I DO? ───────────────────────────────────────────────────────
+
+  // Available Skills — compact summary table (reads frontmatter only, not full content)
   if (modeConfig?.skills?.length) {
-    primer += "## Mode Skills\n\n";
-    primer += `Skills available in **${modeConfig.id}** mode:\n\n`;
+    primer += `\n## Available Skills\n\n`;
+    primer += `> These skills are available for this deployment mode. Load them with the Read tool when needed.\n\n`;
+    primer += `| Skill | Description | Path |\n`;
+    primer += `|-------|-------------|------|\n`;
     for (const skill of modeConfig.skills) {
-      primer += `- ${skill.name} (${skill['inject-as']})\n`;
+      const row = resolveSkillSummary(skill.name);
+      if (row) primer += row;
     }
     primer += "\n";
   }
@@ -386,14 +427,16 @@ When spawning unplanned sub-agents, use this policy:
     }
   }
 
-  // Inject global skills — standards modules selected by mode type
-  primer += "## Global Skills (apply to ALL agents)\n\n";
+  // ─── HOW DO I WORK? ───────────────────────────────────────────────────────
+
+  // Core Standards — core.md (always injected) + any global_docs for this mode
+  primer += "## Core Standards\n\n";
 
   const modeType = modeConfig?.mode_type ?? 'work';
   const selectedModules = selectModules(modeType);
-  const referenceModules = selectReferenceModules(modeType);
+  const referenceModules = selectReferenceModules(modeType, repoRoot);
   const seenModules = new Set<string>();
-  const referenceNames = new Set(referenceModules.map(r => r.name));
+  const referenceNames = new Set(referenceModules.map(r => r.name.replace(/ /g, '-')));
 
   const globalDirs: string[] = [];
   if (configDir) {
@@ -421,18 +464,7 @@ When spawning unplanned sub-agents, use this policy:
     }
   }
 
-  // Layer 2: Shared skills from mode.skills[] (resolved from ~/.claude/skills/)
-  if (modeConfig?.skills?.length) {
-    for (const skillEntry of modeConfig.skills) {
-      const resolved = resolveSharedSkill(skillEntry.name, skillEntry['inject-as']);
-      if (resolved) {
-        primer += resolved;
-        primer += "\n";
-      }
-    }
-  }
-
-  // Inject team/mode-scoped global docs (e.g. kanban-workflow, workflow-policy)
+  // Inject team/mode-scoped global docs (e.g. review-code-quality.md for review mode)
   // Team-level global_docs are the baseline; mode-level global_docs extend them. Deduplicated.
   const teamGlobalDocs = teamConfig.global_docs ?? [];
   const modeGlobalDocs = modeConfig?.global_docs ?? [];
@@ -452,17 +484,17 @@ When spawning unplanned sub-agents, use this policy:
     primer += "\n</global-skill>\n\n";
   }
 
-  // Add Reference Documents section (Tier 3 — on-demand reference docs)
+  // Reference Documents (Tier 3 — on-demand; includes repo context when repoRoot is set)
   if (referenceModules.length > 0) {
     primer += `## Reference Documents (read on demand)
 
-> These documents are available for detailed reference. Use the Read tool to access them when you need specific guidance.
+> These documents are available for detailed reference. Use the Read tool to access them when needed.
 
 | Document | Path | When to read |
 |----------|------|-------------|
 `;
     for (const ref of referenceModules) {
-      primer += `| ${ref.name.replace(/-/g, ' ')} | \`${ref.path}\` | ${ref.summary} |\n`;
+      primer += `| ${ref.name} | \`${ref.path}\` | ${ref.summary} |\n`;
     }
     primer += "\n";
   }
@@ -493,44 +525,32 @@ When spawning unplanned sub-agents, use this policy:
     // Bulletins dir not yet created — skip injection silently
   }
 
-  // Objective — use mode file content if available, else fall back to YAML objective
-  let objectiveContent: string = teamConfig.objective;
-  if (modeConfig?.objective) {
-    const objectivePath = resolveFile(modeConfig.objective);
-    if (objectivePath && existsSync(objectivePath)) {
-      objectiveContent = readFileSync(objectivePath, "utf-8");
-    }
-  }
-  // Apply template variable substitution (backward compatible — files without {{VAR}} pass through unchanged)
-  objectiveContent = applyTemplateVars(objectiveContent, allTemplateVars);
-  // objectiveContent typically ends with \n
-  primer += `\n## Objective\n\n${objectiveContent}`;
-
-  // Extra objective (if provided)
-  if (extraObjective) {
-    primer += `\n## Additional Instructions\n\n${extraObjective}\n`;
-  }
-
-  // Deployment instructions — simplified for solo modes
+  // Deployment instructions — includes required skills to load on startup
   const isSolo = modeConfig?.solo === true || agentNames.length === 0;
   if (isSolo) {
     primer += `
 ## Deployment Instructions
 
-1. **Read the global standards** in the Global Skills section — especially \`standards.md\`
+1. **Load required skills** — Read and follow these before starting:
+   - \`~/.claude/skills/pa-session-log/SKILL.md\` (session logging)
+   - \`~/.claude/skills/pa-ticket-workflow/SKILL.md\` (ticket workflow)
+   - \`~/.claude/skills/pa-startup/SKILL.md\` (startup priority)
 2. **Work on the objective** — you are a SOLO operator, do all work yourself, no sub-agents
-3. **Shutdown sequence** — follow standards §6: write session log → write completion marker → exit
+3. **Shutdown sequence** — follow core standards §6: write session log → write completion marker → exit
 `;
   } else {
     primer += `
 ## Deployment Instructions
 
-1. **Read the global standards** in the Global Skills section — especially \`standards.md\`
+1. **Load required skills** — Read and follow these before starting:
+   - \`~/.claude/skills/pa-session-log/SKILL.md\` (session logging)
+   - \`~/.claude/skills/pa-ticket-workflow/SKILL.md\` (ticket workflow)
+   - \`~/.claude/skills/pa-startup/SKILL.md\` (startup priority)
 2. **Create the team** using TeamCreate with team name "${teamName}"
-3. **Spawn each agent** — pass deployment context per standards §3 (deployment_id, team_name, parent)
+3. **Spawn each agent** — pass deployment context per core standards §3 (deployment_id, team_name, parent)
 4. **Create tasks** from the objective and assign to agents
 5. **Coordinate** — monitor via TaskList, unblock as needed
-6. **Shutdown sequence** — follow standards §6: sub-agents log → agents log → you log → write completion marker → exit
+6. **Shutdown sequence** — follow core standards §6: sub-agents log → agents log → you log → write completion marker → exit
 `;
   }
 
