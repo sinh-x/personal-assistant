@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-03-25
+
+### Added
+
+- **api**: PA-910 — POST /api/deploy returns HTTP 202 immediately ([`90802f0`])
+- **deploy**: PA-948 — add --provider minimax flag for Minimax API routing ([`34c52dd`])
+- **tickets**: PA-949 phase 1 - add marked + marked-terminal deps ([`3a6afd3`])
+- **tickets**: PA-949 phase 2 - create display module ([`d90c33f`])
+- **primer**: PA-950 phase 1 - refactor selectModules to tiered injection ([`a8a047e`])
+- **primer**: PA-950 phase 2 - clean YAML global_docs and add Phase 0 ([`df57367`])
+- **types**: PA-953 phase 2 - add instruction field and SkillEntry type ([`7691716`])
+- **primer**: PA-953 phase 3 - add resolveSharedSkill and mode skills injection ([`9990826`])
+- **requirements**: PA-953 phase 4 - pilot new schema with requirements team ([`f9b4912`])
+- **primer**: PA-953 phase 8 - WHO/WHY/WHAT/HOW restructure ([`dbd086e`])
+
+### Fixed
+
+- **deploy**: PA-948 review fixes — env file security, model vars, status display ([`914da02`])
+- Update pnpmDeps hash for ansi-escapes-7.3.0 ([`d6eff4a`])
+
 ## [0.4.2] - 2026-03-24
 
 ### Added
