@@ -101,16 +101,40 @@ interface ReferenceDoc {
 }
 
 /**
- * Returns the list of inline standards module names (Tier 1+2) to include for a given mode type.
- * Tier 1: core, cli-reference (always inline — needed throughout every session)
- * Tier 2: work/housekeeping (mode-specific inline — active instructions for the mode)
+ * Resolve a shared skill from ~/.claude/skills/<name>/SKILL.md and return it wrapped
+ * in the XML tag specified by injectAs.
+ *
+ * @param name - Skill directory name (e.g., "pa-cli", "pa-session-log")
+ * @param injectAs - How to wrap the content: 'global-skill', 'shared-skill', or 'reference'
+ * @returns XML-wrapped skill content, or empty string if not found
+ */
+function resolveSharedSkill(name: string, injectAs: 'global-skill' | 'shared-skill' | 'reference'): string {
+  const skillPath = resolve(homedir(), ".claude/skills", name, "SKILL.md");
+  if (!existsSync(skillPath)) {
+    process.stderr.write(`Warning: shared skill not found: ${skillPath}\n`);
+    return "";
+  }
+  const content = readFileSync(skillPath, "utf-8");
+  // For 'reference' type, we inject as a named reference block rather than a skill tag
+  // The reference tag is used for Tier 3 on-demand docs
+  const tag = injectAs === 'reference' ? 'reference' : injectAs;
+  let wrapped = `<${tag} name="${name}">\n`;
+  wrapped += content;
+  if (!content.endsWith("\n")) wrapped += "\n";
+  wrapped += `</${tag}>\n`;
+  return wrapped;
+}
+
+/**
+ * Returns the list of inline standards module names (Tier 1 only) to include for a given mode type.
+ * Tier 1: core.md (always injected global base — identity, error handling, shutdown protocol)
+ * Tier 2 (mode skills): handled separately via mode.skills[] array in generatePrimer()
  * Tier 3: kanban-workflow, workflow-policy, codebase-exploration, impact-analysis → on-demand reference
  */
-function selectInlineModules(modeType: string): string[] {
-  if (modeType === 'housekeeping') {
-    return ['core', 'housekeeping', 'cli-reference'];
-  }
-  return ['core', 'work', 'cli-reference'];
+function selectModules(_modeType: string): string[] {
+  // Only core.md is always-injected as the global base.
+  // All other skills are explicitly listed in the mode's skills[] array.
+  return ['core'];
 }
 
 /**
@@ -366,7 +390,7 @@ When spawning unplanned sub-agents, use this policy:
   primer += "## Global Skills (apply to ALL agents)\n\n";
 
   const modeType = modeConfig?.mode_type ?? 'work';
-  const selectedModules = selectInlineModules(modeType);
+  const selectedModules = selectModules(modeType);
   const referenceModules = selectReferenceModules(modeType);
   const seenModules = new Set<string>();
   const referenceNames = new Set(referenceModules.map(r => r.name));
@@ -377,6 +401,7 @@ When spawning unplanned sub-agents, use this policy:
   }
   globalDirs.push(resolve(homeDir, "skills/global"));
 
+  // Layer 3: Global base — only core.md (always injected)
   for (const gdir of globalDirs) {
     if (!existsSync(gdir)) continue;
     const standardsDir = resolve(gdir, "standards");
@@ -393,6 +418,17 @@ When spawning unplanned sub-agents, use this policy:
       primer += content;
       if (!content.endsWith("\n")) primer += "\n";
       primer += "\n</global-skill>\n\n";
+    }
+  }
+
+  // Layer 2: Shared skills from mode.skills[] (resolved from ~/.claude/skills/)
+  if (modeConfig?.skills?.length) {
+    for (const skillEntry of modeConfig.skills) {
+      const resolved = resolveSharedSkill(skillEntry.name, skillEntry['inject-as']);
+      if (resolved) {
+        primer += resolved;
+        primer += "\n";
+      }
     }
   }
 
