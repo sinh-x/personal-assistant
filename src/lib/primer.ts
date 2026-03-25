@@ -94,17 +94,52 @@ function injectRepoContext(repoRoot: string): string {
   return `\n## Repository Context\n\n${contextContent}`;
 }
 
+interface ReferenceDoc {
+  name: string;
+  path: string;
+  summary: string;
+}
+
 /**
- * Returns the list of standards module names to include for a given mode type.
- *   'housekeeping' → ['core', 'housekeeping']
- *   'work'         → ['core', 'work', 'inbox-output']
- *   'interactive'  → ['core', 'work', 'inbox-output']
+ * Returns the list of inline standards module names (Tier 1+2) to include for a given mode type.
+ * Tier 1: core, cli-reference (always inline — needed throughout every session)
+ * Tier 2: work/housekeeping (mode-specific inline — active instructions for the mode)
+ * Tier 3: kanban-workflow, workflow-policy, codebase-exploration, impact-analysis → on-demand reference
  */
-function selectModules(modeType: string): string[] {
+function selectInlineModules(modeType: string): string[] {
   if (modeType === 'housekeeping') {
-    return ['core', 'housekeeping', 'cli-reference', 'kanban-workflow', 'workflow-policy'];
+    return ['core', 'housekeeping', 'cli-reference'];
   }
-  return ['core', 'work', 'inbox-output', 'cli-reference', 'kanban-workflow', 'workflow-policy', 'codebase-exploration', 'impact-analysis'];
+  return ['core', 'work', 'cli-reference'];
+}
+
+/**
+ * Returns the list of on-demand reference documents (Tier 3) for a given mode type.
+ * These are listed in the Reference Documents section rather than injected inline.
+ */
+function selectReferenceModules(_modeType: string): ReferenceDoc[] {
+  return [
+    {
+      name: 'kanban-workflow',
+      path: 'skills/global/standards/kanban-workflow.md',
+      summary: 'Before making ticket status transitions — defines lifecycle, role ownership, Sinh gates',
+    },
+    {
+      name: 'workflow-policy',
+      path: 'skills/global/policy/workflow-policy.md',
+      summary: 'For edge cases: UAT skip conditions, bug fast-track, executor selection. Overrides kanban-workflow',
+    },
+    {
+      name: 'codebase-exploration',
+      path: 'skills/global/standards/codebase-exploration.md',
+      summary: 'Before modifying code in an unfamiliar repo — entry-point identification and deep dives',
+    },
+    {
+      name: 'impact-analysis',
+      path: 'skills/global/standards/impact-analysis.md',
+      summary: 'When ticket has doc_refs to a plan — identifies change surface and downstream consumers',
+    },
+  ];
 }
 
 /**
@@ -331,8 +366,10 @@ When spawning unplanned sub-agents, use this policy:
   primer += "## Global Skills (apply to ALL agents)\n\n";
 
   const modeType = modeConfig?.mode_type ?? 'work';
-  const selectedModules = selectModules(modeType);
+  const selectedModules = selectInlineModules(modeType);
+  const referenceModules = selectReferenceModules(modeType);
   const seenModules = new Set<string>();
+  const referenceNames = new Set(referenceModules.map(r => r.name));
 
   const globalDirs: string[] = [];
   if (configDir) {
@@ -369,11 +406,29 @@ When spawning unplanned sub-agents, use this policy:
     const docPath = resolveFile(docRelPath);
     if (!docPath || !existsSync(docPath)) continue;
     const docName = docRelPath.split("/").pop()?.replace(/\.md$/, "") ?? docRelPath;
+    // Skip if already injected as inline or reference module (dedup guard)
+    if (seenModules.has(docName) || referenceNames.has(docName)) continue;
+    seenModules.add(docName);
     const docContent = readFileSync(docPath, "utf-8");
     primer += `<global-skill name="${docName}">\n`;
     primer += docContent;
     if (!docContent.endsWith("\n")) primer += "\n";
     primer += "\n</global-skill>\n\n";
+  }
+
+  // Add Reference Documents section (Tier 3 — on-demand reference docs)
+  if (referenceModules.length > 0) {
+    primer += `## Reference Documents (read on demand)
+
+> These documents are available for detailed reference. Use the Read tool to access them when you need specific guidance.
+
+| Document | Path | When to read |
+|----------|------|-------------|
+`;
+    for (const ref of referenceModules) {
+      primer += `| ${ref.name.replace(/-/g, ' ')} | \`${ref.path}\` | ${ref.summary} |\n`;
+    }
+    primer += "\n";
   }
 
   // Inject active bulletins so running/sub-agents are aware of system-wide blocks
