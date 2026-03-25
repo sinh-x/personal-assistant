@@ -20,10 +20,11 @@
 
 import { Hono } from "hono";
 import type { Context } from "hono";
+import { marked } from "marked";
 import { TicketStore } from "../../tickets/index.js";
 import { validateAuthor, validateAssignee } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
-import type { CreateTicketInput, UpdateTicketInput } from "../../tickets/types.js";
+import type { CreateTicketInput, UpdateTicketInput, Comment } from "../../tickets/types.js";
 import { listRepos } from "../../repos.js";
 
 export function ticketRoutes(): Hono {
@@ -118,11 +119,34 @@ export function ticketRoutes(): Hono {
   });
 
   // GET /api/tickets/:id — get single ticket
+  // Supports ?render=html query param to return content fields as rendered HTML
   app.get("/api/tickets/:id", (c: Context) => {
     const id = c.req.param("id") as string;
+    const renderHtml = c.req.query("render") === "html";
     const ticket = store.get(id);
     if (!ticket) {
       return c.json({ error: "Ticket not found", code: "NOT_FOUND" }, 404);
+    }
+    if (renderHtml) {
+      // Render content fields to HTML using marked
+      const renderToHtml = (content: string): string => {
+        if (!content) return "";
+        try {
+          return marked.parse(content, { async: false }) as string;
+        } catch {
+          return content;
+        }
+      };
+      const htmlTicket = {
+        ...ticket,
+        summary: renderToHtml(ticket.summary ?? ""),
+        description: renderToHtml(ticket.description ?? ""),
+        comments: (ticket.comments ?? []).map((comment: Comment) => ({
+          ...comment,
+          content: renderToHtml(comment.content),
+        })),
+      };
+      return c.json({ ticket: htmlTicket });
     }
     return c.json({ ticket });
   });
