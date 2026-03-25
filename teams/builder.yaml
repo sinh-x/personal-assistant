@@ -1,7 +1,7 @@
 name: builder
 model: sonnet  # implementation work requires judgment and code reasoning
 description: "Execute multi-phase implementation projects for the personal-assistant system"
-default_mode: background
+default_mode: implement
 
 deploy_modes:
   - id: housekeeping
@@ -10,64 +10,86 @@ deploy_modes:
     mode_type: housekeeping
     agents: []
     objective: skills/global/housekeeping-objective.md
-  - id: background
-    label: Background
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+  - id: implement
+    label: Implement
     phone_visible: true
     mode_type: work
-  - id: foreground
-    label: Foreground
-    phone_visible: false
-    mode_type: work
+    agents: []  # solo, no sub-agents
+    objective: teams/builder/modes/implement.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
   - id: worker
     label: Worker
     phone_visible: false
     mode_type: interactive
-    objective: skills/builder-worker-objective.md
-  - id: interactive
-    label: Interactive
-    phone_visible: false
+    agents: []  # solo, no sub-agents
+    objective: teams/builder/modes/worker.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+  - id: orchestrator
+    label: Orchestrator
+    phone_visible: true
     mode_type: interactive
+    agents: []  # solo, no sub-agents
+    objective: teams/builder/modes/orchestrator.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
 
 context:
   organization: sinh-x
   notes: >
-    Solo agent. Deploy with --objective pointing to a specific implementation plan
-    and phase. Each deployment executes ONE phase, commits, and reports.
+    Solo agent team. Three execution modes:
+    - worker: interactive session awaiting user instructions
+    - implement: autonomous ticket-driven execution (one phase per deployment)
+    - orchestrator: cross-team pipeline manager launching builder/implement via pa deploy
     Increase PA_MAX_RUNTIME to 3600 (1 hour) for builder deployments.
 
 agents:
-  - name: architect
-    role: "Read implementation plans, execute one phase at a time, commit and verify"
-    skill: skills/builder.md
+  - name: builder-agent
+    role: "Executes implementation work: interactive (worker), autonomous (implement), or orchestration (orchestrator)"
+    instruction: teams/builder/modes/implement.md
 
 objective: |
   You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
 
-  You are the builder agent. You execute implementation work one phase at a time.
+  You are the builder agent. Run with --mode worker (interactive), --mode implement (autonomous), or --mode orchestrator (launcher).
 
-  ## Work Selection Priority
-
-  **If an "Additional Instructions" section exists below, that is your PRIMARY objective.**
-  Use it as the work item — skip the inbox/ongoing scan entirely and execute it directly.
-
-  **Otherwise**, fall back to inbox/ongoing scanning:
-  1. Check `~/Documents/ai-usage/agent-teams/builder/ongoing/` FIRST for in-progress items from previous deployments
-  1a. When you pick up an inbox item for multi-step work, move it to `agent-teams/builder/ongoing/` BEFORE starting work. Move to `done/` only when ALL phases are complete.
-  2. Then check `~/Documents/ai-usage/agent-teams/builder/inbox/` for new items.
-
-  ## Execution Steps
-
-  Once you have your work item (from CLI objective or inbox):
-  1. Read the plan document to identify the target repo path and branch name
-  2. **Switch to the repo path** — cd to the repo before doing anything else
-  3. **Pre-flight branch check** — see skills/builder.md §Pre-flight Checks
-  4. Identify which phase to execute next (check git log + item checklist for completed phases)
-  5. Execute ONLY that one phase
-  6. Verify the phase (run tests, type checks, compare output)
-  7. Commit with conventional commit message: `feat(<scope>): phase N - description`
-  8. Update the inbox item — check off completed phase (`- [ ]` → `- [x]`)
-  9. If ALL phases are checked off: move item `ongoing/ → done/`. Otherwise leave in `ongoing/`.
-  10. Add completion comment on the working ticket: `pa ticket comment <id> --author team-manager --content "Phase N complete: <summary>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"`
-
-  IMPORTANT: ONE phase per deployment. Do not attempt multiple phases.
-  If a phase fails verification, stop and report. Do not proceed to the next phase.
+  Default mode: implement. Use --mode worker for interactive sessions or --mode orchestrator for pipeline coordination.
