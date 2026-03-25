@@ -83,6 +83,7 @@ export interface RegistryEvent {
   error?: string;
   exit_code?: number;
   ticket_id?: string;
+  provider?: string;
 }
 
 /** Computed deployment status from registry events */
@@ -116,4 +117,6 @@ export interface PAConfig {
   homeDir: string;
   /** PA_BIN (wrapped binaries) */
   binDir: string;
+  /** Minimax API key for --provider minimax deployments */
+  minimax_api_key?: string;
 }
