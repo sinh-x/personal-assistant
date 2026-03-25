@@ -17,10 +17,6 @@ deploy_modes:
     agents: []  # solo TM — no sub-agents
     objective: teams/orchestrator/modes/orchestration.md
 
-global_docs:
-  - skills/global/standards/kanban-workflow.md
-  - skills/global/policy/workflow-policy.md
-
 context:
   organization: sinh-x
   notes: >

@@ -36,3 +36,5 @@ export type {
 } from "./metrics.js";
 
 export { validateAuthor, validateAssignee, matchAssignee, getValidTeamNames } from "./validate.js";
+
+export { formatTicketCard } from "./display.js";
