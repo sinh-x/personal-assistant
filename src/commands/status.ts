@@ -16,6 +16,8 @@ interface DeploymentRecord {
   summary?: string;
   agents: string;
   primer?: string;
+  provider?: string;
+  models?: Record<string, string>;
 }
 
 /** Format ISO timestamp to short form: "YYYY-MM-DD HH:MM:SS" */
@@ -58,6 +60,8 @@ function buildDeployments(events: RegistryEvent[]): Map<string, DeploymentRecord
           agents,
           primer: event.primer,
           status: "running",
+          provider: event.provider,
+          models: event.models,
         });
         break;
       }
@@ -134,6 +138,13 @@ function showDetail(did: string, rec: DeploymentRecord): void {
     }
   }
 
+  if (rec.provider && rec.provider !== "anthropic") {
+    console.log(`  Provider: ${rec.provider}`);
+  }
+  if (rec.models && Object.keys(rec.models).length > 0) {
+    const modelStr = Object.entries(rec.models).map(([k, v]) => `${k}=${v}`).join(", ");
+    console.log(`  Models:   ${modelStr}`);
+  }
   console.log(`  Agents:   ${rec.agents || "none"}`);
   if (rec.pid !== undefined) {
     console.log(`  PID:      ${rec.pid}`);
@@ -226,6 +237,7 @@ function showList(
     const si = statusIcon(rec.status);
     const started = shortTs(rec.started);
     const ended = rec.ended ? shortTs(rec.ended) : "-";
+    const providerTag = rec.provider && rec.provider !== "anthropic" ? ` [${rec.provider}]` : "";
     let summary = rec.summary ?? "";
     if (summary.length > 50) {
       summary = summary.slice(0, 47) + "...";
@@ -233,7 +245,7 @@ function showList(
 
     // Match bash printf: "%-12s %-22s [%-2s] %-4s %-20s %-20s %s"
     console.log(
-      `${did.padEnd(12)} ${rec.team.padEnd(22)} [${si.padEnd(2)}] ${"".padEnd(4)} ${started.padEnd(20)} ${ended.padEnd(20)} ${summary}`
+      `${did.padEnd(12)} ${(rec.team + providerTag).padEnd(22)} [${si.padEnd(2)}] ${"".padEnd(4)} ${started.padEnd(20)} ${ended.padEnd(20)} ${summary}`
     );
   }
 }

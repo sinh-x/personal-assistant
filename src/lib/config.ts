@@ -30,10 +30,13 @@ export function loadConfig(): PAConfig {
   let configDir: string | undefined;
   let dataDir: string | undefined;
 
+  let minimaxApiKey: string | undefined;
+
   if (existsSync(configPath)) {
     const content = readFileSync(configPath, "utf-8");
     configDir = extractYamlValue(content, "config_dir");
     dataDir = extractYamlValue(content, "data_dir");
+    minimaxApiKey = extractYamlValue(content, "minimax_api_key");
   }
 
   // Environment variables override config file
@@ -45,5 +48,6 @@ export function loadConfig(): PAConfig {
     dataDir,
     homeDir: getHomeDir(),
     binDir: process.env["PA_BIN"] || resolve(getHomeDir(), "../bin"),
+    minimax_api_key: minimaxApiKey,
   };
 }
