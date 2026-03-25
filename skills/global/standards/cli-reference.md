@@ -22,6 +22,7 @@ deployment, and system operations.
 | `pa serve` | Start the agent API server | `--port`, `--host`, `--background`, `--cors` |
 | `pa ticket <sub>` | Manage tickets (see §Ticket) | — |
 | `pa bulletin <sub>` | Manage bulletins (see §Bulletin) | — |
+| `pa trash <sub>` | Soft-delete PA project files (see §Trash) | — |
 
 ## Ticket Subcommands
 
@@ -61,5 +62,15 @@ The `--project` flag accepts canonical keys from `repos.yaml`. Resolution order:
 Common keys: `pa` (PA·), `avodah` (AVO·), `ai-usage-log` (AUL·), `nixos` (NX·), `dot-files` (DOT·)
 
 Run `pa repos list` to see all configured project keys.
+
+## Trash Subcommands
+
+| Subcommand | Purpose | Key Flags |
+|-----------|---------|-----------|
+| `trash move <path>` | Soft-delete a file | `--reason`* `--actor` `--type` |
+| `trash list` | List trashed items | `--status` `--type` `--search` |
+| `trash show <id>` | Show full trash entry details | — |
+| `trash restore <id>` | Restore to original path | `--force` `--actor` |
+| `trash purge` | Delete items older than N days | `--days` (30) `--dry-run` `--actor` |
 
 `*` Required flag

@@ -94,3 +94,8 @@ export function getTicketsDir(): string {
 export function getBulletinsDir(): string {
   return expandHome("~/Documents/ai-usage/bulletins");
 }
+
+/** Trash directory for soft-deleted PA project files */
+export function getTrashDir(): string {
+  return expandHome("~/Documents/ai-usage/trash");
+}
