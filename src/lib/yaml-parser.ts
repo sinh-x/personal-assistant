@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import yaml from "js-yaml";
-import type { TeamConfig, DeployMode, Hierarchy, HierarchyMember } from "./types.js";
+import type { TeamConfig, DeployMode, Hierarchy, HierarchyMember, SkillEntry } from "./types.js";
 
 /**
  * Parse a team YAML file into a typed TeamConfig.
@@ -13,6 +13,7 @@ export function parseTeamYaml(filePath: string): TeamConfig {
   const agents = (raw["agents"] as Array<Record<string, string>>).map((a) => ({
     name: a["name"],
     role: a["role"],
+    instruction: a["instruction"],
     skill: a["skill"],
     model: a["model"] as TeamConfig["model"] | undefined,
   }));
@@ -21,17 +22,28 @@ export function parseTeamYaml(filePath: string): TeamConfig {
   let deployModes: DeployMode[] | undefined;
   const rawModes = raw["deploy_modes"] as Array<Record<string, unknown>> | undefined;
   if (rawModes) {
-    deployModes = rawModes.map((m) => ({
-      id: m["id"] as string,
-      label: m["label"] as string,
-      phone_visible: m["phone_visible"] as boolean | undefined,
-      objective: m["objective"] as string | undefined,
-      agents: m["agents"] as string[] | undefined,
-      skills: m["skills"] as string[] | undefined,
-      mode_type: m["mode_type"] as DeployMode["mode_type"] | undefined,
-      solo: m["solo"] as boolean | undefined,
-      global_docs: m["global_docs"] as string[] | undefined,
-    }));
+    deployModes = rawModes.map((m) => {
+      // Parse skills[] as SkillEntry[] — each entry has name + inject-as
+      const rawSkills = m["skills"] as Array<Record<string, string>> | undefined;
+      const skills: SkillEntry[] | undefined = rawSkills
+        ? rawSkills.map((s) => ({
+            name: s["name"],
+            "inject-as": s["inject-as"] as SkillEntry["inject-as"],
+          }))
+        : undefined;
+
+      return {
+        id: m["id"] as string,
+        label: m["label"] as string,
+        phone_visible: m["phone_visible"] as boolean | undefined,
+        objective: m["objective"] as string | undefined,
+        agents: m["agents"] as string[] | undefined,
+        skills,
+        mode_type: m["mode_type"] as DeployMode["mode_type"] | undefined,
+        solo: m["solo"] as boolean | undefined,
+        global_docs: m["global_docs"] as string[] | undefined,
+      };
+    });
   }
 
   // Parse hierarchy block
