@@ -31,10 +31,6 @@ deploy_modes:
     mode_type: work
     agents: []  # solo, team-manager executes directly
 
-global_docs:
-  - skills/global/standards/kanban-workflow.md
-  - skills/global/policy/workflow-policy.md
-
 context:
   organization: sinh-x
   notes: >

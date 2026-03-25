@@ -23,6 +23,21 @@ Read `repo_root` from the `<deployment-context>` block in your primer.
   Do not read files outside `repo_root`. Use `repo_root` as the `Repository:` value in the output doc.
 - If `repo_root` is absent: proceed without a restriction (legacy / non-git context).
 
+### Phase 0: Validate Codebase Assumptions
+
+Before asking the user questions, run a quick validation of the codebase state:
+
+1. Read `repo_root` key files: `package.json`, `CLAUDE.md`, top-level directory listing
+2. Check for existing implementations related to the topic:
+   - Search for relevant function names, API endpoints, or modules
+   - Verify that assumed "missing" features are actually missing
+3. Note any discrepancies between ticket assumptions and actual codebase state
+
+This prevents requirements docs from claiming something is missing when it already exists
+(as happened with AVO-005, where a comment API was already implemented).
+
+Report findings: "Validation check complete. Found: [X exists, Y is missing as expected]."
+
 ### Phase 1: Understand the Problem (2-3 questions)
 
 Start by understanding what the user wants at a high level:
