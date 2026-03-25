@@ -1,3 +1,6 @@
+/** Runtime to use for agent invocation */
+export type Runtime = "claude" | "opencode";
+
 /** Mode-specific deployment configuration within a team */
 export interface DeployMode {
   id: string;
@@ -45,6 +48,8 @@ export interface TeamConfig {
   agents: Agent[];
   objective: string;
   model?: 'haiku' | 'sonnet' | 'opus';
+  /** Runtime to use for this team (overrides global config; CLI --runtime overrides this) */
+  runtime?: Runtime;
   /** Available deployment modes for this team */
   deploy_modes?: DeployMode[];
   /** Default mode to use when no --mode flag is provided */
@@ -80,6 +85,7 @@ export interface RegistryEvent {
   primer?: string;
   agents?: string[];
   models?: Record<string, string>;
+  runtime?: Runtime;
   error?: string;
   exit_code?: number;
   ticket_id?: string;
@@ -116,4 +122,6 @@ export interface PAConfig {
   homeDir: string;
   /** PA_BIN (wrapped binaries) */
   binDir: string;
+  /** Default runtime for all deployments (CLI --runtime overrides) */
+  runtime?: Runtime;
 }

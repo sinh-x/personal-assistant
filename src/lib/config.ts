@@ -2,7 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { getUserConfigPath, getHomeDir, getDataDir } from "./paths.js";
-import type { PAConfig } from "./types.js";
+import type { PAConfig, Runtime } from "./types.js";
 
 /** Simple YAML key extractor for the flat config file */
 function extractYamlValue(content: string, key: string): string | undefined {
@@ -30,10 +30,16 @@ export function loadConfig(): PAConfig {
   let configDir: string | undefined;
   let dataDir: string | undefined;
 
+  let runtime: Runtime | undefined;
+
   if (existsSync(configPath)) {
     const content = readFileSync(configPath, "utf-8");
     configDir = extractYamlValue(content, "config_dir");
     dataDir = extractYamlValue(content, "data_dir");
+    const runtimeVal = extractYamlValue(content, "runtime");
+    if (runtimeVal === "opencode" || runtimeVal === "claude") {
+      runtime = runtimeVal;
+    }
   }
 
   // Environment variables override config file
@@ -45,5 +51,6 @@ export function loadConfig(): PAConfig {
     dataDir,
     homeDir: getHomeDir(),
     binDir: process.env["PA_BIN"] || resolve(getHomeDir(), "../bin"),
+    runtime,
   };
 }

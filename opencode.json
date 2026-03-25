@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "build": {
+      "permission": {
+        "bash": "allow",
+        "read": "allow",
+        "edit": "allow",
+        "external_directory": {
+          "/home/sinh/Documents/ai-usage/*": "allow",
+          "/home/sinh/.local/share/personal-assistant/*": "allow",
+          "/home/sinh/git-repos/sinh-x/*": "allow"
+        }
+      }
+    }
+  }
+}

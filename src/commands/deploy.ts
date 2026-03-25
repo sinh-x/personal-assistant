@@ -12,29 +12,32 @@ import { spawnDetached } from "../utils/process.js";
 import { resolveRepo } from "../lib/repos.js";
 import { localISOTimestamp } from "../lib/time.js";
 import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
+import { resolveRuntime, type AgentRuntime } from "../lib/runtime.js";
 
-const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
-
-/** Resolve effective model for team-manager and each agent, applying Sonnet floor and validation */
+/** Resolve effective model for team-manager and each agent, applying runtime-specific validation */
 function resolveEffectiveModels(
   teamConfig: TeamConfig,
+  runtime: AgentRuntime,
   opts: { teamModel?: string; agentModel?: string }
 ): { tmModel: string | undefined; agentModels: Record<string, string | undefined> } {
   let tmModel: string | undefined = opts.teamModel ?? teamConfig.model ?? undefined;
-  if (tmModel === "haiku") {
+
+  // Claude-specific: apply haiku→sonnet floor policy
+  if (runtime.name === "claude" && tmModel === "haiku") {
     console.log('Warning: team-manager model "haiku" upgraded to "sonnet" (minimum floor)');
     tmModel = "sonnet";
   }
-  if (tmModel !== undefined && !VALID_MODELS.has(tmModel)) {
-    console.warn(`Warning: unknown model "${tmModel}" for team-manager — ignored`);
+
+  if (tmModel !== undefined && !runtime.validateModel(tmModel)) {
+    console.warn(`Warning: unknown model "${tmModel}" for team-manager on ${runtime.name} runtime — ignored`);
     tmModel = undefined;
   }
 
   const agentModels: Record<string, string | undefined> = {};
   for (const agent of teamConfig.agents) {
     const m = opts.agentModel ?? agent.model ?? teamConfig.model ?? undefined;
-    if (m !== undefined && !VALID_MODELS.has(m)) {
-      console.warn(`Warning: unknown model "${m}" for agent "${agent.name}" — ignored`);
+    if (m !== undefined && !runtime.validateModel(m)) {
+      console.warn(`Warning: unknown model "${m}" for agent "${agent.name}" on ${runtime.name} runtime — ignored`);
       agentModels[agent.name] = undefined;
     } else {
       agentModels[agent.name] = m;
@@ -105,6 +108,7 @@ export function deployCommand(
     direct?: boolean;
     teamModel?: string;
     agentModel?: string;
+    runtime?: string;
     mode?: string;
     listModes?: boolean;
     repo?: string;
@@ -165,6 +169,9 @@ export function deployCommand(
 
   // Use YAML name field as canonical team name (overrides filename-derived name)
   if (!teamName) teamName = teamConfig.name || basename(teamFile, ".yaml");
+
+  // Resolve runtime: CLI flag > team YAML > global config > default "claude"
+  const runtime = resolveRuntime(teamConfig.runtime ?? config.runtime, opts.runtime);
 
   // Handle --list-modes: print modes table and exit
   if (opts.listModes) {
@@ -335,12 +342,11 @@ export function deployCommand(
     repoRoot = resolved.path;
   }
 
-  // Resolve effective models
-  const { tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
+  // Resolve effective models (runtime-aware validation)
+  const { tmModel, agentModels } = resolveEffectiveModels(teamConfig, runtime, {
     teamModel: opts.teamModel,
     agentModel: opts.agentModel,
   });
-  const modelFlag = tmModel ? `--model ${tmModel}` : "";
 
   // Deployment env vars passed to claude so hooks can locate the activity log.
   // PA_ACTIVITY_LOG must be set here directly — CLAUDE_ENV_FILE only propagates
@@ -400,19 +406,20 @@ export function deployCommand(
     timestamp: deployTs,
     agents: agentNames,
     primer: primerFile,
+    runtime: runtime.name,
     ...(anyModelSet ? { models: modelsMap } : {}),
     ...(opts.ticket ? { ticket_id: opts.ticket } : {}),
   };
   appendRegistryEvent(startEvent);
 
-  // Build claude command
-  const claudePrompt = `Read the deployment primer at '${primerFile}' using the Read tool and follow ALL instructions in it exactly. Start immediately. When finished, write the completion marker and exit.`;
+  // Build agent prompt (runtime-agnostic)
+  const agentPrompt = `Read the deployment primer at '${primerFile}' using the Read tool and follow ALL instructions in it exactly. Start immediately. When finished, write the completion marker and exit.`;
 
   if (mode === "direct") {
     console.log(`Deploying team (direct): ${teamConfig.name} [${deployId}]`);
     appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
     try {
-      execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+      execSync(runtime.buildCommand(agentPrompt, { model: tmModel }), {
         stdio: "inherit",
         env: deployEnv,
       });
@@ -426,7 +433,7 @@ export function deployCommand(
     console.log("  You will be prompted to approve tool calls.");
     appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
     try {
-      execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+      execSync(runtime.buildCommand(agentPrompt, { model: tmModel }), {
         stdio: "inherit",
         env: deployEnv,
       });
@@ -439,7 +446,7 @@ export function deployCommand(
     console.log(`Deploying team (foreground): ${teamConfig.name} [${deployId}]`);
     appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
     try {
-      execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+      execSync(runtime.buildCommand(agentPrompt, { model: tmModel }), {
         stdio: "inherit",
         env: deployEnv,
       });
@@ -450,6 +457,12 @@ export function deployCommand(
     }
   } else {
     // Background mode
+    if (runtime.name !== "claude") {
+      console.error(`Error: Background mode is not supported for ${runtime.name} runtime (Phase 4 — deferred).`);
+      console.error(`  Use --interactive or --direct instead.`);
+      process.exit(1);
+    }
+
     const logFile = resolve(logsDir, `${teamName}-${deployId}.log`);
     console.log(`Deploying team (background): ${teamConfig.name} [${deployId}]`);
     console.log(`  Log: ${logFile}`);
@@ -461,6 +474,7 @@ export function deployCommand(
     const logHeader = `=== Deployment Log ===
 Deployment: ${deployId}
 Team:       ${teamName}
+Runtime:    ${runtime.name}
 Started:    ${deployTs}
 Timeout:    ${maxRuntime}s
 Primer:     ${primerFile}
@@ -478,16 +492,19 @@ Agents:     ${agentNames.join(" ")}
       bashPath = "/usr/bin/env bash";
     }
 
+    // Build background command via runtime abstraction
+    const bgCmd = runtime.buildBackgroundCommand(agentPrompt, { model: tmModel });
+
     // Build background script
     const bgScript = `
 export PA_DEPLOYMENT_ID='${deployId}'
 export PA_DEPLOYMENT_DIR='${deployDir}'
 export PA_ACTIVITY_LOG='${activityLog}'
-echo '[$(date -Iseconds)] claude starting...' >> '${logFile}'
-stdbuf -oL timeout '${maxRuntime}' claude ${modelFlag ? modelFlag + " " : ""}--dangerously-skip-permissions --print '${claudePrompt.replace(/'/g, "'\\''")}' >> '${logFile}' 2>'${logFile}.err'
+echo '[$(date -Iseconds)] ${runtime.name} starting...' >> '${logFile}'
+stdbuf -oL timeout '${maxRuntime}' ${bgCmd} >> '${logFile}' 2>'${logFile}.err'
 exit_code=$?
 echo '' >> '${logFile}'
-echo "[$(date -Iseconds)] claude exited with code $exit_code" >> '${logFile}'
+echo "[$(date -Iseconds)] ${runtime.name} exited with code $exit_code" >> '${logFile}'
 if [[ -s '${logFile}.err' ]]; then
   echo '' >> '${logFile}'
   echo '=== STDERR ===' >> '${logFile}'
