@@ -26,6 +26,18 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 
 ---
 
+## 4. File Deletion Policy
+
+**Never hard-delete PA project files** (skills, teams, objectives, modes). Use `pa trash move` instead:
+
+```bash
+pa trash move <path> --reason "<why>" --actor <team>/<agent> --type <skill|team|objective|mode|other>
+```
+
+Trashed files are retained for 30 days in `~/Documents/ai-usage/trash/` and can be restored with `pa trash restore <id>`. Sprint-master auto-purges expired entries during triage.
+
+---
+
 ## 5. Error Handling
 
 - **Never silently swallow errors.** Log them in your session and report to parent/manager.

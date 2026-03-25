@@ -147,6 +147,7 @@ complete -c pa -n __fish_use_subcommand -a serve        -d 'Start the agent API 
 complete -c pa -n __fish_use_subcommand -a ticket       -d 'Manage tickets'
 complete -c pa -n __fish_use_subcommand -a bulletin     -d 'Manage bulletins (deploy-time blockers)'
 complete -c pa -n __fish_use_subcommand -a registry     -d 'Manage deployment registry'
+complete -c pa -n __fish_use_subcommand -a trash        -d 'Soft-delete PA project files'
 
 # --- deploy: <team> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
@@ -280,3 +281,26 @@ complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcomm
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l status   -d 'Completion status' -r -a 'success partial failed'
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l summary  -d 'One-line summary of what was done' -r
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l log-file -d 'Session log file path (optional)' -r
+
+# --- trash: nested subcommands ---
+complete -c pa -n '__fish_seen_subcommand_from trash; and not __fish_seen_subcommand_from move list show restore purge' -a 'move list show restore purge'
+
+# trash move <path>
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from move' -l reason -d 'Why this file is being trashed' -r
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from move' -l actor  -d 'Who is trashing it' -r
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from move' -l type   -d 'File type' -r -a 'skill team objective mode other'
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from move' -F
+
+# trash list
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l status -d 'Filter by status' -r -a 'trashed restored purged'
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l type   -d 'Filter by file type' -r -a 'skill team objective mode other'
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l search -d 'Free-text search' -r
+
+# trash restore <id>
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore' -l force -d 'Overwrite if original path exists'
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore' -l actor -d 'Who is restoring' -r
+
+# trash purge
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from purge' -l days    -d 'Retention period in days' -r
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from purge' -l dry-run -d 'Show what would be purged without deleting'
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from purge' -l actor   -d 'Who is purging' -r

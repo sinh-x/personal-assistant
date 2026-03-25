@@ -168,6 +168,21 @@ pa ticket comment <id> --author sprint-master \
 
 Log the count of auto-closed FYI tickets in the daily digest Triage Summary section.
 
+### Step 8c — Auto-purge trash
+
+Purge soft-deleted files older than 30 days from the PA trash:
+
+```bash
+pa trash purge --days 30 --actor sprint-master/team-manager
+```
+
+If any files were purged, log the count in the daily digest Triage Summary section.
+
+To preview first without deleting:
+```bash
+pa trash purge --days 30 --dry-run
+```
+
 ### Step 9 — Suggest backlog for stale ideas
 
 During triage, find active `idea` tickets that have had no updates in 14 or more days
