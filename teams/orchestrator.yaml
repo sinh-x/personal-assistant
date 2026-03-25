@@ -1,3 +1,8 @@
+deprecated: true
+deprecated_by: builder
+deprecated_reason: "Orchestrator capabilities absorbed into builder team (orchestrator mode). Use 'pa deploy builder --mode orchestrator' instead."
+deprecated_date: "2026-03-26"
+
 name: orchestrator
 model: opus  # PM needs strong judgment
 description: "Cross-team pipeline manager — coordinates requirements, builder, and other teams"
