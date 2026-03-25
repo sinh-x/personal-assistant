@@ -355,7 +355,7 @@ ${teamConfig.description}
     primer += "## Mode Skills\n\n";
     primer += `Skills available in **${modeConfig.id}** mode:\n\n`;
     for (const skill of modeConfig.skills) {
-      primer += `- ${skill}\n`;
+      primer += `- ${skill.name} (${skill['inject-as']})\n`;
     }
     primer += "\n";
   }

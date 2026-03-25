@@ -77,7 +77,7 @@ function printModesTable(teamName: string, modes: DeployMode[] | undefined): voi
     m.label,
     m.phone_visible ? "yes" : "no",
     m.agents === undefined ? "all" : m.agents.length === 0 ? "(tm only)" : m.agents.join(", "),
-    m.skills?.join(", ") ?? "—",
+    m.skills?.length ? m.skills.map(s => s.name).join(", ") : "—",
   ]);
   const headers = ["ID", "LABEL", "PHONE", "AGENTS", "SKILLS"];
   const widths = headers.map((h, i) =>
@@ -194,20 +194,50 @@ export function deployCommand(
     return;
   }
 
-  // Handle --validate: check skill files, mode objective files, and template vars without deploying
+  // Handle --validate: check skill files, mode objective files, shared skills, and template vars without deploying
   if (opts.validate) {
     let allOk = true;
     const rows: Array<{ status: string; path: string; note: string }> = [];
 
-    // Check each agent skill file
+    // Check each agent skill/instruction file
     for (const agent of teamConfig.agents) {
+      // Check instruction field (new, preferred)
+      if (agent.instruction) {
+        const instPath = resolveFile(agent.instruction);
+        if (instPath && existsSync(instPath)) {
+          rows.push({ status: "OK", path: agent.instruction, note: `agent:${agent.name} instruction` });
+        } else {
+          rows.push({ status: "MISSING", path: agent.instruction, note: `agent:${agent.name} instruction` });
+          allOk = false;
+        }
+      }
+      // Also check deprecated skill field for backwards compat
       if (agent.skill) {
         const skillPath = resolveFile(agent.skill);
         if (skillPath && existsSync(skillPath)) {
-          rows.push({ status: "OK", path: agent.skill, note: `agent:${agent.name} skill` });
+          rows.push({ status: "OK", path: agent.skill, note: `agent:${agent.name} skill (deprecated)` });
         } else {
-          rows.push({ status: "MISSING", path: agent.skill, note: `agent:${agent.name} skill` });
+          rows.push({ status: "MISSING", path: agent.skill, note: `agent:${agent.name} skill (deprecated)` });
           allOk = false;
+        }
+      }
+    }
+
+    // Check shared skills from mode.skills[] (resolved from ~/.claude/skills/)
+    const sharedSkillDirs = new Set<string>();
+    for (const mode of teamConfig.deploy_modes ?? []) {
+      if (mode.skills) {
+        for (const skillEntry of mode.skills) {
+          // Dedupe by skill name
+          if (sharedSkillDirs.has(skillEntry.name)) continue;
+          sharedSkillDirs.add(skillEntry.name);
+          const skillPath = resolve(homedir(), ".claude/skills", skillEntry.name, "SKILL.md");
+          if (existsSync(skillPath)) {
+            rows.push({ status: "OK", path: `~/.claude/skills/${skillEntry.name}/SKILL.md`, note: `mode:${mode.id} shared-skill` });
+          } else {
+            rows.push({ status: "MISSING", path: `~/.claude/skills/${skillEntry.name}/SKILL.md`, note: `mode:${mode.id} shared-skill` });
+            allOk = false;
+          }
         }
       }
     }
