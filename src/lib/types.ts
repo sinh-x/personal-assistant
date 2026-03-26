@@ -79,6 +79,16 @@ export interface Agent {
   model?: 'haiku' | 'sonnet' | 'opus';
 }
 
+/** Session rating for agent self-evaluation, written to registry on completion */
+export interface Rating {
+  source: "agent" | "system" | "user";
+  overall: number;
+  productivity?: number;
+  quality?: number;
+  efficiency?: number;
+  insight?: number;
+}
+
 /** Events written to the deployment registry JSONL */
 export interface RegistryEvent {
   deployment_id: string;
@@ -96,6 +106,7 @@ export interface RegistryEvent {
   exit_code?: number;
   ticket_id?: string;
   provider?: string;
+  rating?: Rating;
 }
 
 /** Computed deployment status from registry events */
