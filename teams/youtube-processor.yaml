@@ -12,10 +12,16 @@ deploy_modes:
     mode_type: housekeeping
     agents: []
     objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: background
     label: Background
     phone_visible: true
     mode_type: work
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: foreground
     label: Foreground
     phone_visible: true

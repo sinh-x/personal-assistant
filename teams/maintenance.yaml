@@ -9,27 +9,42 @@ deploy_modes:
     mode_type: housekeeping
     agents: []
     objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: background
     label: Background
     phone_visible: true
     mode_type: work
     solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: foreground
     label: Foreground
     phone_visible: true
     mode_type: work
     solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: interactive
     label: Interactive
     phone_visible: false
     mode_type: interactive
     solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: repo-scan
     label: Repo Scan
     phone_visible: true
     mode_type: work
     solo: true
     objective: skills/maintenance/repo-scan-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."

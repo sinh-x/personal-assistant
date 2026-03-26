@@ -10,6 +10,9 @@ deploy_modes:
     mode_type: housekeeping
     agents: []
     objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: background
     label: Background
     phone_visible: false
@@ -31,6 +34,9 @@ agents:
 # This team is designed for background/scheduled use only.
 # Schedule: pa schedule rpm-gather weekly --at 21:00
 # Trigger manually: pa deploy rpm-gather --background
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
 objective: |
   You are running as a solo RPM gather agent — do NOT spawn sub-agents.
   You are in background mode. Do NOT ask Sinh any questions.

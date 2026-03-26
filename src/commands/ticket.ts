@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
+import { formatTicketCard } from "../lib/tickets/display.js";
 import type {
   Estimate,
   TicketStatus,
@@ -294,18 +295,21 @@ export function createTicketCommand(): Command {
     .command("show")
     .description("Show full ticket details")
     .argument("<id>", "Ticket ID (e.g. PA-001)")
-    .action((id: string) => {
+    .option("--json", "Output raw JSON instead of formatted card")
+    .action((id: string, opts: { json?: boolean }) => {
       const store = new TicketStore();
       const ticket = store.get(id);
       if (!ticket) {
         console.error(`Ticket not found: ${id}`);
         process.exit(1);
       }
-      console.log(JSON.stringify(ticket, null, 2));
-      // F6: Display doc_refs as a formatted table
-      const docRefs = ticket.doc_refs ?? [];
-      console.log("\n── Document References ──────────────────────────────────────────────");
-      console.log(formatDocRefsTable(docRefs));
+      if (opts.json) {
+        console.log(JSON.stringify(ticket, null, 2));
+        console.log("\n── Document References ──────────────────────────────────────────────");
+        console.log(formatDocRefsTable(ticket.doc_refs ?? []));
+      } else {
+        console.log(formatTicketCard(ticket));
+      }
     });
 
   // ── attach ─────────────────────────────────────────────────────────────────
