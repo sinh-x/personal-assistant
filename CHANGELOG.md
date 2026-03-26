@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.4] - 2026-03-26
+
+### Added
+
+- **trash**: Implement pa trash soft-delete protocol ([`316a5d3`])
+- **builder**: PA-969 - migrate to instruction: schema and add shared skills ([`ff752ef`])
+- **requirements**: PA-969 - restructure requirements team with analyze mode ([`936ff62`])
+- **requirements**: PA-982 - KPI framework and mode templates ([`8ca209f`])
+- **ticket**: Phase 3 - wire formatTicketCard to CLI show command ([`93be458`])
+- **api**: Phase 4 - add ?render=html to GET /api/tickets/:id ([`e8ba182`])
+- **api**: Phase 5 - add GET /api/images endpoint for image serving ([`b804afd`])
+- **teams**: Add pa-session-log to all team YAMLs ([`3e7728f`])
+- **registry**: Add rating options to pa registry complete command ([`616833b`])
+
+### Fixed
+
+- **orchestrator**: Add imperative delegation instruction to primer ([`7ef3651`])
+
 ## [0.4.3] - 2026-03-25
 
 ### Added
