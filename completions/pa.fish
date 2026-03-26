@@ -119,6 +119,11 @@ function __pa_bulletin_ids
     pa bulletin list 2>/dev/null | string match -rg '\[([A-Z]+-[0-9]+)\]'
 end
 
+function __pa_trash_ids
+    # List trash entry IDs from 'pa trash list'. Format: T-001, T-002, etc.
+    pa trash list 2>/dev/null | string match -rg '^T-[0-9]+'
+end
+
 function __pa_assignees
     # Combine unique assignees from active tickets + team names.
     # Filter column 5 to only valid assignee tokens (no overflow artifacts from long names).
@@ -161,6 +166,9 @@ complete -c pa -n '__fish_seen_subcommand_from deploy' -l list-modes     -d 'Lis
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l team-model     -d 'Model for the team-manager (haiku|sonnet|opus)' -r -a 'haiku sonnet opus'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l agent-model    -d 'Model for all named agents (haiku|sonnet|opus)' -r -a 'haiku sonnet opus'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l repo           -d 'Target repo name from repos.yaml' -r
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l ticket        -d 'Link deployment to a ticket' -r -a '(__pa_ticket_ids)'
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l validate       -d 'Validate team config, skill files, mode files, and template variables without deploying'
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l provider      -d 'API provider (anthropic or minimax)' -r -a 'anthropic minimax'
 
 # --- daily: <mode> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from daily; and not __fish_seen_subcommand_from plan progress end' -a 'plan progress end' -d 'Daily mode'
@@ -281,6 +289,12 @@ complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcomm
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l status   -d 'Completion status' -r -a 'success partial failed'
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l summary  -d 'One-line summary of what was done' -r
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l log-file -d 'Session log file path (optional)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-source -d 'Rating source' -r -a 'agent system user'
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-overall -d 'Overall rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-productivity -d 'Productivity rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-quality -d 'Quality rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-efficiency -d 'Efficiency rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-insight -d 'Insight rating (0-5)' -r
 
 # --- trash: nested subcommands ---
 complete -c pa -n '__fish_seen_subcommand_from trash; and not __fish_seen_subcommand_from move list show restore purge' -a 'move list show restore purge'
@@ -295,6 +309,9 @@ complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l status -d 'Filter by status' -r -a 'trashed restored purged'
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l type   -d 'Filter by file type' -r -a 'skill team objective mode other'
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l search -d 'Free-text search' -r
+
+# trash show <id>
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_trash_ids)' -a '(__pa_trash_ids)' -d 'Trash ID'
 
 # trash restore <id>
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore' -l force -d 'Overwrite if original path exists'
