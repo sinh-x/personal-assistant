@@ -18,9 +18,10 @@ const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
 /** Resolve effective model for team-manager and each agent, applying Sonnet floor and validation */
 function resolveEffectiveModels(
   teamConfig: TeamConfig,
-  opts: { teamModel?: string; agentModel?: string }
+  opts: { teamModel?: string; agentModel?: string; modeModel?: string }
 ): { tmModel: string | undefined; agentModels: Record<string, string | undefined> } {
-  let tmModel: string | undefined = opts.teamModel ?? teamConfig.model ?? undefined;
+  // Precedence: explicit --model flag > mode-level model > team-level model
+  let tmModel: string | undefined = opts.teamModel ?? opts.modeModel ?? teamConfig.model ?? undefined;
   if (tmModel === "haiku") {
     console.log('Warning: team-manager model "haiku" upgraded to "sonnet" (minimum floor)');
     tmModel = "sonnet";
@@ -398,6 +399,7 @@ export function deployCommand(
     ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
       teamModel: opts.teamModel,
       agentModel: opts.agentModel,
+      modeModel: teamConfig.deploy_modes?.find((m) => m.id === opts.mode)?.model,
     }));
     modelFlag = tmModel ? `--model ${tmModel}` : "";
   }
