@@ -94,6 +94,36 @@ function __pa_deploy_ids
     end
 end
 
+function __pa_deployments_with_team
+    # List deployments as "team/deployment_id" with summary as description.
+    # Format: "team/id\tsummary" for fish's -d flag display.
+    # Uses Python for portable JSON parsing; prefer entries with summaries.
+    set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
+    if test -f "$registry"
+        python3 -c "
+import sys, json
+# First pass: collect summaries (prefer completed events which have summaries)
+entries = {}
+for line in open('$registry'):
+    try:
+        entry = json.loads(line.strip())
+        if 'deployment_id' in entry and 'team' in entry:
+            dep_id = entry.get('deployment_id', '')
+            team = entry.get('team', '')
+            summary = entry.get('summary', '')
+            if dep_id not in entries or (summary and not entries[dep_id][1]):
+                entries[dep_id] = (team, summary[:80] if summary else '')
+    except:
+        pass
+# Output in deployment_id order for consistency
+for dep_id in sorted(entries.keys()):
+    team, summary = entries[dep_id]
+    summary_disp = summary if summary else '(no summary)'
+    print(f'{team}/{dep_id}\t{summary_disp}')
+" 2>/dev/null
+    end
+end
+
 function __pa_timer_names
     # List removable pa-* timer names (strip pa- prefix and .timer suffix)
     systemctl --user list-timers 'pa-*' --no-legend 2>/dev/null | string match -r 'pa-\S+\.timer' | string replace -r '^pa-' '' | string replace -r '\.timer$' '' | sort -u
@@ -160,7 +190,7 @@ complete -c pa -n '__fish_seen_subcommand_from deploy' -l dry-run        -d 'Gen
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l background     -d 'Run in background'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l interactive    -d 'Run in foreground, user approves each tool call'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l direct         -d 'Lightweight direct mode — no sub-agents, skip-permissions'
-complete -c pa -n '__fish_seen_subcommand_from deploy' -l objective      -d 'Append extra instructions' -r
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l objective      -d 'Append extra instructions (use team name as prefix, e.g. builder:...)' -r -a 'builder: requirement: maintenance: secretary:'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l mode           -d 'Deploy using a specific mode' -r -a '(__pa_modes)'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l list-modes     -d 'List available modes for the team and exit'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l team-model     -d 'Model for the team-manager (haiku|sonnet|opus)' -r -a 'haiku sonnet opus'
@@ -178,7 +208,7 @@ complete -c pa -n '__fish_seen_subcommand_from daily' -l interactive -d 'Run in 
 complete -c pa -n '__fish_seen_subcommand_from daily' -l review      -d 'Interactive review mode (end=review+synthesize, plan=finalize draft)'
 
 # --- status: [deploy-id] + flags ---
-complete -c pa -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from (__pa_deploy_ids)' -a '(__pa_deploy_ids)' -d 'Deployment ID'
+complete -c pa -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from (__pa_deployments_with_team)' -a '(__pa_deployments_with_team)' -d 'Deployment (team/id — summary)'
 complete -c pa -n '__fish_seen_subcommand_from status' -l running   -d 'Show only running deployments'
 complete -c pa -n '__fish_seen_subcommand_from status' -l team      -d 'Filter by team name' -r -a '(__pa_teams)'
 complete -c pa -n '__fish_seen_subcommand_from status' -l wait      -d 'Block until deployment reaches a terminal state'
