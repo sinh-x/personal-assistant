@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, copyFileSync } from "node:fs";
 import { resolve, basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
@@ -449,6 +449,7 @@ export function deployCommand(
     templateVars: opts.templateVars,
   });
   writeFileSync(primerFile, primerContent);
+  copyFileSync(primerFile, resolve(deployDir, "primer.md"));
   console.log(`Primer generated: ${primerFile}`);
 
   // Dry run — print primer and exit
