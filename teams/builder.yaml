@@ -26,6 +26,7 @@ deploy_modes:
     phone_visible: true
     mode_type: work
     model: opus
+    provider: minimax
     agents: []  # solo, no sub-agents
     objective: teams/builder/modes/implement.md
     skills:
@@ -44,6 +45,7 @@ deploy_modes:
     phone_visible: false
     mode_type: interactive
     model: opus
+    provider: minimax
     agents: []  # solo, no sub-agents
     objective: teams/builder/modes/worker.md
     skills:

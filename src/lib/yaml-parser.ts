@@ -41,6 +41,8 @@ export function parseTeamYaml(filePath: string): TeamConfig {
         skills,
         mode_type: m["mode_type"] as DeployMode["mode_type"] | undefined,
         solo: m["solo"] as boolean | undefined,
+        model: m["model"] as DeployMode["model"] | undefined,
+        provider: m["provider"] as DeployMode["provider"] | undefined,
         global_docs: m["global_docs"] as string[] | undefined,
       };
     });

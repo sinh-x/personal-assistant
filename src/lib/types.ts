@@ -22,6 +22,8 @@ export interface DeployMode {
   solo?: boolean;
   /** Per-mode model override — takes precedence over team-level model, but yields to explicit --model CLI flag */
   model?: 'haiku' | 'sonnet' | 'opus';
+  /** Per-mode API provider — takes precedence over default 'anthropic', but yields to explicit --provider CLI flag */
+  provider?: 'anthropic' | 'minimax';
   /**
    * Additional global skill/policy docs to inject for this mode.
    * Paths relative to PA_CONFIG or PA_HOME.
