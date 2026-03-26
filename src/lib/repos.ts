@@ -130,7 +130,7 @@ export function getRepoPrefix(projectName: string): string | undefined {
 export function resolveProjectFromCwd(): { key: string; prefix: string } | undefined {
   let repoRoot: string;
   try {
-    repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8" }).trim();
+    repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
   } catch {
     return undefined;
   }
