@@ -49,8 +49,13 @@ program
       if (opts.all) {
         project = undefined; // all projects
       } else if (opts.project) {
-        const resolved = resolveProject(opts.project);
-        project = resolved.key;
+        try {
+          const resolved = resolveProject(opts.project);
+          project = resolved.key;
+        } catch (err: unknown) {
+          console.error((err as Error).message);
+          process.exit(1);
+        }
       } else {
         const cwd = resolveProjectFromCwd();
         if (!cwd) {
