@@ -1,5 +1,5 @@
 name: builder
-model: sonnet  # implementation work requires judgment and code reasoning
+model: opus
 description: "Execute multi-phase implementation projects for the personal-assistant system"
 default_mode: implement
 
@@ -59,7 +59,6 @@ deploy_modes:
     label: Orchestrator
     phone_visible: true
     mode_type: interactive
-    model: opus
     agents: []  # solo, no sub-agents
     objective: teams/builder/modes/orchestrator.md
     skills:
