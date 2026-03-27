@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { homedir } from "node:os";
+import { execSync } from "node:child_process";
 import yaml from "js-yaml";
 import { getHomeDir, getUserConfigPath } from "./paths.js";
 import { loadConfig } from "./config.js";
@@ -118,4 +119,26 @@ export function getRepoPrefix(projectName: string): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Resolve the current working directory (CWD) to a project { key, prefix }.
+ * Uses git rev-parse --show-toplevel to find the repo root, then matches
+ * against listRepos() entries by path.
+ * Returns undefined if not in a git repo or the repo is not in repos.yaml.
+ */
+export function resolveProjectFromCwd(): { key: string; prefix: string } | undefined {
+  let repoRoot: string;
+  try {
+    repoRoot = execSync("git rev-parse --show-toplevel", { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+  } catch {
+    return undefined;
+  }
+  const repos = listRepos();
+  for (const repo of repos) {
+    if (repo.path === repoRoot && repo.prefix) {
+      return { key: repo.name, prefix: repo.prefix };
+    }
+  }
+  return undefined;
 }

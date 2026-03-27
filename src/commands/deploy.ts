@@ -122,21 +122,11 @@ export function deployCommand(
 ): void {
   const config = loadConfig();
 
-  // Validate --provider early before doing any work
-  const provider = opts.provider ?? "anthropic";
-  if (!VALID_PROVIDERS.has(provider)) {
-    console.error(`Error: Invalid provider "${provider}". Valid values: anthropic, minimax`);
+  // Validate explicit --provider early (final resolution deferred until mode is known)
+  if (opts.provider && !VALID_PROVIDERS.has(opts.provider)) {
+    console.error(`Error: Invalid provider "${opts.provider}". Valid values: anthropic, minimax`);
     process.exit(1);
   }
-
-  // Fail-fast if Minimax API key is missing
-  if (provider === "minimax" && !config.minimax_api_key) {
-    console.error(`Error: --provider minimax requires minimax_api_key in config.yaml`);
-    console.error(`  Config file: ~/.config/sinh-x/personal-assistant/config.yaml`);
-    console.error(`  Add: minimax_api_key: <your-key>`);
-    process.exit(1);
-  }
-  const minimaxApiKey = config.minimax_api_key;
 
   const paHome = getHomeDir();
   const dataDir = getDataDir();
@@ -329,6 +319,25 @@ export function deployCommand(
     }
   }
 
+  // Resolve effective provider: explicit --provider > mode-level provider > "anthropic"
+  const effectiveModeId = opts.mode ?? teamConfig.default_mode;
+  const modeProvider = teamConfig.deploy_modes?.find((m) => m.id === effectiveModeId)?.provider;
+  const provider = opts.provider ?? modeProvider ?? "anthropic";
+  if (!VALID_PROVIDERS.has(provider)) {
+    console.error(`Error: Invalid provider "${provider}" from mode "${effectiveModeId}". Valid values: anthropic, minimax`);
+    process.exit(1);
+  }
+
+  // Fail-fast if Minimax API key is missing
+  if (provider === "minimax" && !config.minimax_api_key) {
+    console.error(`Error: provider minimax requires minimax_api_key in config.yaml`);
+    console.error(`  Config file: ~/.config/sinh-x/personal-assistant/config.yaml`);
+    console.error(`  Add: minimax_api_key: <your-key>`);
+    process.exit(1);
+  }
+  const minimaxApiKey = config.minimax_api_key;
+  if (provider !== "anthropic") console.log(`  Provider: ${provider}`);
+
   // Bulletin guard — block deployment if an active bulletin targets this team.
   // Skipped in dry-run mode so users can still preview primers when blocked.
   if (mode !== "dry-run") {
@@ -388,21 +397,16 @@ export function deployCommand(
     repoRoot = resolved.path;
   }
 
-  // Resolve effective models — skipped when using Minimax (ANTHROPIC_MODEL env var handles it)
+  // Resolve effective models — always call resolveEffectiveModels to populate tmModel/agentModels
+  // regardless of provider. modelFlag is only set for non-minimax (minimax uses ANTHROPIC_MODEL env var)
   let tmModel: string | undefined;
   let agentModels: Record<string, string | undefined> = {};
-  let modelFlag: string;
-
-  if (provider === "minimax") {
-    modelFlag = "";
-  } else {
-    ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
-      teamModel: opts.teamModel,
-      agentModel: opts.agentModel,
-      modeModel: teamConfig.deploy_modes?.find((m) => m.id === opts.mode)?.model,
-    }));
-    modelFlag = tmModel ? `--model ${tmModel}` : "";
-  }
+  ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
+    teamModel: opts.teamModel,
+    agentModel: opts.agentModel,
+    modeModel: teamConfig.deploy_modes?.find((m) => m.id === (opts.mode ?? teamConfig.default_mode))?.model,
+  }));
+  const modelFlag = provider === "minimax" ? "" : (tmModel ? `--model ${tmModel}` : "");
 
   // Deployment env vars passed to claude so hooks can locate the activity log.
   // PA_ACTIVITY_LOG must be set here directly — CLAUDE_ENV_FILE only propagates
@@ -469,6 +473,9 @@ export function deployCommand(
   }
   const anyModelSet = Object.keys(modelsMap).length > 0;
 
+  // Derive repo name: opts.repo takes precedence, else basename of repoRoot
+  const repoName = opts.repo ?? (repoRoot ? basename(repoRoot) : undefined);
+
   // Write start event to registry
   const startEvent: RegistryEvent = {
     deployment_id: deployId,
@@ -479,6 +486,8 @@ export function deployCommand(
     primer: primerFile,
     ...(anyModelSet ? { models: modelsMap } : {}),
     ...(opts.ticket ? { ticket_id: opts.ticket } : {}),
+    ...(opts.objective ? { objective: opts.objective } : {}),
+    ...(repoName ? { repo: repoName } : {}),
     provider,
   };
   appendRegistryEvent(startEvent);

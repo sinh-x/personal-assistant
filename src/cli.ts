@@ -10,6 +10,7 @@ import { ideaCommand } from "./commands/idea.js";
 import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
+import { resolveProject, resolveProjectFromCwd, listRepos } from "./lib/repos.js";
 import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
 import { createTicketCommand } from "./commands/ticket.js";
 import { createBulletinCommand } from "./commands/bulletin.js";
@@ -37,13 +38,40 @@ program
 program
   .command("board")
   .description(
-    "Show kanban board — all tickets grouped by status with assignee. Defaults to all projects. Backlog and archived tickets are excluded by default."
+    "Show kanban board — all tickets grouped by status with assignee. Defaults to current repo's project. Use --all for all projects."
   )
-  .option("--project <name>", "Filter by project (default: all projects)")
+  .option("--project <name>", "Filter by project (key, prefix, or basename)")
+  .option("--all", "Show all projects")
   .option("--assignee <name>", "Filter by assignee")
   .action(
-    (opts: { project?: string; assignee?: string }) => {
-      boardCommand(opts.project, {
+    (opts: { project?: string; all?: boolean; assignee?: string }) => {
+      let project: string | undefined;
+      if (opts.all) {
+        project = undefined; // all projects
+      } else if (opts.project) {
+        try {
+          const resolved = resolveProject(opts.project);
+          project = resolved.key;
+        } catch (err: unknown) {
+          console.error((err as Error).message);
+          process.exit(1);
+        }
+      } else {
+        const cwd = resolveProjectFromCwd();
+        if (!cwd) {
+          console.error("Not in a registered repo. Use --all or --project <name>");
+          const available = listRepos()
+            .filter((r) => r.prefix)
+            .map((r) => r.name)
+            .join(", ");
+          if (available) {
+            console.error(`Available projects: ${available}`);
+          }
+          process.exit(1);
+        }
+        project = cwd.key;
+      }
+      boardCommand(project, {
         assignee: opts.assignee,
         excludeTags: ["backlog", "archived"],
         excludeTypes: ["fyi", "work-report"],
