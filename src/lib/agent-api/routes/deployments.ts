@@ -66,6 +66,11 @@ function computeDeploymentStatuses(events: RegistryEvent[]): DeploymentStatus[] 
       summary: completed?.summary,
       log_file: started?.log_file,
       primer: started?.primer,
+      ticket_id: started?.ticket_id,
+      objective: started?.objective,
+      models: started?.models,
+      provider: started?.provider,
+      repo: started?.repo,
     });
   }
 
@@ -138,6 +143,8 @@ export function deploymentsRoutes(): Hono {
       exit_code: completed?.exit_code ?? crashed?.exit_code,
       rating: completed?.rating,
       ticket_id: started?.ticket_id,
+      objective: started?.objective,
+      repo: started?.repo,
     };
 
     // Read activity.jsonl (no since filter)

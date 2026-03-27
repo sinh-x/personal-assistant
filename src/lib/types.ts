@@ -111,6 +111,8 @@ export interface RegistryEvent {
   ticket_id?: string;
   provider?: string;
   rating?: Rating;
+  objective?: string;
+  repo?: string;
 }
 
 /** Computed deployment status from registry events */
@@ -132,6 +134,11 @@ export interface DeploymentStatus {
   summary?: string;
   log_file?: string;
   primer?: string;
+  ticket_id?: string;
+  objective?: string;
+  models?: Record<string, string>;
+  provider?: string;
+  repo?: string;
 }
 
 /** PA configuration paths */

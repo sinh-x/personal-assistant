@@ -397,21 +397,16 @@ export function deployCommand(
     repoRoot = resolved.path;
   }
 
-  // Resolve effective models — skipped when using Minimax (ANTHROPIC_MODEL env var handles it)
+  // Resolve effective models — always call resolveEffectiveModels to populate tmModel/agentModels
+  // regardless of provider. modelFlag is only set for non-minimax (minimax uses ANTHROPIC_MODEL env var)
   let tmModel: string | undefined;
   let agentModels: Record<string, string | undefined> = {};
-  let modelFlag: string;
-
-  if (provider === "minimax") {
-    modelFlag = "";
-  } else {
-    ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
-      teamModel: opts.teamModel,
-      agentModel: opts.agentModel,
-      modeModel: teamConfig.deploy_modes?.find((m) => m.id === (opts.mode ?? teamConfig.default_mode))?.model,
-    }));
-    modelFlag = tmModel ? `--model ${tmModel}` : "";
-  }
+  ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
+    teamModel: opts.teamModel,
+    agentModel: opts.agentModel,
+    modeModel: teamConfig.deploy_modes?.find((m) => m.id === (opts.mode ?? teamConfig.default_mode))?.model,
+  }));
+  const modelFlag = provider === "minimax" ? "" : (tmModel ? `--model ${tmModel}` : "");
 
   // Deployment env vars passed to claude so hooks can locate the activity log.
   // PA_ACTIVITY_LOG must be set here directly — CLAUDE_ENV_FILE only propagates
@@ -478,6 +473,9 @@ export function deployCommand(
   }
   const anyModelSet = Object.keys(modelsMap).length > 0;
 
+  // Derive repo name: opts.repo takes precedence, else basename of repoRoot
+  const repoName = opts.repo ?? (repoRoot ? basename(repoRoot) : undefined);
+
   // Write start event to registry
   const startEvent: RegistryEvent = {
     deployment_id: deployId,
@@ -488,6 +486,8 @@ export function deployCommand(
     primer: primerFile,
     ...(anyModelSet ? { models: modelsMap } : {}),
     ...(opts.ticket ? { ticket_id: opts.ticket } : {}),
+    ...(opts.objective ? { objective: opts.objective } : {}),
+    ...(repoName ? { repo: repoName } : {}),
     provider,
   };
   appendRegistryEvent(startEvent);
