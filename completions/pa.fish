@@ -94,6 +94,36 @@ function __pa_deploy_ids
     end
 end
 
+function __pa_deployments_with_team
+    # List deployments as "team/deployment_id" with summary as description.
+    # Format: "team/id\tsummary" for fish's -d flag display.
+    # Uses Python for portable JSON parsing; prefer entries with summaries.
+    set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
+    if test -f "$registry"
+        python3 -c "
+import sys, json
+# First pass: collect summaries (prefer completed events which have summaries)
+entries = {}
+for line in open('$registry'):
+    try:
+        entry = json.loads(line.strip())
+        if 'deployment_id' in entry and 'team' in entry:
+            dep_id = entry.get('deployment_id', '')
+            team = entry.get('team', '')
+            summary = entry.get('summary', '')
+            if dep_id not in entries or (summary and not entries[dep_id][1]):
+                entries[dep_id] = (team, summary[:80] if summary else '')
+    except:
+        pass
+# Output in deployment_id order for consistency
+for dep_id in sorted(entries.keys()):
+    team, summary = entries[dep_id]
+    summary_disp = summary if summary else '(no summary)'
+    print(f'{team}/{dep_id}\t{summary_disp}')
+" 2>/dev/null
+    end
+end
+
 function __pa_timer_names
     # List removable pa-* timer names (strip pa- prefix and .timer suffix)
     systemctl --user list-timers 'pa-*' --no-legend 2>/dev/null | string match -r 'pa-\S+\.timer' | string replace -r '^pa-' '' | string replace -r '\.timer$' '' | sort -u
@@ -117,6 +147,11 @@ end
 function __pa_bulletin_ids
     # List active bulletin IDs from 'pa bulletin list'. Format in output: [B-001].
     pa bulletin list 2>/dev/null | string match -rg '\[([A-Z]+-[0-9]+)\]'
+end
+
+function __pa_trash_ids
+    # List trash entry IDs from 'pa trash list'. Format: T-001, T-002, etc.
+    pa trash list 2>/dev/null | string match -rg '^T-[0-9]+'
 end
 
 function __pa_assignees
@@ -155,12 +190,15 @@ complete -c pa -n '__fish_seen_subcommand_from deploy' -l dry-run        -d 'Gen
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l background     -d 'Run in background'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l interactive    -d 'Run in foreground, user approves each tool call'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l direct         -d 'Lightweight direct mode — no sub-agents, skip-permissions'
-complete -c pa -n '__fish_seen_subcommand_from deploy' -l objective      -d 'Append extra instructions' -r
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l objective      -d 'Append extra instructions (use team name as prefix, e.g. builder:...)' -r -a 'builder: requirement: maintenance: secretary:'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l mode           -d 'Deploy using a specific mode' -r -a '(__pa_modes)'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l list-modes     -d 'List available modes for the team and exit'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l team-model     -d 'Model for the team-manager (haiku|sonnet|opus)' -r -a 'haiku sonnet opus'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l agent-model    -d 'Model for all named agents (haiku|sonnet|opus)' -r -a 'haiku sonnet opus'
 complete -c pa -n '__fish_seen_subcommand_from deploy' -l repo           -d 'Target repo name from repos.yaml' -r
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l ticket        -d 'Link deployment to a ticket' -r -a '(__pa_ticket_ids)'
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l validate       -d 'Validate team config, skill files, mode files, and template variables without deploying'
+complete -c pa -n '__fish_seen_subcommand_from deploy' -l provider      -d 'API provider (anthropic or minimax)' -r -a 'anthropic minimax'
 
 # --- daily: <mode> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from daily; and not __fish_seen_subcommand_from plan progress end' -a 'plan progress end' -d 'Daily mode'
@@ -170,7 +208,7 @@ complete -c pa -n '__fish_seen_subcommand_from daily' -l interactive -d 'Run in 
 complete -c pa -n '__fish_seen_subcommand_from daily' -l review      -d 'Interactive review mode (end=review+synthesize, plan=finalize draft)'
 
 # --- status: [deploy-id] + flags ---
-complete -c pa -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from (__pa_deploy_ids)' -a '(__pa_deploy_ids)' -d 'Deployment ID'
+complete -c pa -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from (__pa_deployments_with_team)' -a '(__pa_deployments_with_team)' -d 'Deployment (team/id — summary)'
 complete -c pa -n '__fish_seen_subcommand_from status' -l running   -d 'Show only running deployments'
 complete -c pa -n '__fish_seen_subcommand_from status' -l team      -d 'Filter by team name' -r -a '(__pa_teams)'
 complete -c pa -n '__fish_seen_subcommand_from status' -l wait      -d 'Block until deployment reaches a terminal state'
@@ -281,6 +319,12 @@ complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcomm
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l status   -d 'Completion status' -r -a 'success partial failed'
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l summary  -d 'One-line summary of what was done' -r
 complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l log-file -d 'Session log file path (optional)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-source -d 'Rating source' -r -a 'agent system user'
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-overall -d 'Overall rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-productivity -d 'Productivity rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-quality -d 'Quality rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-efficiency -d 'Efficiency rating (0-5)' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l rating-insight -d 'Insight rating (0-5)' -r
 
 # --- trash: nested subcommands ---
 complete -c pa -n '__fish_seen_subcommand_from trash; and not __fish_seen_subcommand_from move list show restore purge' -a 'move list show restore purge'
@@ -295,6 +339,9 @@ complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l status -d 'Filter by status' -r -a 'trashed restored purged'
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l type   -d 'Filter by file type' -r -a 'skill team objective mode other'
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from list' -l search -d 'Free-text search' -r
+
+# trash show <id>
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_trash_ids)' -a '(__pa_trash_ids)' -d 'Trash ID'
 
 # trash restore <id>
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore' -l force -d 'Overwrite if original path exists'

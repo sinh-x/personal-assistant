@@ -20,6 +20,8 @@ export interface DeployMode {
   mode_type?: 'housekeeping' | 'work' | 'interactive';
   /** Solo operator mode — team-manager does all work, no sub-agents; omits multi-agent deployment instructions */
   solo?: boolean;
+  /** Per-mode model override — takes precedence over team-level model, but yields to explicit --model CLI flag */
+  model?: 'haiku' | 'sonnet' | 'opus';
   /**
    * Additional global skill/policy docs to inject for this mode.
    * Paths relative to PA_CONFIG or PA_HOME.
