@@ -32,7 +32,7 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 - **On tool failure:** Try once, if it fails again report the error and move on. Do not retry in a loop.
 - **On permission errors:** Log the error, skip that step, note it in Results.
 - **On critical failure:** Log your session, send error report to parent, stop.
-- **Always read CLI stderr output.** Warnings, reminders, and suggestions printed to stderr are actionable even when the command exits with code 0. Do not assume stderr is noise — check it after every `pa ticket` command for `doc_ref` reminders, `needs-doc-ref` tag warnings, and other guidance.
+- **Always read CLI stderr output.** Warnings, reminders, and suggestions printed to stderr are actionable even when the command exits with code 0. Do not assume stderr is noise — check it after every `pa ticket` command for `doc_refs` reminders, `needs-doc-ref` tag warnings, and other guidance.
 
 ---
 

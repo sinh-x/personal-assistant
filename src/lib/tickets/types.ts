@@ -53,10 +53,24 @@ export interface Comment {
   editedAt?: string;
 }
 
+/** A typed document reference attached to a ticket */
+export interface DocRef {
+  /** Document type: 'requirements' | 'spike' | 'implementation' | 'review-report' | 'attachment' */
+  type: string;
+  /** Relative path to the document (within ~/Documents/ai-usage/) */
+  path: string;
+  /** At most one doc_ref per ticket may be primary */
+  primary: boolean;
+  /** ISO timestamp when this ref was added */
+  addedAt: string;
+  /** Agent or user who added this ref */
+  addedBy: string;
+}
+
 /** One entry in the JSONL audit log — records every mutation */
 export interface AuditEntry {
   ticket_id: string;
-  action: "created" | "updated" | "commented" | "attached" | "comment_edited" | "comment_deleted";
+  action: "created" | "updated" | "commented" | "attached" | "comment_edited" | "comment_deleted" | "doc_ref_added" | "doc_ref_removed";
   actor: string;
   timestamp: string;
   /** Map of field name → [old_value, new_value] */
@@ -79,8 +93,7 @@ export interface Ticket {
   to: string;
   tags: string[];
   blockedBy: string[];
-  doc_ref: string;
-  attachments: string[];
+  doc_refs: DocRef[];
   comments: Comment[];
   createdAt: string;
   updatedAt: string;
@@ -92,10 +105,27 @@ export type CreateTicketInput = Omit<Ticket, "id" | "createdAt" | "updatedAt" | 
   resolvedAt?: string | null;
 };
 
+/** Input for adding a single doc_ref to a ticket */
+export interface AddDocRefInput {
+  /** Document type (defaults to 'attachment' if omitted) */
+  type?: string;
+  /** Relative path to the document */
+  path: string;
+  /** Mark as primary doc_ref — demotes any existing primary */
+  primary?: boolean;
+  /** Override addedBy — defaults to actor */
+  addedBy?: string;
+}
+
 /** Fields that can be updated after creation */
 export type UpdateTicketInput = Partial<
   Omit<Ticket, "id" | "project" | "createdAt">
->;
+> & {
+  /** Add a doc_ref to the array (additive, does not replace) */
+  add_doc_ref?: AddDocRefInput;
+  /** Remove a doc_ref by exact path match */
+  remove_doc_ref?: string;
+};
 
 /** counter.json structure — one entry per project prefix */
 export type CounterStore = Record<string, number>;

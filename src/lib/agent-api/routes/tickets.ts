@@ -103,19 +103,18 @@ export function ticketRoutes(): Hono {
   });
 
   // GET /api/tickets/:id/review — review context: ticket + document links
+  // F9: Returns doc_refs array with generated URLs for each entry
   app.get("/api/tickets/:id/review", (c: Context) => {
     const id = c.req.param("id") as string;
     const ticket = store.get(id);
     if (!ticket) {
       return c.json({ error: "Ticket not found", code: "NOT_FOUND" }, 404);
     }
-    const doc_ref_url = ticket.doc_ref
-      ? `/api/documents?path=${encodeURIComponent(ticket.doc_ref)}`
-      : null;
-    const attachment_urls = (ticket.attachments ?? []).map(
-      (p: string) => `/api/documents?path=${encodeURIComponent(p)}`
-    );
-    return c.json({ ticket, doc_ref_url, attachment_urls });
+    const doc_refs = (ticket.doc_refs ?? []).map((r) => ({
+      ...r,
+      url: `/api/documents?path=${encodeURIComponent(r.path)}`,
+    }));
+    return c.json({ ticket, doc_refs });
   });
 
   // GET /api/tickets/:id — get single ticket
@@ -252,6 +251,7 @@ export function ticketRoutes(): Hono {
   });
 
   // POST /api/tickets/:id/attachments — add an attachment path
+  // F12: Delegates to add_doc_ref with type: 'attachment' (deprecated attach path, kept for compatibility)
   app.post("/api/tickets/:id/attachments", async (c: Context) => {
     const id = c.req.param("id") as string;
     let body: { path: string; actor?: string };
@@ -265,7 +265,7 @@ export function ticketRoutes(): Hono {
     }
     const actor = body.actor ?? "api";
     try {
-      const ticket = store.attach(id, body.path, actor);
+      const ticket = store.update(id, { add_doc_ref: { type: "attachment", path: body.path } }, actor);
       return c.json({ ticket });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

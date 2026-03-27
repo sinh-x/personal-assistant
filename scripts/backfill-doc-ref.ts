@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
  * Retroactive doc-ref sweep script (PA-912 Phase 4 / F9).
+ * Updated for PA-942 multi-doc-ref format.
  *
  * Scans all active tickets for artifact path patterns in comments and summaries.
- * If exactly one unique path is found and doc_ref is empty, sets it automatically.
+ * If exactly one unique path is found and doc_refs is empty, adds it automatically
+ * as a DocRef with type 'attachment' (primary: true, since it's the only one).
  * If multiple paths are found, logs them for manual review.
  *
  * Usage:
@@ -49,7 +51,7 @@ function main(): void {
   let noCandidates = 0;
 
   for (const ticket of activeTickets) {
-    if (ticket.doc_ref && ticket.doc_ref.trim()) {
+    if (ticket.doc_refs && ticket.doc_refs.length > 0) {
       alreadySet++;
       continue;
     }
@@ -68,9 +70,13 @@ function main(): void {
       const [path] = allPaths;
       updated++;
       console.log(`  [update]  ${ticket.id}: ${ticket.title}`);
-      console.log(`            → doc_ref: ${path}`);
+      console.log(`            → add doc_ref: ${path}`);
       if (!DRY_RUN) {
-        store.update(ticket.id, { doc_ref: path }, "backfill-doc-ref");
+        store.update(
+          ticket.id,
+          { add_doc_ref: { type: "attachment", path, primary: true } },
+          "backfill-doc-ref",
+        );
       }
     } else {
       ambiguous++;
@@ -84,7 +90,7 @@ function main(): void {
 
   console.log("\n=== Backfill doc-ref Summary ===");
   console.log(`  Total active tickets scanned:    ${activeTickets.length}`);
-  console.log(`  Already have doc_ref (skipped):  ${alreadySet}`);
+  console.log(`  Already have doc_refs (skipped): ${alreadySet}`);
   console.log(`  Updated (path found and set):    ${updated}`);
   console.log(`  Ambiguous (multiple candidates): ${ambiguous}`);
   console.log(`  No candidates:                   ${noCandidates}`);

@@ -306,11 +306,11 @@ Save the document to 3 destinations:
 ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md
 ```
 
-**REQUIRED — attach doc_ref immediately after saving to artifacts:**
+**REQUIRED — add doc_ref immediately after saving to artifacts:**
 ```bash
-pa ticket update <ticket-id> --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
+pa ticket update <ticket-id> --doc-ref "spike:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
 ```
-Do this **before** advancing ticket status. If you advance without setting `doc-ref`, the CLI will warn and add a `needs-doc-ref` tag automatically.
+Do this **before** advancing ticket status. If you advance without a `doc_refs` entry, the CLI will warn and add a `needs-doc-ref` tag automatically.
 
 **3. Ticket update (conditional):**
 
@@ -388,4 +388,4 @@ Write session log to `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` followi
 - **Ticket claim.** Claim tickets by setting `--assignee requirements/team-manager` (keep status as `requirement-review`). Advance to `pending-approval --assignee sinh` when complete.
 - **Read before writing.** Always read files before modifying them.
 - **Self-validate before saving.** Verify `From:` and `To:` are populated before writing any document.
-- **Always set doc_ref on handoff.** When advancing to `pending-approval`, always include `--doc-ref` in the `pa ticket update` command pointing to the spike artifact. A ticket advancing without doc_ref will be automatically tagged `needs-doc-ref` by the CLI. Use `pa ticket update <id> --doc-ref <path>` to attach retroactively if needed.
+- **Always add doc_ref on handoff.** When advancing to `pending-approval`, always include `--doc-ref spike:<path>` in the `pa ticket update` command pointing to the spike artifact. A ticket advancing without any `doc_refs` will be automatically tagged `needs-doc-ref` by the CLI. Use `pa ticket update <id> --doc-ref spike:<path>` to add retroactively if needed.

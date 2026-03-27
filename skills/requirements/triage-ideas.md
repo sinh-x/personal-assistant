@@ -148,7 +148,7 @@ Triaged N ideas into M groups. N new ideas processed.
 
 If an approved ticket is found:
 
-1. Read the ticket and its doc_ref for Sinh's feedback
+1. Read the ticket and its doc_refs for Sinh's feedback
 2. For each group in the proposal, create an individual requirements ticket:
    ```
    pa ticket create --type task --project personal-assistant \
