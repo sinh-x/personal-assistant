@@ -149,6 +149,8 @@ Reference existing code/patterns found during exploration.
 - [ ] AC1: Given X, when Y, then Z
 - [ ] AC2: ...
 
+> **Note for requirements authors:** Leave §4 In Scope and §10 Acceptance Criteria items as `- [ ]` checkboxes. The builder team updates these during implementation — checking items off with verification callouts as phases complete. Pre-checking items in the requirements doc would defeat their purpose as UAT evidence.
+
 ## 11. Effort Estimate
 - Size: S / M / L / XL
 - Estimated sessions: N
