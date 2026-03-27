@@ -13,6 +13,7 @@ import { reposCommand } from "./commands/repos.js";
 import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
 import { createTicketCommand } from "./commands/ticket.js";
 import { createBulletinCommand } from "./commands/bulletin.js";
+import { createRegistryCommand } from "./commands/registry.js";
 
 declare const __PA_VERSION__: string;
 
@@ -25,10 +26,11 @@ program
 
 program
   .command("teams")
-  .description("Show agent team workflow status (inbox/ongoing/wfr counts). With [name]: show folder detail for one team.")
+  .description("Show agent team workflow status. Active tickets only by default. With [name]: show board for one team.")
   .argument("[name]", "Team name for detailed view")
-  .action((name?: string) => {
-    teamsCommand(name);
+  .option("--all", "Show all tickets including backlog, archived, and terminal")
+  .action((name: string | undefined, opts: { all?: boolean }) => {
+    teamsCommand(name, opts);
   });
 
 program
@@ -43,6 +45,7 @@ program
       boardCommand(opts.project, {
         assignee: opts.assignee,
         excludeTags: ["backlog", "archived"],
+        excludeTypes: ["fyi", "work-report"],
       });
     }
   );
@@ -62,7 +65,8 @@ program
   .option("--list-modes", "List available modes for the team and exit")
   .option("--repo <name>", "Target repo name from repos.yaml (overrides CWD-based detection)")
   .option("--ticket <id>", "Link deployment to a ticket")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string }) => {
+  .option("--validate", "Validate team config, skill files, mode files, and template variables without deploying")
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean }) => {
     deployCommand(team, opts);
   });
 
@@ -95,7 +99,9 @@ program
   .option("--report", "Show the work report for a deployment")
   .option("--artifacts", "List artifact files for a deployment")
   .option("--activity", "Show agent activity timeline for a deployment")
-  .action((deployId: string | undefined, opts: { running?: boolean; team?: string; wait?: boolean; report?: boolean; artifacts?: boolean; activity?: boolean }) => {
+  .option("--recent <n>", "Show only the N most recent deployments")
+  .option("--today", "Show only today's deployments")
+  .action((deployId: string | undefined, opts: { running?: boolean; team?: string; wait?: boolean; report?: boolean; artifacts?: boolean; activity?: boolean; recent?: string; today?: boolean }) => {
     const args: string[] = [];
     if (opts.running) {
       args.push("--running");
@@ -108,6 +114,8 @@ program
       else if (opts.artifacts) args.push("--artifacts");
       else if (opts.activity) args.push("--activity");
     }
+    if (opts.recent) args.push("--recent", opts.recent);
+    if (opts.today) args.push("--today");
     statusCommand(args);
   });
 
@@ -193,5 +201,6 @@ program
 
 program.addCommand(createTicketCommand());
 program.addCommand(createBulletinCommand());
+program.addCommand(createRegistryCommand());
 
 program.parse();

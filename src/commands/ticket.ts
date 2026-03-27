@@ -1,6 +1,6 @@
 import { Command } from "commander";
 import { TicketStore } from "../lib/tickets/index.js";
-import { validateAuthor } from "../lib/tickets/validate.js";
+import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import type {
   Estimate,
   TicketStatus,
@@ -84,6 +84,13 @@ export function createTicketCommand(): Command {
       }) => {
         const estimate = validateEstimate(opts.estimate);
 
+        try {
+          validateAssignee(opts.assignee);
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+
         // Compute tags — may be augmented by summary template check
         const tags: string[] = opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
 
@@ -156,6 +163,15 @@ export function createTicketCommand(): Command {
           actor: string;
         }
       ) => {
+        if (opts.assignee !== undefined) {
+          try {
+            validateAssignee(opts.assignee);
+          } catch (err) {
+            console.error(err instanceof Error ? err.message : String(err));
+            process.exit(1);
+          }
+        }
+
         const store = new TicketStore();
         const input: UpdateTicketInput = {};
         if (opts.status) input.status = opts.status as TicketStatus;
@@ -187,6 +203,9 @@ export function createTicketCommand(): Command {
     .option("--assignee <name>", "Filter by assignee")
     .option("--priority <priority>", "Filter by priority")
     .option("--type <type>", "Filter by type")
+    .option("--tags <tags>", "Filter by tags (comma-separated, AND logic)")
+    .option("--exclude-tags <tags>", "Exclude tickets with any of these tags (comma-separated)")
+    .option("--search <text>", "Free-text search on ticket ID, title, and summary (case-insensitive)")
     .action(
       (opts: {
         project?: string;
@@ -194,6 +213,9 @@ export function createTicketCommand(): Command {
         assignee?: string;
         priority?: string;
         type?: string;
+        tags?: string;
+        excludeTags?: string;
+        search?: string;
       }) => {
         const store = new TicketStore();
         const tickets = store.list({
@@ -202,6 +224,9 @@ export function createTicketCommand(): Command {
           assignee: opts.assignee,
           priority: opts.priority,
           type: opts.type,
+          tags: opts.tags ? opts.tags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+          excludeTags: opts.excludeTags ? opts.excludeTags.split(",").map((t) => t.trim()).filter(Boolean) : undefined,
+          search: opts.search,
         });
 
         if (tickets.length === 0) {

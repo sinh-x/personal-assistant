@@ -67,14 +67,18 @@ Standard flow: `idea → requirement-review → pending-approval → pending-imp
 
 ## 4. `work-report` and `fyi` Ticket Flow
 
-**Decision:** `work-report` and `fyi` type tickets are excluded from the active kanban board columns.
+**Decision:** `work-report` and `fyi` type tickets are excluded from the active kanban board columns. FYI tickets auto-close after 7 days.
 
 **Rules:**
-1. `work-report` and `fyi` tickets do NOT appear in the standard board columns (`idea`, `requirement-review`, etc.).
-2. They are visible in a separate "archive" or "comms" filter view only.
+1. `work-report` and `fyi` tickets do NOT appear in the standard board columns (`idea`, `requirement-review`, etc.). This is enforced by the `excludeTypes` filter in `pa board` (CLI), `GET /api/board` (API), and `buildBoardView()` (code).
+2. They are visible on demand via `pa ticket list --type fyi` or `pa ticket list --type work-report`.
 3. New `work-report` tickets should NOT be created — agents add completion comments directly to the working ticket instead (see `work.md` §4 for the hybrid model).
 4. Legacy `work-report` tickets (from the inbox migration) flow `idea → done` directly after Sinh reads them. Sprint-master closes them in bulk during triage.
-5. Retention: `work-report` and `fyi` tickets in terminal status (`done`, `rejected`, `cancelled`) are archived after 90 days.
+5. **FYI auto-close:** Sprint-master auto-closes FYI tickets older than 7 days to `done` status with a comment "Auto-closed: FYI ticket aged past 7 days without action." This runs during every triage (see `triage.md` Step 8b).
+   - Condition: `type === "fyi"` AND `status` is not terminal AND `(now - createdAt) >= 7 days`
+   - Exception: FYI tickets tagged `blocked` are NOT auto-closed.
+6. **Sprint-master idea triage skips FYI tickets** — FYI tickets in `idea` status are NOT routed to the requirements team. They follow the auto-close path instead.
+7. Retention: `work-report` and `fyi` tickets in terminal status (`done`, `rejected`, `cancelled`) are archived after 90 days (same as other terminal tickets via the Step 8 auto-archive rule).
 
 **Note on work reports vs ticket comments:** The standard agent output flow is now ticket-centric. Agents post a brief completion comment on the ticket they worked on. Standalone work-report files and tickets are deprecated except for edge cases without an associated ticket.
 

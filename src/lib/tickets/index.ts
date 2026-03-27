@@ -33,4 +33,4 @@ export type {
   EstimateMetrics,
 } from "./metrics.js";
 
-export { validateAuthor } from "./validate.js";
+export { validateAuthor, validateAssignee, matchAssignee, getValidTeamNames } from "./validate.js";

@@ -49,6 +49,8 @@ pa ticket list --project personal-assistant | grep '"estimate": ""'
 
 Focus triage on tickets with no assignee, no estimate, or in early-stage statuses (`idea`, `requirement-review`, `pending-approval`). Do NOT re-triage tickets already `implementing`, `pending-implementation`, or in terminal states.
 
+**Skip FYI tickets during idea triage** — `type === "fyi"` tickets in `idea` status are NOT routed to the requirements team. They are handled by Step 8b (auto-close after 7 days).
+
 ### Step 2 — Read each ticket
 
 For each ticket needing triage, use:
@@ -103,8 +105,7 @@ All tickets MUST have an effort estimate. If missing, infer from content:
 ```bash
 pa ticket update <TICKET-ID> \
   --priority <priority> \
-  --assignee <team> \
-  --assignee team-manager \
+  --assignee <team>/team-manager \
   --estimate <XS|S|M|L|XL>
 ```
 
@@ -144,17 +145,42 @@ For each terminal ticket:
 
 **Skip tickets already tagged `archived`.** This step is idempotent — safe to run on every triage.
 
+### Step 8b — Auto-close stale FYI tickets
+
+FYI tickets are informational — they do not require implementation work or multi-stage review. Auto-close them after 7 days without manual intervention.
+
+```bash
+# Find all non-terminal FYI tickets
+pa ticket list --type fyi
+```
+
+For each FYI ticket where `type === "fyi"` AND `status` is not terminal (`done`, `rejected`, `cancelled`) AND `(now - createdAt) >= 7 days`:
+
+```bash
+pa ticket update <id> --status done
+pa ticket comment <id> --author sprint-master \
+  --content "Auto-closed: FYI ticket aged past 7 days without action."
+```
+
+**This step is idempotent** — safe to run on every triage. Terminal tickets are skipped automatically.
+
+**Do NOT auto-close** FYI tickets tagged `blocked` — they may be waiting on a dependency.
+
+Log the count of auto-closed FYI tickets in the daily digest Triage Summary section.
+
 ### Step 9 — Suggest backlog for stale ideas
 
 During triage, find active `idea` tickets that have had no updates in 14 or more days
 and add a comment recommending backlog. **Do NOT add the tag — Sinh decides.**
+
+**Skip FYI tickets** (`type === "fyi"`) — they are handled by Step 8b and should not be routed to requirements.
 
 ```bash
 # Find all idea tickets
 pa ticket list --status idea
 ```
 
-For each `idea` ticket where `(now - updatedAt) >= 14 days` AND not already tagged `backlog`:
+For each `idea` ticket where `(now - updatedAt) >= 14 days` AND not already tagged `backlog` AND `type !== "fyi"`:
 
 ```bash
 pa ticket comment <id> --author sprint-master \

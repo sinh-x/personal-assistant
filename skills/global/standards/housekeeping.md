@@ -155,7 +155,7 @@ When picking up a ticket for multi-step work:
 Ticket in 'pending-implementation' state
   ↓
 Agent claims it
-  → pa ticket update <id> --status implementing --assignee <agent>
+  → pa ticket update <id> --status implementing --assignee <team>/<agent>
   → begin work
 
 Agent work completes
@@ -209,7 +209,7 @@ Team workspace: ~/Documents/ai-usage/agent-teams/<team-name>/  (persistent, cros
 Run workspace:  ~/Documents/ai-usage/deployments/<deploy-id>/<agent-name>/  (per-deployment)
 Bulletins:      pa bulletin list  (check on startup — FIRST priority!)
 Ticket work:    pa ticket list --assignee <team> --status pending-implementation
-Ticket claim:   pa ticket update <id> --status implementing --assignee <agent>
+Ticket claim:   pa ticket update <id> --status implementing --assignee <team>/<agent>
 Ticket done:    pa ticket update <id> --status review-uat --assignee sinh
 Blocked:        pa ticket update <id> --tags blocked  (keep status, add tag + comment)
 Review request: pa ticket create --type review-request --assignee <downstream> --estimate M

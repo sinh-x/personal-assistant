@@ -21,7 +21,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { TicketStore } from "../../tickets/index.js";
-import { validateAuthor } from "../../tickets/validate.js";
+import { validateAuthor, validateAssignee } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
 import type { CreateTicketInput, UpdateTicketInput } from "../../tickets/types.js";
 import { listRepos } from "../../repos.js";
@@ -40,6 +40,7 @@ export function ticketRoutes(): Hono {
       type?: string;
       tags?: string[];
       excludeTags?: string[];
+      search?: string;
     } = {};
 
     const project = c.req.query("project");
@@ -49,6 +50,7 @@ export function ticketRoutes(): Hono {
     const type = c.req.query("type");
     const tagsParam = c.req.query("tags");
     const excludeTagsParam = c.req.query("excludeTags");
+    const search = c.req.query("search");
 
     if (project) filters.project = project;
     if (status) filters.status = status;
@@ -57,6 +59,7 @@ export function ticketRoutes(): Hono {
     if (type) filters.type = type;
     if (tagsParam) filters.tags = tagsParam.split(",").map((t) => t.trim()).filter(Boolean);
     if (excludeTagsParam) filters.excludeTags = excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean);
+    if (search) filters.search = search;
 
     try {
       const tickets = store.list(filters);
@@ -78,6 +81,17 @@ export function ticketRoutes(): Hono {
 
     const actor = body.actor ?? "api";
     const { actor: _actor, ...input } = body;
+
+    if (input.assignee) {
+      try {
+        validateAssignee(input.assignee);
+      } catch (err) {
+        return c.json(
+          { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
+          400
+        );
+      }
+    }
 
     try {
       const ticket = store.create(input as CreateTicketInput, actor);
@@ -126,6 +140,17 @@ export function ticketRoutes(): Hono {
 
     const actor = body.actor ?? "api";
     const { actor: _actor, ...input } = body;
+
+    if ((input as UpdateTicketInput).assignee) {
+      try {
+        validateAssignee((input as UpdateTicketInput).assignee!);
+      } catch (err) {
+        return c.json(
+          { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
+          400
+        );
+      }
+    }
 
     try {
       const ticket = store.update(id, input as UpdateTicketInput, actor);
@@ -281,13 +306,18 @@ export function ticketRoutes(): Hono {
     const project = c.req.query("project") || undefined;
 
     const DEFAULT_EXCLUDE_TAGS = ["backlog", "archived"];
-    const filters: { assignee?: string; excludeTags?: string[] } = {};
+    const DEFAULT_EXCLUDE_TYPES = ["fyi", "work-report"];
+    const filters: { assignee?: string; excludeTags?: string[]; excludeTypes?: string[] } = {};
     const assignee = c.req.query("assignee");
     const excludeTagsParam = c.req.query("excludeTags");
+    const excludeTypesParam = c.req.query("excludeTypes");
     if (assignee) filters.assignee = assignee;
     filters.excludeTags = excludeTagsParam
       ? excludeTagsParam.split(",").map((t) => t.trim()).filter(Boolean)
       : DEFAULT_EXCLUDE_TAGS;
+    filters.excludeTypes = excludeTypesParam !== undefined
+      ? excludeTypesParam.split(",").map((t) => t.trim()).filter(Boolean)
+      : DEFAULT_EXCLUDE_TYPES;
 
     try {
       const board = buildBoardView(project, filters);

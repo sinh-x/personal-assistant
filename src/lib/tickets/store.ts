@@ -10,6 +10,7 @@ import {
 import { resolve, join } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { getTicketsDir } from "../paths.js";
+import { matchAssignee } from "./validate.js";
 import type {
   Ticket,
   AuditEntry,
@@ -573,6 +574,8 @@ export class TicketStore {
     type?: string;
     tags?: string[];
     excludeTags?: string[];
+    excludeTypes?: string[];
+    search?: string;
   } = {}): Ticket[] {
     const files = readdirSync(this.dir).filter(
       (f) => f.endsWith(".json") && f !== "counter.json"
@@ -591,7 +594,7 @@ export class TicketStore {
     return tickets.filter((t) => {
       if (filters.project && t.project !== filters.project) return false;
       if (filters.status && t.status !== filters.status) return false;
-      if (filters.assignee && t.assignee !== filters.assignee) return false;
+      if (filters.assignee && !matchAssignee(t.assignee, filters.assignee)) return false;
       if (filters.priority && t.priority !== filters.priority) return false;
       if (filters.type && t.type !== filters.type) return false;
       if (filters.tags?.length) {
@@ -599,6 +602,14 @@ export class TicketStore {
       }
       if (filters.excludeTags?.length) {
         if (filters.excludeTags.some((tag) => t.tags.includes(tag))) return false;
+      }
+      if (filters.excludeTypes?.length) {
+        if (filters.excludeTypes.includes(t.type)) return false;
+      }
+      if (filters.search) {
+        const needle = filters.search.toLowerCase();
+        const haystack = `${t.id} ${t.title} ${t.summary}`.toLowerCase();
+        if (!haystack.includes(needle)) return false;
       }
       return true;
     });

@@ -146,6 +146,7 @@ complete -c pa -n __fish_use_subcommand -a requirements -d 'Requirements lifecyc
 complete -c pa -n __fish_use_subcommand -a serve        -d 'Start the agent API server'
 complete -c pa -n __fish_use_subcommand -a ticket       -d 'Manage tickets'
 complete -c pa -n __fish_use_subcommand -a bulletin     -d 'Manage bulletins (deploy-time blockers)'
+complete -c pa -n __fish_use_subcommand -a registry     -d 'Manage deployment registry'
 
 # --- deploy: <team> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from deploy; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
@@ -175,6 +176,8 @@ complete -c pa -n '__fish_seen_subcommand_from status' -l wait      -d 'Block un
 complete -c pa -n '__fish_seen_subcommand_from status' -l report    -d 'Show the work report for a deployment'
 complete -c pa -n '__fish_seen_subcommand_from status' -l artifacts -d 'List artifact files for a deployment'
 complete -c pa -n '__fish_seen_subcommand_from status' -l activity  -d 'Show agent activity timeline for a deployment'
+complete -c pa -n '__fish_seen_subcommand_from status' -l recent    -d 'Show only the N most recent deployments' -r
+complete -c pa -n '__fish_seen_subcommand_from status' -l today     -d 'Show only today\'s deployments'
 
 # --- schedule: <spec> <repeat> ---
 complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (commandline -opc)) -eq 2' -a '(__pa_teams) daily:plan daily:progress daily:end' -d 'Team or daily:<mode>'
@@ -183,8 +186,9 @@ complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (comman
 # --- remove-timer: <name> ---
 complete -c pa -n '__fish_seen_subcommand_from remove-timer' -a '(__pa_timer_names)' -d 'Timer to remove'
 
-# --- teams: <name> ---
+# --- teams: <name> + flags ---
 complete -c pa -n '__fish_seen_subcommand_from teams; and not __fish_seen_subcommand_from (__pa_teams)' -a '(__pa_teams)' -d 'Team name'
+complete -c pa -n '__fish_seen_subcommand_from teams' -l all -d 'Show all tickets including backlog, archived, and terminal'
 
 # --- repos: <subcommand> ---
 complete -c pa -n '__fish_seen_subcommand_from repos; and not __fish_seen_subcommand_from list' -a 'list' -d 'List registered repos'
@@ -234,11 +238,14 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l actor    -d 'Actor for audit log' -r
 
 # ticket list
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l project  -d 'Filter by project' -r -a '(__pa_projects)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l status   -d 'Filter by status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l assignee -d 'Filter by assignee' -r -a '(__pa_assignees)'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority -d 'Filter by priority' -r -a 'critical high medium low'
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l type     -d 'Filter by type' -r -a 'feature bug task review-request work-report fyi idea question'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l project       -d 'Filter by project' -r -a '(__pa_projects)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l status        -d 'Filter by status' -r -a 'idea requirement-review pending-approval pending-implementation implementing review-uat done rejected cancelled'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l assignee      -d 'Filter by assignee' -r -a '(__pa_assignees)'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l priority      -d 'Filter by priority' -r -a 'critical high medium low'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l type          -d 'Filter by type' -r -a 'feature bug task review-request work-report fyi idea question'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l tags          -d 'Filter by tags (comma-separated, AND logic)' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l exclude-tags  -d 'Exclude tickets with any of these tags (comma-separated)' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from list' -l search        -d 'Free-text search on ticket ID, title, and summary' -r
 
 # ticket show <ID>
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
@@ -264,3 +271,12 @@ complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcomm
 
 # bulletin resolve <ID>
 complete -c pa -n '__fish_seen_subcommand_from bulletin; and __fish_seen_subcommand_from resolve; and not __fish_seen_subcommand_from (__pa_bulletin_ids)' -a '(__pa_bulletin_ids)' -d 'Bulletin ID'
+
+# --- registry: nested subcommands ---
+complete -c pa -n '__fish_seen_subcommand_from registry; and not __fish_seen_subcommand_from complete' -a 'complete'
+
+# registry complete <deploy-id>
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete; and not __fish_seen_subcommand_from (__pa_deploy_ids)' -a '(__pa_deploy_ids)' -d 'Deployment ID'
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l status   -d 'Completion status' -r -a 'success partial failed'
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l summary  -d 'One-line summary of what was done' -r
+complete -c pa -n '__fish_seen_subcommand_from registry; and __fish_seen_subcommand_from complete' -l log-file -d 'Session log file path (optional)' -r

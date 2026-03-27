@@ -12,6 +12,7 @@ import {
   BOARD_COLUMNS,
 } from "../lib/tickets/board.js";
 import type { BoardView } from "../lib/tickets/board.js";
+import { TERMINAL_STATUSES } from "../lib/tickets/types.js";
 
 // ANSI color helpers (no-op when not a TTY)
 const COLORS = {
@@ -117,7 +118,7 @@ function makeSepCol(width: number): string {
 }
 
 /** Show kanban summary table of all agent teams */
-function showAllTeams(): void {
+function showAllTeams(all = false): void {
   const agentTeamsDir = getAgentTeamsDir();
   if (!existsSync(agentTeamsDir)) {
     console.log(
@@ -138,7 +139,12 @@ function showAllTeams(): void {
   // Gather per-team, per-status ticket counts
   const ticketMap = new Map<string, Record<string, number>>();
   try {
-    const summaries = getTeamStatusSummaries();
+    const summaries = all
+      ? getTeamStatusSummaries()
+      : getTeamStatusSummaries(undefined, {
+          excludeTags: ["backlog", "archived"],
+          excludeStatuses: TERMINAL_STATUSES,
+        });
     for (const s of summaries) {
       ticketMap.set(s.team, s.counts as Record<string, number>);
     }
@@ -181,7 +187,7 @@ function showAllTeams(): void {
 const DETAIL_WIDTH = 64;
 
 /** Show kanban board detail view for one team */
-function showOneTeam(name: string): void {
+function showOneTeam(name: string, all = false): void {
   const agentTeamsDir = getAgentTeamsDir();
   const teamDir = resolve(agentTeamsDir, name);
 
@@ -197,7 +203,9 @@ function showOneTeam(name: string): void {
 
   let board;
   try {
-    board = getTeamBoard(name);
+    board = all
+      ? getTeamBoard(name)
+      : getTeamBoard(name, { excludeTags: ["backlog", "archived"] });
   } catch {
     console.log("\n(ticket system unavailable)");
     const running = getRunningDeploysForTeam(name);
@@ -245,7 +253,7 @@ function showOneTeam(name: string): void {
 /** Show project-wide kanban board, optionally filtered by assignee */
 function showBoard(
   project?: string,
-  filters: { assignee?: string; excludeTags?: string[] } = {}
+  filters: { assignee?: string; excludeTags?: string[]; excludeTypes?: string[] } = {}
 ): void {
   let board: BoardView;
   try {
@@ -294,7 +302,7 @@ function showBoard(
  */
 export function boardCommand(
   project?: string,
-  filters: { assignee?: string; excludeTags?: string[] } = {}
+  filters: { assignee?: string; excludeTags?: string[]; excludeTypes?: string[] } = {}
 ): void {
   showBoard(project, filters);
 }
@@ -303,11 +311,14 @@ export function boardCommand(
  * Show agent team kanban board.
  * Without name: summary table of all teams with per-status ticket counts.
  * With name: kanban board for one team, tickets grouped by status.
+ *
+ * By default, excludes backlog/archived tickets and terminal statuses.
+ * Use opts.all to show everything.
  */
-export function teamsCommand(name?: string): void {
+export function teamsCommand(name?: string, opts: { all?: boolean } = {}): void {
   if (name) {
-    showOneTeam(name);
+    showOneTeam(name, opts.all);
   } else {
-    showAllTeams();
+    showAllTeams(opts.all);
   }
 }

@@ -35,7 +35,7 @@ The deployment registry tracks all team deployments:
 After all agents finish and all session logs are written, the team manager writes:
 
 ```bash
-flock -w 5 ~/Documents/ai-usage/deployments/.registry.lock bash -c "echo '{\"deployment_id\":\"<DEPLOYMENT_ID>\",\"team\":\"<TEAM_NAME>\",\"event\":\"completed\",\"timestamp\":\"'$(date -Iseconds)'\",\"status\":\"<success|partial|failed>\",\"summary\":\"<one-line summary>\"}' >> ~/Documents/ai-usage/deployments/registry.jsonl"
+pa registry complete <DEPLOYMENT_ID> --status <success|partial|failed> --summary "<one-line summary>"
 ```
 
 **Status values:**
@@ -61,8 +61,10 @@ pa ticket list --assignee <team-name> --status pending-implementation
 
 **Claim a ticket before starting:**
 
+Always use team-qualified `<team>/<agent>` format for `--assignee` (e.g., `builder/team-manager`). Bare agent names are deprecated.
+
 ```bash
-pa ticket update <ticket-id> --status implementing --assignee <agent-name>
+pa ticket update <ticket-id> --status implementing --assignee <team>/<agent-name>
 ```
 
 **On completion — role-specific status transitions:**
@@ -398,7 +400,7 @@ pa ticket list --assignee requirements --status requirement-review
 ### Claim a ticket
 
 ```bash
-pa ticket update <ticket-id> --status implementing --assignee <agent-name>
+pa ticket update <ticket-id> --status implementing --assignee <team>/<agent-name>
 ```
 
 ### Update as you work
