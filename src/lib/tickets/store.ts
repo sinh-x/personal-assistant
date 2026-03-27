@@ -234,6 +234,16 @@ export class TicketStore {
     const id = this.allocateId(prefix);
     const now = new Date().toISOString();
 
+    // F6: Dedup guard — deduplicate doc_refs by path (keep last entry per path)
+    const dedupedDocRefs: DocRef[] = [];
+    const seenPaths = new Set<string>();
+    for (const ref of [...input.doc_refs].reverse()) {
+      if (!seenPaths.has(ref.path)) {
+        seenPaths.add(ref.path);
+        dedupedDocRefs.unshift(ref);
+      }
+    }
+
     const ticket: Ticket = {
       ...input,
       project: canonicalKey,
@@ -241,6 +251,7 @@ export class TicketStore {
       createdAt: now,
       updatedAt: now,
       resolvedAt: input.resolvedAt ?? null,
+      doc_refs: dedupedDocRefs,
     };
 
     writeFileSync(this.ticketPath(id), JSON.stringify(ticket, null, 2));
@@ -395,6 +406,7 @@ export class TicketStore {
     }
 
     if (addDocRefInput) {
+      const existingIdx = docRefs.findIndex((r) => r.path === addDocRefInput.path);
       const newRef: DocRef = {
         type: addDocRefInput.type ?? "attachment",
         path: addDocRefInput.path,
@@ -402,20 +414,43 @@ export class TicketStore {
         addedAt: now,
         addedBy: addDocRefInput.addedBy ?? actor,
       };
-      // Demote existing primary if the new one is primary
-      if (newRef.primary) {
-        docRefs = docRefs.map((r) => ({ ...r, primary: false }));
+
+      if (existingIdx >= 0) {
+        // Upsert path — existing doc_ref found at same path
+        const oldRef = docRefs[existingIdx];
+        // If new ref is primary, demote any existing primary
+        if (newRef.primary) {
+          docRefs = docRefs.map((r) => ({ ...r, primary: false }));
+        }
+        // Replace the matched entry with updated values
+        docRefs = docRefs.map((r, i) => (i === existingIdx ? { ...r, ...newRef } : r));
+        const before = ticket.doc_refs ?? [];
+        changes["doc_refs"] = [before, docRefs];
+        process.stderr.write(`Info: doc_ref '${addDocRefInput.path}' already exists — updated in place\n`);
+        this.appendAudit({
+          ticket_id: id,
+          action: "doc_ref_updated",
+          actor,
+          timestamp: now,
+          changes: { doc_ref: [oldRef, newRef] },
+        });
+      } else {
+        // Append path — no existing doc_ref with this path
+        // Demote existing primary if the new one is primary
+        if (newRef.primary) {
+          docRefs = docRefs.map((r) => ({ ...r, primary: false }));
+        }
+        const before = ticket.doc_refs ?? [];
+        docRefs = [...docRefs, newRef];
+        changes["doc_refs"] = [before, docRefs];
+        this.appendAudit({
+          ticket_id: id,
+          action: "doc_ref_added",
+          actor,
+          timestamp: now,
+          changes: { doc_ref: [null, newRef] },
+        });
       }
-      const before = ticket.doc_refs ?? [];
-      docRefs = [...docRefs, newRef];
-      changes["doc_refs"] = [before, docRefs];
-      this.appendAudit({
-        ticket_id: id,
-        action: "doc_ref_added",
-        actor,
-        timestamp: now,
-        changes: { doc_ref: [null, newRef] },
-      });
     }
 
     const updated: Ticket = { ...ticket, ...(restInput as Partial<Ticket>), doc_refs: docRefs, updatedAt: now };
