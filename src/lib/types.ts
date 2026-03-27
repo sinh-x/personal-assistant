@@ -20,7 +20,7 @@ export interface DeployMode {
   mode_type?: 'housekeeping' | 'work' | 'interactive';
   /** Solo operator mode — team-manager does all work, no sub-agents; omits multi-agent deployment instructions */
   solo?: boolean;
-  /** Per-mode model override — takes precedence over team-level model, but yields to explicit --model CLI flag */
+  /** Per-mode model override — takes precedence over team-level model, but yields to explicit --team-model CLI flag */
   model?: 'haiku' | 'sonnet' | 'opus';
   /** Per-mode API provider — takes precedence over default 'anthropic', but yields to explicit --provider CLI flag */
   provider?: 'anthropic' | 'minimax';

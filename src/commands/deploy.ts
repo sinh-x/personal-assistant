@@ -20,7 +20,7 @@ function resolveEffectiveModels(
   teamConfig: TeamConfig,
   opts: { teamModel?: string; agentModel?: string; modeModel?: string }
 ): { tmModel: string | undefined; agentModels: Record<string, string | undefined> } {
-  // Precedence: explicit --model flag > mode-level model > team-level model
+  // Precedence: explicit --team-model CLI flag > per-mode YAML model > team-level YAML model
   let tmModel: string | undefined = opts.teamModel ?? opts.modeModel ?? teamConfig.model ?? undefined;
   if (tmModel === "haiku") {
     console.log('Warning: team-manager model "haiku" upgraded to "sonnet" (minimum floor)');
@@ -316,6 +316,14 @@ export function deployCommand(
       console.error(`Error: Invalid mode "${opts.mode}" for team: ${teamConfig.name}`);
       printModesTable(teamConfig.name, modes);
       process.exit(1);
+    }
+  }
+
+  // Validate --direct: warn if --direct used but no direct mode configured
+  if (opts.direct) {
+    const modes = teamConfig.deploy_modes;
+    if (modes && modes.length > 0 && !modes.find((m) => m.id === "direct")) {
+      console.warn("Warning: --direct used but team has no direct deploy mode — falling back to default mode behavior");
     }
   }
 
