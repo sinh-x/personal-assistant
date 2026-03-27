@@ -9,10 +9,16 @@ deploy_modes:
     mode_type: housekeeping
     agents: []
     objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: interactive
     label: Interactive
     phone_visible: true
     mode_type: interactive
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: weekly-review
     label: Weekly Review
     phone_visible: true
@@ -40,6 +46,9 @@ agents:
 # Use `pa deploy rpm --interactive` for block management.
 # Use `pa deploy rpm --interactive --objective "MODE: weekly-review"` for weekly review.
 # For background weekly gather, use team: rpm-gather.
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
 objective: |
   You are running as a solo RPM agent — do NOT spawn sub-agents.
 

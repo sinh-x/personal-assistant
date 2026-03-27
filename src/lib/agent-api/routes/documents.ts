@@ -13,18 +13,41 @@
  *
  * Uses validateSandboxPath() as defense-in-depth (global middleware already
  * validates ?path= params for absolute paths).
+ *
+ * GET /api/images?path=<path>
+ *
+ * Serves image files (png, jpg, gif, svg, webp) from ~/Documents/ai-usage/
+ * with proper Content-Type headers. Reuses sandbox security for path validation.
  */
 
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { readFile, readdir } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, extname } from "node:path";
 import { validateSandboxPath, normalizeSandboxPath } from "../utils/sandbox.js";
 import {
   parseMarkdownMetadata,
   detectDocumentType,
 } from "../utils/markdown.js";
+
+const ALLOWED_IMAGE_EXTENSIONS = new Set([
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".gif",
+  ".svg",
+  ".webp",
+]);
+
+const IMAGE_CONTENT_TYPES: Record<string, string> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".svg": "image/svg+xml",
+  ".webp": "image/webp",
+};
 
 interface FileItem {
   id: string;
@@ -119,6 +142,48 @@ export function documentsRoutes(): Hono {
         modified: stat.mtime.toISOString(),
       },
     });
+  });
+
+  app.get("/api/images", async (c: Context) => {
+    const imgPathParam = c.req.query("path");
+    if (!imgPathParam) {
+      return c.json(
+        { error: "path query param is required", code: "BAD_REQUEST" },
+        400
+      );
+    }
+
+    const normalized = normalizeSandboxPath(imgPathParam);
+
+    let resolvedPath: string;
+    try {
+      resolvedPath = validateSandboxPath(normalized);
+    } catch {
+      return c.json(
+        { error: "Path traversal denied", code: "SANDBOX_VIOLATION" },
+        403
+      );
+    }
+
+    if (!existsSync(resolvedPath)) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+
+    const ext = extname(resolvedPath).toLowerCase();
+    if (!ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+      return c.json(
+        { error: "Unsupported image format", code: "UNSUPPORTED_MEDIA_TYPE" },
+        415
+      );
+    }
+
+    const contentType = IMAGE_CONTENT_TYPES[ext] ?? "application/octet-stream";
+    const statImg = statSync(resolvedPath);
+    const fileBuffer = await readFile(resolvedPath);
+
+    c.header("Content-Type", contentType);
+    c.header("Content-Length", String(statImg.size));
+    return c.body(fileBuffer);
   });
 
   return app;

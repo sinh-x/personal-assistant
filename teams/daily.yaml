@@ -24,28 +24,43 @@ deploy_modes:
     mode_type: housekeeping
     agents: []
     objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: plan
     label: Plan
     phone_visible: true
     mode_type: work
     agents: []  # solo, no sub-agents
     objective: teams/daily/modes/plan.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: plan-review
     label: Plan Review
     phone_visible: false
     mode_type: work
     agents: []  # solo, no sub-agents
     objective: teams/daily/modes/plan-review.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: progress
     label: Progress
     phone_visible: true
     mode_type: work
     objective: teams/daily/modes/progress.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: end
     label: End
     phone_visible: true
     mode_type: work
     objective: teams/daily/modes/end.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
   - id: end-review
     label: End Review
     phone_visible: false
@@ -86,6 +101,9 @@ agents:
 # at runtime by daily.ts (dynamic variables: TODAY, OUTPUT_DIR, etc.).
 # Modes: plan, plan-review, progress, end, end-review
 # This field serves as fallback if mode files are not found.
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
 objective: |
   See teams/daily/modes/ for mode-specific objectives.
   Run with: pa daily plan | pa daily plan --review | pa daily progress | pa daily end | pa daily end --review
