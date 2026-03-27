@@ -3,7 +3,8 @@
  *
  * POST /api/deploy — fire-and-forget deployment trigger.
  *   Body: {team: string, mode?: string, objective?: string, repo?: string, ticket?: string}
- *   Returns: {deployment_id: string, status: "launched", team, mode}
+ *   Returns 202: {status: "pending", team, mode} — spawned successfully; real status arrives via WS deployment-status-change
+ *   Returns 202: {status: "failed", reason: string} — spawn failed (binary not found, permission error, etc.)
  */
 
 import { Hono } from "hono";
@@ -84,57 +85,34 @@ export function deployRoutes(): Hono {
       args.push("--ticket", ticket.trim());
     }
 
-    // Spawn and read first line for deployment ID (with 5s timeout)
+    // Spawn detached and return 202 immediately — phone gets real status via WS deployment-status-change
     const paBin = getPaBin();
-    let deploymentId = "";
+    let proc: ReturnType<typeof spawn>;
 
-    await new Promise<void>((resolve) => {
-      const proc = spawn(paBin, args, {
-        detached: true,
-        stdio: ["ignore", "pipe", "ignore"],
+    try {
+      proc = spawn(paBin, args, { detached: true, stdio: "ignore" });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return c.json({ status: "failed", reason, team, mode: mode ?? null }, 202);
+    }
+
+    // Brief wait (50ms) to catch immediate spawn failures (e.g., binary not found)
+    const spawnError = await new Promise<Error | null>((resolve) => {
+      const timer = setTimeout(() => resolve(null), 50);
+      proc.once("error", (err: Error) => {
+        clearTimeout(timer);
+        resolve(err);
       });
-
-      let partial = "";
-      let resolved = false;
-
-      const timeout = setTimeout(() => {
-        if (!resolved) {
-          resolved = true;
-          resolve();
-        }
-      }, 5000);
-
-      proc.stdout?.on("data", (chunk: Buffer) => {
-        if (resolved) return;
-        partial += chunk.toString();
-        const nl = partial.indexOf("\n");
-        if (nl >= 0) {
-          const firstLine = partial.substring(0, nl);
-          const match = firstLine.match(/\b(d-[a-f0-9]{6})\b/);
-          if (match) deploymentId = match[1];
-          resolved = true;
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-
-      proc.on("error", () => {
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          resolve();
-        }
-      });
-
-      proc.unref();
     });
 
-    return c.json({
-      deployment_id: deploymentId,
-      status: "launched",
-      team,
-      mode: mode ?? null,
-    });
+    if (spawnError !== null) {
+      return c.json({ status: "failed", reason: spawnError.message, team, mode: mode ?? null }, 202);
+    }
+
+    proc.on("error", () => {}); // Suppress late errors after response is sent
+    proc.unref();
+
+    return c.json({ status: "pending", team, mode: mode ?? null }, 202);
   });
 
   return app;

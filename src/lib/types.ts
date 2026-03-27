@@ -1,3 +1,10 @@
+/** Skill entry for mode-level skill declarations */
+export interface SkillEntry {
+  name: string;
+  /** How this skill is injected into the primer */
+  'inject-as': 'global-skill' | 'shared-skill' | 'reference';
+}
+
 /** Mode-specific deployment configuration within a team */
 export interface DeployMode {
   id: string;
@@ -8,7 +15,7 @@ export interface DeployMode {
   /** Subset of agent names to include in this mode; empty array = team-manager only; omitted = all agents */
   agents?: string[];
   /** Skills to surface in this mode's primer */
-  skills?: string[];
+  skills?: SkillEntry[];
   /** Determines which standards modules are included in the primer; defaults to 'work' */
   mode_type?: 'housekeeping' | 'work' | 'interactive';
   /** Solo operator mode — team-manager does all work, no sub-agents; omits multi-agent deployment instructions */
@@ -63,7 +70,12 @@ export interface TeamConfig {
 export interface Agent {
   name: string;
   role: string;
-  skill: string;
+  /** Agent-specific workflow instruction file (replaces skill) */
+  instruction?: string;
+  /**
+   * @deprecated Use `instruction` instead. Kept for backwards compat during migration.
+   */
+  skill?: string;
   model?: 'haiku' | 'sonnet' | 'opus';
 }
 
@@ -83,6 +95,7 @@ export interface RegistryEvent {
   error?: string;
   exit_code?: number;
   ticket_id?: string;
+  provider?: string;
 }
 
 /** Computed deployment status from registry events */
@@ -116,4 +129,6 @@ export interface PAConfig {
   homeDir: string;
   /** PA_BIN (wrapped binaries) */
   binDir: string;
+  /** Minimax API key for --provider minimax deployments */
+  minimax_api_key?: string;
 }

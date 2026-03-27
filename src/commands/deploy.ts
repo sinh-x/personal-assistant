@@ -77,7 +77,7 @@ function printModesTable(teamName: string, modes: DeployMode[] | undefined): voi
     m.label,
     m.phone_visible ? "yes" : "no",
     m.agents === undefined ? "all" : m.agents.length === 0 ? "(tm only)" : m.agents.join(", "),
-    m.skills?.join(", ") ?? "—",
+    m.skills?.length ? m.skills.map(s => s.name).join(", ") : "—",
   ]);
   const headers = ["ID", "LABEL", "PHONE", "AGENTS", "SKILLS"];
   const widths = headers.map((h, i) =>
@@ -95,6 +95,10 @@ function printModesTable(teamName: string, modes: DeployMode[] | undefined): voi
  * Deploy an agent team by generating a primer and running claude.
  * Replaces deploy.sh (342 lines).
  */
+const VALID_PROVIDERS = new Set(["anthropic", "minimax"]);
+const MINIMAX_BASE_URL = "https://api.minimax.io/anthropic";
+const MINIMAX_MODEL = "MiniMax-M2.7";
+
 export function deployCommand(
   spec: string,
   opts: {
@@ -110,11 +114,29 @@ export function deployCommand(
     repo?: string;
     ticket?: string;
     validate?: boolean;
+    provider?: string;
     /** Template variables to substitute in mode objective files */
     templateVars?: Record<string, string>;
   }
 ): void {
   const config = loadConfig();
+
+  // Validate --provider early before doing any work
+  const provider = opts.provider ?? "anthropic";
+  if (!VALID_PROVIDERS.has(provider)) {
+    console.error(`Error: Invalid provider "${provider}". Valid values: anthropic, minimax`);
+    process.exit(1);
+  }
+
+  // Fail-fast if Minimax API key is missing
+  if (provider === "minimax" && !config.minimax_api_key) {
+    console.error(`Error: --provider minimax requires minimax_api_key in config.yaml`);
+    console.error(`  Config file: ~/.config/sinh-x/personal-assistant/config.yaml`);
+    console.error(`  Add: minimax_api_key: <your-key>`);
+    process.exit(1);
+  }
+  const minimaxApiKey = config.minimax_api_key;
+
   const paHome = getHomeDir();
   const dataDir = getDataDir();
   const primersDir = resolve(dataDir, "primers");
@@ -172,20 +194,50 @@ export function deployCommand(
     return;
   }
 
-  // Handle --validate: check skill files, mode objective files, and template vars without deploying
+  // Handle --validate: check skill files, mode objective files, shared skills, and template vars without deploying
   if (opts.validate) {
     let allOk = true;
     const rows: Array<{ status: string; path: string; note: string }> = [];
 
-    // Check each agent skill file
+    // Check each agent skill/instruction file
     for (const agent of teamConfig.agents) {
+      // Check instruction field (new, preferred)
+      if (agent.instruction) {
+        const instPath = resolveFile(agent.instruction);
+        if (instPath && existsSync(instPath)) {
+          rows.push({ status: "OK", path: agent.instruction, note: `agent:${agent.name} instruction` });
+        } else {
+          rows.push({ status: "MISSING", path: agent.instruction, note: `agent:${agent.name} instruction` });
+          allOk = false;
+        }
+      }
+      // Also check deprecated skill field for backwards compat
       if (agent.skill) {
         const skillPath = resolveFile(agent.skill);
         if (skillPath && existsSync(skillPath)) {
-          rows.push({ status: "OK", path: agent.skill, note: `agent:${agent.name} skill` });
+          rows.push({ status: "OK", path: agent.skill, note: `agent:${agent.name} skill (deprecated)` });
         } else {
-          rows.push({ status: "MISSING", path: agent.skill, note: `agent:${agent.name} skill` });
+          rows.push({ status: "MISSING", path: agent.skill, note: `agent:${agent.name} skill (deprecated)` });
           allOk = false;
+        }
+      }
+    }
+
+    // Check shared skills from mode.skills[] (resolved from ~/.claude/skills/)
+    const sharedSkillDirs = new Set<string>();
+    for (const mode of teamConfig.deploy_modes ?? []) {
+      if (mode.skills) {
+        for (const skillEntry of mode.skills) {
+          // Dedupe by skill name
+          if (sharedSkillDirs.has(skillEntry.name)) continue;
+          sharedSkillDirs.add(skillEntry.name);
+          const skillPath = resolve(homedir(), ".claude/skills", skillEntry.name, "SKILL.md");
+          if (existsSync(skillPath)) {
+            rows.push({ status: "OK", path: `~/.claude/skills/${skillEntry.name}/SKILL.md`, note: `mode:${mode.id} shared-skill` });
+          } else {
+            rows.push({ status: "MISSING", path: `~/.claude/skills/${skillEntry.name}/SKILL.md`, note: `mode:${mode.id} shared-skill` });
+            allOk = false;
+          }
         }
       }
     }
@@ -335,19 +387,41 @@ export function deployCommand(
     repoRoot = resolved.path;
   }
 
-  // Resolve effective models
-  const { tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
-    teamModel: opts.teamModel,
-    agentModel: opts.agentModel,
-  });
-  const modelFlag = tmModel ? `--model ${tmModel}` : "";
+  // Resolve effective models — skipped when using Minimax (ANTHROPIC_MODEL env var handles it)
+  let tmModel: string | undefined;
+  let agentModels: Record<string, string | undefined> = {};
+  let modelFlag: string;
+
+  if (provider === "minimax") {
+    modelFlag = "";
+  } else {
+    ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
+      teamModel: opts.teamModel,
+      agentModel: opts.agentModel,
+    }));
+    modelFlag = tmModel ? `--model ${tmModel}` : "";
+  }
 
   // Deployment env vars passed to claude so hooks can locate the activity log.
   // PA_ACTIVITY_LOG must be set here directly — CLAUDE_ENV_FILE only propagates
   // to Bash tool calls, not to hook scripts.
   const activityLog = resolve(deployDir, "activity.jsonl");
+  const minimaxEnv = provider === "minimax"
+    ? {
+        ANTHROPIC_BASE_URL: MINIMAX_BASE_URL,
+        ANTHROPIC_AUTH_TOKEN: minimaxApiKey ?? "",
+        ANTHROPIC_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_SMALL_FAST_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_DEFAULT_SONNET_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_DEFAULT_OPUS_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: MINIMAX_MODEL,
+        DISABLE_PROMPT_CACHING: "1",
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      }
+    : {};
   const deployEnv = {
     ...process.env,
+    ...minimaxEnv,
     PA_DEPLOYMENT_ID: deployId,
     PA_DEPLOYMENT_DIR: deployDir,
     PA_ACTIVITY_LOG: activityLog,
@@ -402,6 +476,7 @@ export function deployCommand(
     primer: primerFile,
     ...(anyModelSet ? { models: modelsMap } : {}),
     ...(opts.ticket ? { ticket_id: opts.ticket } : {}),
+    provider,
   };
   appendRegistryEvent(startEvent);
 
@@ -478,9 +553,29 @@ Agents:     ${agentNames.join(" ")}
       bashPath = "/usr/bin/env bash";
     }
 
+    // Write sensitive env vars to a file (mode 0o600) — sourced and deleted by bgScript
+    const envFile = resolve(deployDir, "deploy.env");
+    if (provider === "minimax") {
+      const escapedKey = minimaxApiKey?.replace(/'/g, "'\\''") ?? "";
+      const envContent = `export ANTHROPIC_BASE_URL='${MINIMAX_BASE_URL}'
+export ANTHROPIC_AUTH_TOKEN='${escapedKey}'
+export ANTHROPIC_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_SMALL_FAST_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_DEFAULT_OPUS_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='${MINIMAX_MODEL}'
+export DISABLE_PROMPT_CACHING='1'
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
+`;
+      writeFileSync(envFile, envContent, { mode: 0o600 });
+    }
+
     // Build background script
+    const sourceEnv = provider === "minimax"
+      ? `source '${envFile}' && rm -f '${envFile}'\n`
+      : "";
     const bgScript = `
-export PA_DEPLOYMENT_ID='${deployId}'
+${sourceEnv}export PA_DEPLOYMENT_ID='${deployId}'
 export PA_DEPLOYMENT_DIR='${deployDir}'
 export PA_ACTIVITY_LOG='${activityLog}'
 echo '[$(date -Iseconds)] claude starting...' >> '${logFile}'
