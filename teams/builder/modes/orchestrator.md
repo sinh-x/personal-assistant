@@ -27,7 +27,7 @@ Determine the target repository **before any other work**. This is mandatory —
 
 **Resolution order:**
 
-1. If `--objective` points to a file path (e.g., an inbox item or requirements doc):
+1. If `--objective` points to a file path (e.g., a requirements doc or artifact):
    - Read the file
    - Look for `repo_path` in frontmatter or plan body
    - If found, use it
@@ -59,12 +59,13 @@ pa ticket create \
 
 Parse the `--objective` to identify the target work.
 
-1. **If objective points to a specific file** — read it directly as the plan document. Skip inbox scan.
-2. **If objective is a topic description** — scan `~/Documents/ai-usage/agent-teams/builder/inbox/` for a matching approved item:
-   - Match by topic keywords in the filename (strip date prefix, compare slugs)
-   - If multiple matches, pick the most recent
-3. **If a matching approved item is found** → go to Phase 3 (Plan Analysis)
-4. **If no matching item is found** → go to Phase 2 (Requirements Gathering)
+1. **If objective points to a specific file** — read it directly as the plan document. Skip ticket scan.
+2. **If objective is a topic description** — search for a matching ticket with a plan document:
+   - `pa ticket list --assignee builder --search "<topic keywords>"`
+   - If a ticket has a `doc_refs` entry (type `requirements` or primary), read that plan document
+   - If multiple matches, pick the highest priority or most recent
+3. **If a matching ticket with plan is found** → go to Phase 3 (Plan Analysis)
+4. **If no matching ticket is found** → go to Phase 2 (Requirements Gathering)
 
 ### Phase 2: Requirements Gathering (optional)
 
@@ -86,9 +87,9 @@ pa status <deploy-id> --wait
 ```
 
 **Step 4 — Wait for Sinh approval:**
-- The requirements team will send its output to Sinh's inbox for review
-- Sinh reviews, possibly edits, and approves — the approved doc appears in builder inbox
-- Monitor `~/Documents/ai-usage/agent-teams/builder/inbox/` for the approved item
+- The requirements team will create a ticket with the requirements doc attached via `doc_refs`
+- Sinh reviews, possibly edits, and approves via ticket status transition
+- Monitor the ticket status: `pa ticket list --assignee builder --status pending-implementation`
 - **Timeout:** 30 minutes (configurable). Check every 60 seconds.
 - **On timeout:** Create an FYI ticket noting the partial state and exit gracefully.
 
@@ -112,16 +113,30 @@ Read the approved requirement/plan document and extract the implementation detai
 - `feature_branch` — branch name (or derive from topic: `feature/<short-topic>`)
 - Phase checklist — the ordered list of implementation phases with descriptions
 
+**Extract per-phase context from the plan:**
+
+For each phase in the checklist, identify and collect:
+
+1. **Functional requirements** — which §4 In Scope items and §6 Functional Requirements this phase addresses. Map by reading the §12 Implementation Plan step descriptions and matching them to scope items.
+2. **Non-functional requirements** — which §6 Non-Functional Requirements apply to this phase. Include ALL "Must" priority NFRs as baseline for every phase. Add phase-specific "Should" NFRs when relevant (e.g., a UI phase inherits accessibility NFRs).
+3. **Acceptance criteria** — which §10 AC items can be verified after this phase completes. Map each AC to the earliest phase where it becomes testable.
+4. **Test coverage** — what verification steps the plan specifies for this phase, plus any test files to create or update. Derive from §12 step details and §8 Technical Approach.
+5. **Dependencies** — which §7 Dependencies must be satisfied before this phase, and which prior phases must be complete.
+
+Build a **phase context map** — a structured lookup of phase number → {requirements, NFRs, ACs, tests, dependencies}. This map drives the objective composition in Phase 4.
+
 **Validate the plan:**
 - Plan must have a clear phase checklist with specific deliverables per phase
 - Each phase should have verification steps (build, typecheck, test)
-- If the plan is too thin (no checklist, vague phases, missing verification steps):
+- §4 In Scope items must be traceable to at least one phase
+- §10 Acceptance Criteria must be traceable to at least one phase
+- If the plan is too thin (no checklist, vague phases, missing verification steps, untraceable AC):
   - Create a review-request ticket asking for more detail:
     ```bash
     pa ticket create --type review-request --project personal-assistant \
       --title "Review: Plan too thin for orchestration — <objective>" \
       --assignee sinh --priority high --estimate XS \
-      --summary "Plan for '<objective>' lacks phase checklist or verification steps. Please add detail and re-launch."
+      --summary "Plan for '<objective>' lacks phase checklist, verification steps, or traceable acceptance criteria. Please add detail and re-launch."
     ```
   - Wait for response (30-minute timeout, same as Phase 2)
   - On timeout: exit partial
@@ -139,13 +154,48 @@ Execute each unchecked phase by launching the builder team in implement mode.
 **For each unchecked phase in the checklist:**
 
 **a. Compose the builder objective:**
+
+Use the phase context map from Phase 3 to build a structured, self-contained objective. The builder must be able to execute the phase using ONLY this objective — without re-reading the full plan document.
+
+**Objective template:**
+
 ```
 Phase N of <item-filename>: <phase description from checklist>
+
+## Scope
+<List the §4 In Scope items this phase addresses, as checkboxes>
+
+## Requirements
+### Functional
+<Table of §6 Functional Requirements relevant to this phase: ID | Requirement | Priority>
+
+### Non-Functional
+<Table of §6 Non-Functional Requirements relevant to this phase: ID | Requirement | Priority>
+
+## Acceptance Criteria
+<List the §10 AC items that become verifiable after this phase, as checkboxes>
+
+## Verification
+<Ordered list of verification steps for this phase: build commands, test commands, manual checks>
+
+## Context
+- Repo: <repo_path>
+- Branch: <feature_branch>
+- Plan: <path to plan document>
+- Prior phases completed: <list of completed phase numbers, or "none">
+- Dependencies: <any §7 items or prior-phase outputs this phase needs>
 ```
+
+**Rules for objective composition:**
+- Include ONLY the requirements, NFRs, and ACs relevant to THIS phase — do not dump the entire plan
+- Always include all "Must" priority NFRs as baseline context
+- If an AC spans multiple phases, include it in the EARLIEST phase where it becomes partially testable, with a note: `(partial — full verification after Phase M)`
+- If a phase has no mapped ACs, flag this as a gap: add a note `No acceptance criteria mapped to this phase — builder should verify deliverables match the phase description`
+- Keep the objective readable — prefer concise bullet points over paragraphs
 
 **b. Launch builder in implement mode:**
 ```bash
-unset CLAUDECODE && pa deploy builder --mode implement --background --objective "Phase N of <item>: <description>"
+unset CLAUDECODE && pa deploy builder --mode implement --background --objective "<structured objective from step a>"
 ```
 
 **c. Wait for builder to complete:**
@@ -164,7 +214,7 @@ pa status <deploy-id> --report
 |--------|--------|
 | Success (exit 0) | Verify phase is checked off in the item file. Continue to next phase. |
 | Failure (exit 1) — transient (test flake, timeout) | Retry once with the same objective. |
-| Failure (exit 1) — real error | Report to Sinh inbox with failure details. See below. |
+| Failure (exit 1) — real error | Report to Sinh via FYI ticket with failure details. See below. |
 
 **On real failure:**
 
@@ -217,8 +267,8 @@ pa ticket create \
 Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a note that merge is pending.
 
 **Step 4 — Post-merge cleanup:**
-- Move the item from `ongoing/` to `done/` (if not already done by the builder)
-- Verify the item file has all phases checked off
+- Verify the plan document has all phases checked off
+- Update ticket status if not already done by the builder
 
 ### Phase 6: Report and Shutdown
 
@@ -245,19 +295,19 @@ pa ticket create \
 
 **Step 3 — Registry completion marker** per standards.
 
-## Inbox Claim Protocol
+## Ticket Tracking Protocol
 
-When working with builder inbox items:
-1. The builder team manages its own inbox claim (inbox → ongoing → done)
-2. Orchestrator reads the item but does NOT move it — the builder handles item lifecycle
-3. Orchestrator tracks progress by reading the item file's phase checklist
+When working with builder tickets:
+1. The builder team manages its own ticket lifecycle (claim → implementing → review-uat)
+2. Orchestrator reads the ticket and plan doc but does NOT change ticket status — the builder handles status transitions
+3. Orchestrator tracks progress by reading the plan document's phase checklist
 
 ## Failure Modes
 
 | Scenario | Action |
 |----------|--------|
 | Repo cannot be resolved | Fail immediately (Phase 0) |
-| No matching inbox item and no requirements team available | Report to Sinh, exit |
+| No matching ticket and no requirements team available | Report to Sinh, exit |
 | Requirements team fails | Report failure details to Sinh, exit partial |
 | Sinh approval timeout (30 min) | Exit partial, note in work report |
 | Builder phase fails (transient) | Retry once |
