@@ -67,6 +67,20 @@ export class TicketStore {
     return resolve(this.dir, `${id}.json`);
   }
 
+  /**
+   * Normalize a raw ticket object from disk, ensuring required array fields
+   * are never undefined. Only adds defaults for missing fields — never overwrites.
+   */
+  private normalizeTicket(raw: Record<string, unknown>): Ticket {
+    return {
+      ...raw,
+      tags: raw.tags ?? [],
+      blockedBy: raw.blockedBy ?? [],
+      comments: raw.comments ?? [],
+      doc_refs: raw.doc_refs ?? [],
+    } as Ticket;
+  }
+
   private counterPath(): string {
     return resolve(this.dir, "counter.json");
   }
@@ -284,7 +298,7 @@ export class TicketStore {
   get(id: string): Ticket | undefined {
     const path = this.ticketPath(id);
     if (!existsSync(path)) return undefined;
-    return JSON.parse(readFileSync(path, "utf-8")) as Ticket;
+    return this.normalizeTicket(JSON.parse(readFileSync(path, "utf-8")));
   }
 
   /**
@@ -651,7 +665,7 @@ export class TicketStore {
     const tickets = files
       .map((f) => {
         try {
-          return JSON.parse(readFileSync(resolve(this.dir, f), "utf-8")) as Ticket;
+          return this.normalizeTicket(JSON.parse(readFileSync(resolve(this.dir, f), "utf-8")));
         } catch {
           return null;
         }
