@@ -56,6 +56,7 @@ mkdir -p ~/Documents/ai-usage/daily/$(date +%Y)/$(date +%m)
 - Track goal completion against the plan
 - Include learnings from BOTH human and agent sessions
 - Read self-improvement items from the self-improvement team's daily extract (`agent-teams/self-improvement/daily/YYYY-MM-DD-extract.md`). Aggregate them into a dedicated section in the daily summary so they're visible for review and action
+- **Unified quality section:** sprint-master should also read KPI reports from `agent-teams/kpi-reviewer/artifacts/` for the same date to correlate improvement trends with KPI scores. Include KPI summary alongside self-improvement items for a unified quality view
 - Deductions should reference specific data, not generic advice
 - Compare with previous days if yesterday's summary exists
 - "Tomorrow's Priorities" MUST be based on actual open items, not guesses

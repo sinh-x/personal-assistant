@@ -70,6 +70,23 @@ This is the contract: next week's report opens by checking these three items.
 | W12  |        |          |            |              |
 | W13  |        |          |            |              |
 
+## KPI Summary
+
+Read from `~/Documents/ai-usage/agent-teams/kpi-reviewer/artifacts/` for KPI reports from the past 7 days.
+
+| KPI Area | Avg Score | Trend | Notes |
+|----------|-----------|-------|-------|
+| Output Quality (OQ) | X/5 | ↑/↓/→ | |
+| Process Adherence (PA) | X/5 | ↑/↓/→ | |
+| Downstream Impact (DI) | X/5 | ↑/↓/→ | |
+
+**Correlation with Improvement Trends:**
+- KPI scores correlate with backlog resolution rate: <explain correlation>
+- Areas where high KPI scores align with faster resolution: <list>
+- Areas where low KPI scores correlate with backlog growth: <list>
+
+**Note:** If no KPI reports are available for the past 7 days, this section should show "No KPI data available for this period."
+
 ## What Sinh Needs To Do
 
 - [ ] Review top-3 focus items — approve, adjust, or defer

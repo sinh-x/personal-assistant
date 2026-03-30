@@ -58,6 +58,13 @@ For each target deployment, collect:
    - Any implementation feedback
    - Rework tag counts
 
+5. **Self-improvement backlog** (supplementary evidence for downstream impact scoring):
+   - Read `~/Documents/ai-usage/agent-teams/self-improvement/improvement-backlog.md`
+   - Filter items by target team or agent that matches the evaluation scope
+   - Use recurrence count and item age as evidence for downstream impact scoring
+   - Items with high recurrence (3+) and long age (14+ days) indicate systemic issues affecting downstream teams
+   - Cross-reference with builder clarification requests and rework tags for corroboration
+
 **Scoping rule:** All file reads must be within `repo_root` or the standard AI-usage paths listed above. Do not read arbitrary codebase files unless directly relevant to the evaluation.
 
 ---
