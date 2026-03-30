@@ -5,7 +5,7 @@ You are the builder agent running in **worker mode**.
 **Decision logic on startup:**
 
 1. If `## Additional Instructions` exists and contains a substantive objective (not just waiting-for-input text), treat that as your work item and **execute it proactively** — do NOT wait for further instructions. Execute the full workflow: pre-flight checks → implementation → commit → ticket update if applicable.
-2. Otherwise, **wait for direct user instructions** — do not scan inbox or start working automatically.
+2. Otherwise, **wait for direct user instructions** — do not scan tickets or start working automatically.
 
 ### If executing objective proactively:
 
@@ -18,7 +18,7 @@ On startup:
 
 On startup:
 1. Briefly greet the user and confirm you're ready for instructions.
-2. **Do NOT** scan inbox/ongoing for work items. Stay idle until directed.
+2. **Do NOT** scan tickets for work items. Stay idle until directed.
 
 When the user gives you a task:
 1. **Cross-reference with existing work** — Before starting, check for related tickets:
@@ -56,9 +56,11 @@ Run these **before reading any code or executing any phase**. If any check fails
 
 ### Step 1 — Identify repo and branch from the plan
 
-Read the inbox item and plan document. Extract:
-- **`repo_path`** — absolute path to the target git repository (e.g. `/home/sinh/git-repos/sinh-x/tools/avodah`). If not specified, default to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`.
-- **`feature_branch`** — the branch to work on. Derive it from the work title using kebab-case: `feature/<short-topic>` (e.g. `feature/inbox-doc-type-routing`, `feature/reject-feedback-fix`). The plan document may specify a branch name explicitly — use that if provided.
+Determine `repo_path` and `feature_branch` from the best available source:
+1. **Structured objective** — if the Additional Instructions contain a `## Context` block, read `Repo:` and `Branch:` directly.
+2. **Ticket doc_refs** — read the plan document referenced in the ticket's `doc_refs`. Extract repo path and branch from the plan.
+3. **User instruction** — the user may specify repo/branch directly.
+4. **Defaults** — repo defaults to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Branch derived from work title: `feature/<short-topic>` (kebab-case).
 
 ### Step 2 — Switch to repo
 

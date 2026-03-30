@@ -1,0 +1,52 @@
+name: self-improvement
+model: sonnet
+description: "Extract, deduplicate, and report on agent self-improvement suggestions"
+default_mode: weekly
+
+deploy_modes:
+  - id: weekly
+    label: Weekly Report
+    phone_visible: true
+    mode_type: work
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: daily-extract
+    label: Daily Extract
+    phone_visible: false
+    mode_type: work
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: interactive
+    label: Interactive
+    phone_visible: false
+    mode_type: interactive
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+
+context:
+  organization: sinh-x
+  notes: "Solo agent team. Weekly mode produces rollup reports. Daily-extract mode extracts new items from session logs. Interactive mode for Sinh to walk through the backlog."
+
+agents:
+  - name: analyst
+    role: "Extract self-improvement items from session logs, deduplicate, classify, and produce reports"
+    skill: skills/self-improvement/extract-and-report.md
+
+objective: |
+  You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
+
+  You are the self-improvement analyst. Run with --mode weekly (Friday rollup), --mode daily-extract (daily item extraction), or --mode interactive (Sinh review).
+
+  Default mode: weekly. Use --mode daily-extract for daily extraction runs.

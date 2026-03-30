@@ -5,6 +5,91 @@ import type { TeamConfig, DeployMode } from "./types.js";
 import { BulletinStore } from "./bulletins/index.js";
 import { listRepos } from "./repos.js";
 
+interface ImprovementFocusItem {
+  id: string;
+  title: string;
+  category: string;
+  scope: string;
+  recurrence: string;
+}
+
+/**
+ * Read improvement-focus.md and return filtered items scoped to the given agent/team.
+ * Returns at most 10 lines of formatted output.
+ * Returns empty string if file not found or no matching items.
+ */
+function injectImprovementFocus(
+  resolveFile: (relpath: string) => string | undefined,
+  homeDir: string,
+  agentNames: string[],
+  teamName: string,
+): string {
+  const focusPath = resolveFile("knowledge-base/improvement-focus.md");
+  if (!focusPath || !existsSync(focusPath)) {
+    return "";
+  }
+
+  let content: string;
+  try {
+    content = readFileSync(focusPath, "utf-8");
+  } catch {
+    return "";
+  }
+
+  // Parse the table: find rows after "## Top 3 Focus Items"
+  const tableStart = content.indexOf("## Top 3 Focus Items");
+  if (tableStart === -1) return "";
+
+  const tableEnd = content.indexOf("## Injection Format", tableStart);
+  const tableSection = tableEnd !== -1 ? content.slice(tableStart, tableEnd) : content.slice(tableStart);
+
+  // Parse table rows (skip header and separator rows)
+  const lines = tableSection.split("\n");
+  const items: ImprovementFocusItem[] = [];
+  let inTable = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("| # |")) {
+      inTable = true;
+      continue;
+    }
+    if (trimmed.startsWith("|---")) continue;
+    if (!inTable || !trimmed || trimmed.startsWith("#") || trimmed.startsWith(">")) continue;
+    if (trimmed.startsWith("Example")) break;
+
+    const cells = trimmed.split("|").filter((c) => c.trim() !== "");
+    if (cells.length >= 5) {
+      const id = cells[1].trim();
+      const title = cells[2].trim();
+      const category = cells[3].trim();
+      const scope = cells[4].trim();
+      const recurrence = cells[5]?.trim() ?? "";
+      if (id.startsWith("IMP-")) {
+        items.push({ id, title, category, scope, recurrence });
+      }
+    }
+  }
+
+  // Filter items by scope: "all", team name, or agent name
+  const filtered = items.filter((item) => {
+    const scope = item.scope.toLowerCase();
+    if (scope === "all") return true;
+    if (scope === teamName.toLowerCase()) return true;
+    return agentNames.some((n) => n.toLowerCase() === scope);
+  });
+
+  if (filtered.length === 0) return "";
+
+  // Format as markdown list, max 10 lines total
+  const lines_out: string[] = ["## Improvement Focus", ""];
+  for (const item of filtered.slice(0, 3)) {
+    lines_out.push(`- **[${item.id}]** (${item.category}, ${item.scope}) — ${item.title}`);
+  }
+
+  return lines_out.slice(0, 10).join("\n") + "\n\n";
+}
+
 interface PrimerOptions {
   deployId: string;
   teamName: string;
@@ -425,6 +510,12 @@ When spawning unplanned sub-agents, use this policy:
 
 `;
     }
+  }
+
+  // Inject improvement focus items (F11: primer injection, scoped by agent type, max 10 lines)
+  const focusSection = injectImprovementFocus(resolveFile, homeDir, agentNames, teamName);
+  if (focusSection) {
+    primer += focusSection;
   }
 
   // ─── HOW DO I WORK? ───────────────────────────────────────────────────────

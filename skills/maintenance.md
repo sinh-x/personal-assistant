@@ -32,14 +32,12 @@ Apply fixes directly:
 - Update standards if a gap is found
 - Update flake.nix if packaging is affected
 
-### 3. Process Self-Improvement Suggestions
+### 3. Apply Approved Fixes
 
-Agent daily summaries and session logs contain self-improvement suggestions (scope: skill/team/infra/prompt). You:
-- Read the suggestions from daily summaries (`daily/YYYY/MM/*-daily.md` → "Agent Self-Improvement Suggestions" section)
-- Read agent session logs (`sessions/YYYY/MM/agent-team/` → "Self-Improvement" section)
-- Triage: is this actionable? is it valid?
-- Apply fixes for valid suggestions
-- Close invalid ones with a note explaining why
+Self-improvement extraction is handled by the self-improvement team. You:
+- Read the improvement backlog: `agent-teams/self-improvement/improvement-backlog.md`
+- Apply fixes for items marked as approved (scope: skill/team/infra/prompt)
+- Mark resolved items as closed with a note
 
 ### 4. Health Check
 

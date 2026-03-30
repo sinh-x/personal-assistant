@@ -152,7 +152,7 @@ program
 program
   .command("schedule")
   .description("Schedule a team with systemd timers")
-  .argument("<spec>", "Team name or daily:<mode>")
+  .argument("<spec>", "Team name, daily:<mode>, or requirements:<mode>")
   .argument("<repeat>", "Repeat interval: hourly | daily | weekly | monthly")
   .argument("[times...]", "One or more HH:MM times")
   .action((spec: string, repeat: string, times: string[]) => {
