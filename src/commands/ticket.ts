@@ -13,6 +13,19 @@ import type {
 } from "../lib/tickets/index.js";
 
 const ESTIMATES: Estimate[] = ["XS", "S", "M", "L", "XL"];
+const TYPES: TicketType[] = ["feature", "bug", "task", "review-request", "work-report", "fyi", "idea", "question"];
+const PRIORITIES: TicketPriority[] = ["critical", "high", "medium", "low"];
+const STATUSES: TicketStatus[] = [
+  "idea",
+  "requirement-review",
+  "pending-approval",
+  "pending-implementation",
+  "implementing",
+  "review-uat",
+  "done",
+  "rejected",
+  "cancelled",
+];
 
 /** Required fields per ticket type for summary conformance checks */
 const SUMMARY_TEMPLATES: Record<string, string[]> = {
@@ -33,6 +46,30 @@ function validateEstimate(value: string): Estimate {
     process.exit(1);
   }
   return value as Estimate;
+}
+
+function validateType(value: string): TicketType {
+  if (!TYPES.includes(value as TicketType)) {
+    console.error(`Error: Invalid type "${value}". Must be one of: ${TYPES.join("|")}`);
+    process.exit(1);
+  }
+  return value as TicketType;
+}
+
+function validatePriority(value: string): TicketPriority {
+  if (!PRIORITIES.includes(value as TicketPriority)) {
+    console.error(`Error: Invalid priority "${value}". Must be one of: ${PRIORITIES.join("|")}`);
+    process.exit(1);
+  }
+  return value as TicketPriority;
+}
+
+function validateStatus(value: string): TicketStatus {
+  if (!STATUSES.includes(value as TicketStatus)) {
+    console.error(`Error: Invalid status "${value}". Must be one of: ${STATUSES.join("|")}`);
+    process.exit(1);
+  }
+  return value as TicketStatus;
 }
 
 /**
@@ -91,8 +128,6 @@ export function createTicketCommand(): Command {
     .option("--summary <text>", "Short summary", "")
     .option("--tags <tags>", "Comma-separated tags", "")
     .option("--doc-ref <path>", "Document reference path", "")
-    .option("--from <team>", "From team", "")
-    .option("--to <team>", "To team", "")
     .option("--actor <name>", "Actor for audit log", "cli-user")
     .action(
       (opts: {
@@ -105,8 +140,6 @@ export function createTicketCommand(): Command {
         summary: string;
         tags: string;
         docRef: string;
-        from: string;
-        to: string;
         actor: string;
       }) => {
         const estimate = validateEstimate(opts.estimate);
@@ -135,6 +168,9 @@ export function createTicketCommand(): Command {
           }
         }
 
+        const ticketType = validateType(opts.type);
+        const ticketPriority = validatePriority(opts.priority);
+
         const store = new TicketStore();
         const initialDocRefs: DocRef[] = [];
         if (opts.docRef) {
@@ -147,26 +183,33 @@ export function createTicketCommand(): Command {
             addedBy: opts.actor,
           });
         }
-        const ticket = store.create(
-          {
-            project: opts.project,
-            title: opts.title,
-            type: opts.type as TicketType,
-            priority: opts.priority as TicketPriority,
-            estimate,
-            status: "idea",
-            summary: opts.summary,
-            description: "",
-            assignee: opts.assignee,
-            tags,
-            doc_refs: initialDocRefs,
-            from: opts.from,
-            to: opts.to,
-            blockedBy: [],
-            comments: [],
-          },
-          opts.actor
-        );
+
+        let ticket;
+        try {
+          ticket = store.create(
+            {
+              project: opts.project,
+              title: opts.title,
+              type: ticketType,
+              priority: ticketPriority,
+              estimate,
+              status: "idea",
+              summary: opts.summary,
+              description: "",
+              assignee: opts.assignee,
+              tags,
+              doc_refs: initialDocRefs,
+              from: "",
+              to: "",
+              blockedBy: [],
+              comments: [],
+            },
+            opts.actor
+          );
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
         console.log(`Created: ${ticket.id}`);
         console.log(JSON.stringify(ticket, null, 2));
       }
@@ -215,7 +258,6 @@ export function createTicketCommand(): Command {
 
         const store = new TicketStore();
         const input: UpdateTicketInput = {};
-        if (opts.status) input.status = opts.status as TicketStatus;
         if (opts.assignee !== undefined) input.assignee = opts.assignee;
         if (opts.priority) input.priority = opts.priority as TicketPriority;
         if (opts.tags !== undefined) {
@@ -233,7 +275,17 @@ export function createTicketCommand(): Command {
         if (opts.removeDocRef !== undefined) {
           input.remove_doc_ref = opts.removeDocRef;
         }
-        const ticket = store.update(id, input, opts.actor);
+        if (opts.status) {
+          input.status = validateStatus(opts.status);
+        }
+
+        let ticket;
+        try {
+          ticket = store.update(id, input, opts.actor);
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
         console.log(`Updated: ${ticket.id}`);
         console.log(JSON.stringify(ticket, null, 2));
       }
@@ -245,10 +297,10 @@ export function createTicketCommand(): Command {
     .command("list")
     .description("List tickets with optional filters")
     .option("--project <name>", "Filter by project")
-    .option("--status <status>", "Filter by status")
+    .option("--status <status>", "Filter by status (idea|requirement-review|pending-approval|pending-implementation|implementing|review-uat|done|rejected|cancelled)")
     .option("--assignee <name>", "Filter by assignee")
-    .option("--priority <priority>", "Filter by priority")
-    .option("--type <type>", "Filter by type")
+    .option("--priority <priority>", "Filter by priority (critical|high|medium|low)")
+    .option("--type <type>", "Filter by type (feature|bug|task|review-request|work-report|fyi|idea|question)")
     .option("--tags <tags>", "Filter by tags (comma-separated, AND logic)")
     .option("--exclude-tags <tags>", "Exclude tickets with any of these tags (comma-separated)")
     .option("--search <text>", "Free-text search on ticket ID, title, and summary (case-insensitive)")

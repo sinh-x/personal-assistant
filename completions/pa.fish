@@ -219,7 +219,7 @@ complete -c pa -n '__fish_seen_subcommand_from status' -l recent    -d 'Show onl
 complete -c pa -n '__fish_seen_subcommand_from status' -l today     -d 'Show only today\'s deployments'
 
 # --- schedule: <spec> <repeat> ---
-complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (commandline -opc)) -eq 2' -a '(__pa_teams) daily:plan daily:progress daily:end' -d 'Team or daily:<mode>'
+complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (commandline -opc)) -eq 2' -a '(__pa_teams) daily:plan daily:progress daily:end requirements:ideas' -d 'Team, daily:<mode>, or requirements:<mode>'
 complete -c pa -n '__fish_seen_subcommand_from schedule; and test (count (commandline -opc)) -eq 3' -a 'hourly daily weekly monthly' -d 'Repeat interval'
 
 # --- remove-timer: <name> ---
@@ -240,6 +240,7 @@ complete -c pa -n '__fish_seen_subcommand_from requirements' -l background  -d '
 complete -c pa -n '__fish_seen_subcommand_from requirements' -l interactive -d 'Run in foreground, user approves each tool call'
 
 # --- board: flags ---
+complete -c pa -n '__fish_seen_subcommand_from board' -l all       -d 'Show all tickets including backlog, archived, and terminal'
 complete -c pa -n '__fish_seen_subcommand_from board' -l project  -d 'Filter by project' -r -a '(__pa_projects)'
 complete -c pa -n '__fish_seen_subcommand_from board' -l assignee -d 'Filter by assignee' -r -a '(__pa_assignees)'
 
@@ -262,7 +263,6 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l summary  -d 'Short summary' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l tags     -d 'Comma-separated tags' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l doc-ref  -d 'Document reference path' -r
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l blocked-by -d 'Comma-separated blocking ticket IDs' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from create' -l actor    -d 'Actor for audit log' -r
 
 # ticket update <ID>
@@ -273,7 +273,9 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l estimate -d 'New estimate' -r -a 'XS S M L XL'
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l tags     -d 'Comma-separated tags (replaces existing)' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l blocked-by -d 'Comma-separated blocking ticket IDs (empty to clear)' -r
-complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l doc-ref  -d 'Document reference path' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l doc-ref         -d 'Add document reference: [type:]path' -r
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l doc-ref-primary  -d 'Mark the added doc-ref as primary'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l remove-doc-ref   -d 'Remove a doc-ref by exact path match' -r
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from update' -l actor    -d 'Actor for audit log' -r
 
 # ticket list
@@ -288,6 +290,7 @@ complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcomman
 
 # ticket show <ID>
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
+complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from show' -l json -d 'Output raw JSON instead of formatted card'
 
 # ticket attach <ID>
 complete -c pa -n '__fish_seen_subcommand_from ticket; and __fish_seen_subcommand_from attach; and not __fish_seen_subcommand_from (__pa_ticket_ids)' -a '(__pa_ticket_ids)' -d 'Ticket ID'
@@ -344,6 +347,7 @@ complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from show; and not __fish_seen_subcommand_from (__pa_trash_ids)' -a '(__pa_trash_ids)' -d 'Trash ID'
 
 # trash restore <id>
+complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore; and not __fish_seen_subcommand_from (__pa_trash_ids)' -a '(__pa_trash_ids)' -d 'Trash ID'
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore' -l force -d 'Overwrite if original path exists'
 complete -c pa -n '__fish_seen_subcommand_from trash; and __fish_seen_subcommand_from restore' -l actor -d 'Who is restoring' -r
 
