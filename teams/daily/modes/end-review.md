@@ -62,8 +62,8 @@ Output: {{OUTPUT_DIR}}/{{TODAY}}-daily.md
   ### From Agent Teams
   ### Cross-Cutting Insights
 
-  ## Self-Improvement (aggregated from agent sessions)
-  Extracted from ## Self-Improvement sections in agent session logs
+  ## Self-Improvement (from self-improvement team)
+  Read from self-improvement team daily extract: `agent-teams/self-improvement/daily/YYYY-MM-DD-extract.md`
 
   ## Deductions & Observations
   - Productivity patterns (peak hours, session lengths)
