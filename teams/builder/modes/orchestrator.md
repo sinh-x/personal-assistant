@@ -18,6 +18,7 @@ Common repos:
 - **One objective per launch.** Process a single work item per deployment. Do not batch multiple items.
 - **Never modify builder or requirements configs.** Use those teams as-is. You coordinate, they execute.
 - **PA_MAX_RUNTIME.** Orchestrator deployments should run with PA_MAX_RUNTIME=10800 (3 hours). If approaching timeout, write a partial work report and exit gracefully.
+- **Requirements doc gate (STRICT).** Never proceed to Phase 3/4 without a requirements doc attached to the ticket via `doc_refs`. If a ticket has no `doc_refs` with type `requirements` or marked primary, you MUST: (1) gather implementation context from the codebase, (2) add a discovery comment to the ticket, (3) push the ticket back to `requirement-review` status assigned to `requirements`, and (4) exit. Do NOT launch the requirements team inline — let the normal requirements pipeline handle it.
 
 ## Workflow
 
@@ -60,12 +61,21 @@ pa ticket create \
 Parse the `--objective` to identify the target work.
 
 1. **If objective points to a specific file** — read it directly as the plan document. Skip ticket scan.
-2. **If objective is a topic description** — search for a matching ticket with a plan document:
+2. **If objective is a ticket ID** (e.g., `AVO-028`, `PA-042`) — show the ticket directly: `pa ticket show <id>`
+3. **If objective is a topic description** — search for a matching ticket with a plan document:
    - `pa ticket list --assignee builder --search "<topic keywords>"`
    - If a ticket has a `doc_refs` entry (type `requirements` or primary), read that plan document
    - If multiple matches, pick the highest priority or most recent
-3. **If a matching ticket with plan is found** → go to Phase 3 (Plan Analysis)
-4. **If no matching ticket is found** → go to Phase 2 (Requirements Gathering)
+
+**After finding a ticket (from step 2 or 3), check for requirements doc:**
+
+4. **If ticket has `doc_refs` with type `requirements` or a primary doc** → read that plan document → go to Phase 3 (Plan Analysis)
+5. **If ticket has NO `doc_refs` (no requirements doc)** → **STOP. Do not proceed.** Follow the requirements doc gate:
+   a. Explore the codebase to understand what the ticket requires (read relevant files, understand current behavior)
+   b. Add a structured discovery comment to the ticket with: files involved, current behavior, what needs to change, affected test surface, estimated scope
+   c. Push the ticket back: `pa ticket update <id> --status requirement-review --assignee requirements`
+   d. Exit with a partial status report noting that the ticket was sent to requirements
+6. **If no matching ticket is found** → go to Phase 2 (Requirements Gathering)
 
 ### Phase 2: Requirements Gathering (optional)
 
@@ -307,6 +317,7 @@ When working with builder tickets:
 | Scenario | Action |
 |----------|--------|
 | Repo cannot be resolved | Fail immediately (Phase 0) |
+| Ticket found but no requirements doc (`doc_refs` empty) | Gather info, add discovery comment, push to `requirement-review`, exit (Phase 1 step 5) |
 | No matching ticket and no requirements team available | Report to Sinh, exit |
 | Requirements team fails | Report failure details to Sinh, exit partial |
 | Sinh approval timeout (30 min) | Exit partial, note in work report |
