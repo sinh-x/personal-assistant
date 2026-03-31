@@ -7,6 +7,7 @@ deploy_modes:
     label: Housekeeping
     phone_visible: true
     mode_type: housekeeping
+    provider: minimax
     agents: []
     objective: skills/global/housekeeping-objective.md
     skills:
@@ -16,6 +17,7 @@ deploy_modes:
     label: Background
     phone_visible: true
     mode_type: work
+    provider: minimax
     solo: true
     skills:
       - name: pa-session-log
@@ -24,6 +26,7 @@ deploy_modes:
     label: Foreground
     phone_visible: true
     mode_type: work
+    provider: minimax
     solo: true
     skills:
       - name: pa-session-log
@@ -32,6 +35,7 @@ deploy_modes:
     label: Interactive
     phone_visible: false
     mode_type: interactive
+    provider: minimax
     solo: true
     skills:
       - name: pa-session-log
@@ -40,6 +44,7 @@ deploy_modes:
     label: Repo Scan
     phone_visible: true
     mode_type: work
+    provider: minimax
     solo: true
     objective: skills/maintenance/repo-scan-objective.md
     skills:

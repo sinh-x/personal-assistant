@@ -7,6 +7,7 @@ deploy_modes:
     label: Single Deployment
     phone_visible: true
     mode_type: work
+    provider: minimax
     agents: [evaluator]
     objective: skills/kpi-reviewer/single-objective.md
     skills:
@@ -26,6 +27,7 @@ deploy_modes:
     label: Ticket Scope
     phone_visible: false
     mode_type: work
+    provider: minimax
     agents: [evaluator]
     objective: skills/kpi-reviewer/ticket-objective.md
     skills:
@@ -45,6 +47,7 @@ deploy_modes:
     label: Daily Scope
     phone_visible: false
     mode_type: work
+    provider: minimax
     agents: [evaluator]
     objective: skills/kpi-reviewer/daily-objective.md
     skills:
