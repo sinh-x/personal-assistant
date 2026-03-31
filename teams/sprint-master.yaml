@@ -8,6 +8,7 @@ deploy_modes:
     label: Housekeeping
     phone_visible: true
     mode_type: housekeeping
+    provider: minimax
     agents: []
     objective: skills/global/housekeeping-objective.md
     skills:
@@ -17,6 +18,7 @@ deploy_modes:
     label: Triage
     phone_visible: true
     mode_type: work
+    provider: minimax
     agents: []  # solo, team-manager executes directly
     skills:
       - name: pa-session-log
@@ -25,6 +27,7 @@ deploy_modes:
     label: Sprint Review
     phone_visible: true
     mode_type: work
+    provider: minimax
     agents: []  # solo, team-manager executes directly
     skills:
       - name: pa-session-log
@@ -33,6 +36,7 @@ deploy_modes:
     label: Velocity
     phone_visible: true
     mode_type: work
+    provider: minimax
     agents: []  # solo, team-manager executes directly
     skills:
       - name: pa-session-log
@@ -41,6 +45,7 @@ deploy_modes:
     label: Knowledge Org
     phone_visible: false
     mode_type: work
+    provider: minimax
     agents: []  # solo, team-manager executes directly
 
 context:

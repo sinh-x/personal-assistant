@@ -22,6 +22,7 @@ deploy_modes:
     label: Housekeeping
     phone_visible: true
     mode_type: housekeeping
+    provider: minimax
     agents: []
     objective: skills/global/housekeeping-objective.md
     skills:
@@ -31,6 +32,7 @@ deploy_modes:
     label: Plan
     phone_visible: true
     mode_type: work
+    provider: minimax
     agents: []  # solo, no sub-agents
     objective: teams/daily/modes/plan.md
     skills:
@@ -40,6 +42,7 @@ deploy_modes:
     label: Plan Review
     phone_visible: false
     mode_type: work
+    provider: minimax
     agents: []  # solo, no sub-agents
     objective: teams/daily/modes/plan-review.md
     skills:
@@ -49,6 +52,7 @@ deploy_modes:
     label: Progress
     phone_visible: true
     mode_type: work
+    provider: minimax
     objective: teams/daily/modes/progress.md
     skills:
       - name: pa-session-log
@@ -57,6 +61,7 @@ deploy_modes:
     label: End
     phone_visible: true
     mode_type: work
+    provider: minimax
     objective: teams/daily/modes/end.md
     skills:
       - name: pa-session-log
@@ -65,6 +70,7 @@ deploy_modes:
     label: End Review
     phone_visible: false
     mode_type: work
+    provider: minimax
     agents: []  # TM spawns synthesizer interactively after Sinh confirms
     objective: teams/daily/modes/end-review.md
 
