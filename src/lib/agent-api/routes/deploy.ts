@@ -12,6 +12,7 @@ import type { Context } from "hono";
 import { spawn } from "node:child_process";
 import { getBinDir } from "../../paths.js";
 import { join } from "node:path";
+import { existsSync } from "node:fs";
 
 /** Validate that a string only contains safe characters for CLI args */
 function isSafeIdentifier(value: string): boolean {
@@ -19,7 +20,10 @@ function isSafeIdentifier(value: string): boolean {
 }
 
 function getPaBin(): string {
-  return process.env["PA_BIN"] ?? join(getBinDir(), "pa");
+  if (process.env["PA_BIN"]) return process.env["PA_BIN"];
+  const resolved = join(getBinDir(), "pa");
+  if (existsSync(resolved)) return resolved;
+  return "pa"; // fall back to PATH lookup
 }
 
 export function deployRoutes(): Hono {
