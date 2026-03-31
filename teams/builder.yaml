@@ -62,7 +62,7 @@ deploy_modes:
   - id: orchestrator
     label: Orchestrator
     phone_visible: true
-    mode_type: interactive
+    mode_type: work
     model: opus
     agents: []  # solo, no sub-agents
     objective: teams/builder/modes/orchestrator.md
