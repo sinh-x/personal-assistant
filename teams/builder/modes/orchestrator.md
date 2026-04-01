@@ -120,7 +120,7 @@ Read the approved requirement/plan document and extract the implementation detai
 
 **Extract these fields:**
 - `repo_path` — target repository (should match Phase 0 resolution)
-- `feature_branch` — branch name (or derive from topic: `feature/<short-topic>`)
+- `feature_branch` — branch name (or derive from topic: `feature/<TICKET-ID>-<short-topic>`)
 - Phase checklist — the ordered list of implementation phases with descriptions
 
 **Extract per-phase context from the plan:**
@@ -190,7 +190,7 @@ Phase N of <item-filename>: <phase description from checklist>
 
 ## Context
 - Repo: <repo_path>
-- Branch: <feature_branch>
+- Branch: <feature_branch> (must include ticket key, e.g., feature/PA-042-topic)
 - Plan: <path to plan document>
 - Prior phases completed: <list of completed phase numbers, or "none">
 - Dependencies: <any §7 items or prior-phase outputs this phase needs>

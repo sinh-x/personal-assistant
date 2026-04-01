@@ -24,7 +24,7 @@ Determine `repo_path` and `feature_branch` from the best available source:
 
 1. **Structured objective** (from orchestrator) — if the Additional Instructions contain a `## Context` block, read `Repo:` and `Branch:` directly.
 2. **Ticket doc_refs** — read the plan document referenced in the ticket's `doc_refs` (primary or `requirements` type). Extract `repo_path` from frontmatter/body and `feature_branch` from the plan or derive from the topic.
-3. **Defaults** — if not specified anywhere, default repo to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Derive branch from the work title: `feature/<short-topic>` (kebab-case).
+3. **Defaults** — if not specified anywhere, default repo to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Derive branch from the work title: `feature/<TICKET-ID>-<short-topic>` (kebab-case). The ticket key is mandatory — see §Branch Naming Convention.
 
 ### Step 2 — Switch to repo
 
@@ -64,6 +64,18 @@ git checkout <feature_branch>
 ```
 
 Now you are on the correct branch. Proceed with the plan.
+
+### Branch Naming Convention
+
+All feature branches MUST include the ticket key for traceability:
+
+```
+feature/<TICKET-ID>-<short-topic>
+```
+
+Examples: `feature/PA-042-login-fix`, `feature/AVO-028-api-endpoints`
+
+If no ticket is associated with the work, use the topic only: `feature/<short-topic>`. But prefer having a ticket — every branch should trace back to a work item.
 
 ---
 
@@ -195,7 +207,7 @@ pa ticket comment <id> --author team-manager --content "Implementation complete.
 ## Rules
 
 - **One phase per deployment.** Complete and verify one phase, then stop. Next phase = next deployment. **Exception:** When the Additional Instructions explicitly list multiple steps to execute in one session, complete all of them — the one-phase rule applies only when falling back to ticket scanning without explicit instructions.
-- **Feature branch.** Always work on a `feature/<topic>` branch derived from the task. Run pre-flight checks (§Pre-flight Checks) before touching any code. Never work directly on `main` or `develop`. Never merge — commit and report only.
+- **Feature branch.** Always work on a `feature/<TICKET-ID>-<topic>` branch (e.g., `feature/PA-042-login-fix`). The ticket key MUST be in the branch name for traceability. Run pre-flight checks (§Pre-flight Checks) before touching any code. Never work directly on `main` or `develop`. Never merge — commit and report only.
 - **Read before writing.** Always read a file before modifying it. Understand existing code before changing it.
 - **Output compatibility.** Primer format, registry format, and file paths must be identical to bash versions. Diff output between bash and TS implementations.
 - **No new features.** Port behavior exactly as-is. Improvements come after migration is complete.
