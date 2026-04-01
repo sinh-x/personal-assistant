@@ -120,7 +120,7 @@ Read the approved requirement/plan document and extract the implementation detai
 
 **Extract these fields:**
 - `repo_path` — target repository (should match Phase 0 resolution)
-- `feature_branch` — branch name (or derive from topic: `feature/<short-topic>`)
+- `feature_branch` — branch name (or derive from topic: `feature/<TICKET-ID>-<short-topic>`). The ticket key is mandatory for traceability.
 - Phase checklist — the ordered list of implementation phases with descriptions
 
 **Extract per-phase context from the plan:**
@@ -155,11 +155,30 @@ Build a **phase context map** — a structured lookup of phase number → {requi
 
 Execute each unchecked phase by launching the builder team in implement mode.
 
-**Pre-flight:**
+**Pre-flight — Branch Management (orchestrator responsibility):**
+
+The orchestrator owns the entire branch lifecycle. Implement mode agents do NOT create or switch branches — they only verify they are on the expected branch and fail if not. The orchestrator must ensure the correct branch is checked out before launching each implement agent.
+
 1. Verify you are in the repo root (`pwd` matches resolved repo path)
 2. Check current branch: `git branch --show-current`
-3. If on `main` or `develop`, the builder will create the feature branch on its first phase
-4. If already on the correct feature branch, proceed
+3. **Branch setup:**
+
+| Current branch | Action |
+|----------------|--------|
+| `develop` | Create the feature branch: `git checkout -b <feature_branch>` |
+| `feature_branch` (matches this work) | Proceed — already on the right branch |
+| `main` | Switch to develop first: `git checkout develop && git checkout -b <feature_branch>` |
+| Any other branch | **STOP** — write failed work report. Do not switch from an unrelated branch. |
+
+**All feature branches MUST be created from `develop`.** Never branch from `main` directly.
+
+4. Confirm the branch is correct before launching each implement phase:
+```bash
+current=$(git branch --show-current)
+if [ "$current" != "<feature_branch>" ]; then
+  git checkout <feature_branch>
+fi
+```
 
 **For each unchecked phase in the checklist:**
 
@@ -190,7 +209,7 @@ Phase N of <item-filename>: <phase description from checklist>
 
 ## Context
 - Repo: <repo_path>
-- Branch: <feature_branch>
+- Branch: <feature_branch> (already checked out by orchestrator — implement must verify, not create)
 - Plan: <path to plan document>
 - Prior phases completed: <list of completed phase numbers, or "none">
 - Dependencies: <any §7 items or prior-phase outputs this phase needs>
@@ -245,7 +264,7 @@ After creating the failure ticket, **stop**. Do not continue to the next phase o
 
 ### Phase 5: Merge
 
-After all phases complete successfully, merge the feature branch.
+After all phases complete successfully, merge the feature branch. The orchestrator owns this step — implement agents never merge.
 
 **Step 1 — Determine merge strategy:**
 
@@ -253,11 +272,11 @@ Check these sources in order:
 1. `<repo>/CLAUDE.md` — look for explicit branch/merge instructions
 2. `<repo>/.claude/skills/git-workflow/SKILL.md` — project-specific branch rules
 3. `<repo>/.claude/branch-strategy.yaml` — machine-readable branch config
-4. `git branch -a | grep develop` — if a `develop` branch exists, it is likely the merge target
+4. **Default: merge target is `develop`** — feature branches are always created from `develop` and merge back into `develop`
 
 **Step 2 — If strategy is clear:**
-- For repos with GitHub remotes: `gh pr create --base <target-branch> --head <feature-branch> --title "<title>" --body "<summary>"`
-- For local-only repos: `git checkout <target> && git merge --no-ff <feature-branch>`
+- For repos with GitHub remotes: `gh pr create --base develop --head <feature-branch> --title "<title>" --body "<summary>"`
+- For local-only repos: `git checkout develop && git merge --no-ff <feature-branch>`
 
 **Step 3 — If strategy is unclear:**
 

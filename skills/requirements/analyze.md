@@ -94,6 +94,59 @@ Surface anything unclear:
 
 Write the final requirements document using the **Standard Checklist** below.
 
+### Phase 7: Generate UAT Document
+
+After producing the requirements document, generate a companion **UAT (User Acceptance Testing) document** that Sinh or a reviewer can use to verify the implementation.
+
+**UAT document template:**
+
+```markdown
+# UAT Test Plan: <title>
+
+> **Date:** YYYY-MM-DD
+> **Requirements:** <link to requirements doc>
+> **Ticket:** <ticket-id>
+> **Author:** <agent_name>
+
+## System Type
+<CLI / Web / Mobile / Other — detect from codebase>
+
+## Test Scenarios
+
+For each Acceptance Criteria item from the requirements doc, produce a test scenario:
+
+### TS-1: <AC description>
+- **Preconditions:** <what must be true before testing>
+- **Steps:**
+  1. <action>
+  2. <action>
+- **Expected Result:** <what should happen>
+- **Actual Result:** _<to be filled during UAT>_
+- **Status:** _<pass / fail / blocked — to be filled during UAT>_
+
+## Regression Checks
+- [ ] Existing functionality not broken (list key workflows to re-verify)
+- [ ] Build passes (`pnpm build` / `dart analyze` / etc.)
+- [ ] Tests pass (`pnpm test` / `flutter test` / etc.)
+
+## Edge Cases
+- <edge case 1>: <how to test>
+- <edge case 2>: <how to test>
+
+## UAT Sign-Off
+- [ ] All test scenarios passed
+- [ ] Regression checks passed
+- [ ] Edge cases verified or accepted as known limitations
+- **Reviewer:** _<name>_
+- **Date:** _<date>_
+```
+
+**Rules for UAT generation:**
+- One test scenario per Acceptance Criteria item — map TS-N to AC-N
+- Include regression checks relevant to the changed area (derive from §8 Technical Approach)
+- Include edge cases from §9 Risks & Unknowns
+- Keep steps concrete and actionable — a reviewer should be able to follow them without reading the requirements doc
+
 ## Standard Checklist
 
 Every requirements document MUST cover these sections. If a section doesn't apply, write "N/A" with a brief reason — never silently skip it.
@@ -185,7 +238,9 @@ Items explicitly deferred from this scope.
 
 ## Output
 
-Save the requirements document in three places:
+Save **both** the requirements document and UAT document:
+
+### Requirements Document — save in three places:
 
 1. **Deployment workspace** (ephemeral):
    ```
@@ -197,37 +252,67 @@ Save the requirements document in three places:
    ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md
    ```
 
-   **REQUIRED — add doc_ref immediately after saving to artifacts:**
-   ```bash
-   pa ticket update <ticket-id> --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
+### UAT Document — save alongside the requirements doc:
+
+1. **Deployment workspace** (ephemeral):
    ```
-   Do this **before** advancing ticket status. If you advance without a `doc_refs` entry, the CLI will warn and add a `needs-doc-ref` tag automatically.
-
-3. **Ticket update (conditional):**
-
-   ### If working on an existing ticket (ticket_id is set):
-   Advance the existing ticket instead of creating a new one:
-   ```bash
-   pa ticket update <ticket_id> --status pending-approval --assignee sinh \
-     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
-   pa ticket comment <ticket_id> --author <agent_name> \
-     --content "Requirements complete. Doc: agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md. Review and approve to route to builder."
+   ~/Documents/ai-usage/deployments/<deployment_id>/<agent_name>/uat-test-plan.md
    ```
 
-   ### If NO existing ticket (standalone work):
-   Create a new review-request ticket:
-   ```bash
-   pa ticket create --type review-request --project personal-assistant \
-     --title "Review: <descriptive-topic>" \
-     --summary "<brief summary of what was produced>" \
-     --assignee builder --priority high --estimate S \
-     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
+2. **Team artifacts** (persistent):
    ```
-   Include in the ticket's summary: what Sinh needs to do (approve, feedback, open questions) and what happens next (route to builder for implementation).
+   ~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>-uat.md
+   ```
 
-   **Required fields (mandatory — do not omit):**
-   - `--assignee builder` — Identifies the downstream team to implement after approval. Use the correct team if builder is not the implementor.
-   - `--doc-ref` — Points to the full requirements document in team artifacts.
+### Attach both doc-refs before advancing ticket status:
+
+```bash
+# Requirements doc (mark as primary)
+pa ticket update <ticket-id> \
+  --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md" \
+  --doc-ref-primary
+
+# UAT test plan
+pa ticket update <ticket-id> \
+  --doc-ref "uat:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>-uat.md"
+```
+
+Do this **before** advancing ticket status. If you advance without a `doc_refs` entry, the CLI will warn and add a `needs-doc-ref` tag automatically.
+
+### Ticket update (conditional):
+
+**If working on an existing ticket (ticket_id is set):**
+Advance the existing ticket instead of creating a new one:
+```bash
+pa ticket update <ticket_id> --status pending-approval --assignee sinh \
+  --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md" \
+  --doc-ref-primary
+pa ticket update <ticket_id> \
+  --doc-ref "uat:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>-uat.md"
+pa ticket comment <ticket_id> --author <agent_name> \
+  --content "Requirements complete. Docs: requirements + UAT test plan attached. Review and approve to route to builder."
+```
+
+**If NO existing ticket (standalone work):**
+Create a new review-request ticket:
+```bash
+pa ticket create --type review-request --project personal-assistant \
+  --title "Review: <descriptive-topic>" \
+  --summary "<brief summary of what was produced>" \
+  --assignee builder --priority high --estimate S \
+  --doc-ref "requirements:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>.md"
+```
+Then attach the UAT doc:
+```bash
+pa ticket update <ticket-id> \
+  --doc-ref "uat:agent-teams/requirements/artifacts/YYYY-MM-DD-<descriptive-topic>-uat.md"
+```
+Include in the ticket's summary: what Sinh needs to do (approve, feedback, open questions) and what happens next (route to builder for implementation).
+
+**Required fields (mandatory — do not omit):**
+- `--assignee builder` — Identifies the downstream team to implement after approval. Use the correct team if builder is not the implementor.
+- `--doc-ref` — Points to the full requirements document in team artifacts.
+- `--doc-ref` (uat) — Points to the UAT test plan. Both documents MUST be attached.
 
 ## Rules
 

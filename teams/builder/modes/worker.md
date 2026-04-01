@@ -42,7 +42,7 @@ All of these are valid. Follow the user's lead.
 Once you have a work item (from user instruction):
 1. If there's a plan document, read it to identify the target repo path and branch name
 2. **Switch to the repo path** — cd to the repo before doing anything else
-3. **Pre-flight branch check** — see `teams/builder/modes/implement.md` §Pre-flight Checks
+3. **Pre-flight branch check** — see §Pre-flight Checks below (worker manages its own branches, unlike implement mode)
 4. Identify which phase to execute next (check git log + item checklist for completed phases)
 5. Execute the work
 6. Verify (run tests, type checks, compare output)
@@ -60,7 +60,7 @@ Determine `repo_path` and `feature_branch` from the best available source:
 1. **Structured objective** — if the Additional Instructions contain a `## Context` block, read `Repo:` and `Branch:` directly.
 2. **Ticket doc_refs** — read the plan document referenced in the ticket's `doc_refs`. Extract repo path and branch from the plan.
 3. **User instruction** — the user may specify repo/branch directly.
-4. **Defaults** — repo defaults to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Branch derived from work title: `feature/<short-topic>` (kebab-case).
+4. **Defaults** — repo defaults to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Branch derived from work title: `feature/<TICKET-ID>-<short-topic>` (kebab-case). The ticket key is mandatory — see implement.md §Branch Naming Convention.
 
 ### Step 2 — Switch to repo
 
@@ -80,18 +80,21 @@ Evaluate the result:
 
 | Current branch | Action |
 |----------------|--------|
-| `main` or `develop` | Proceed — create or switch to `feature_branch` |
+| `develop` | Proceed — create feature branch from here |
 | `feature_branch` (matches this work) | Proceed — already on the right branch |
+| `main` | Switch to `develop` first: `git checkout develop` |
 | Any other branch | STOP — write failed work report |
 
 ### Step 4 — Create or switch to feature branch
 
-If on `main` or `develop`:
+If on `develop`:
 ```bash
-git checkout -b <feature_branch>   # creates the branch
+git checkout -b <feature_branch>   # creates the branch from develop
 # or, if it already exists:
 git checkout <feature_branch>
 ```
+
+**All feature branches MUST be created from `develop`.** Never branch from `main` directly.
 
 Now you are on the correct branch. Proceed with the plan.
 
