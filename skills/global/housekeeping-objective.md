@@ -19,7 +19,13 @@ Your job is to process all inbox and workflow state for your team. Follow the st
    - Tickets that can be completed now: complete work and `pa ticket update <id> --status review-uat --assignee sinh`
    - Tickets blocked externally: add `--tags blocked` + comment, create FYI ticket for whoever can unblock
 
-5. **Produce summary** — Add a completion comment on the housekeeping ticket (if any), or create an FYI for Sinh summarizing:
+5. **WFR audit** — Scan for broken or stalled workflow states:
+   - `pa ticket list --assignee <team_name> --status waiting-for-response` — check for stale WFR tickets (>3 days with no response)
+   - `pa ticket list --assignee <team_name> --tags blocked` — verify blocked tags are still valid
+   - For any WFR tickets >3 days: add a follow-up comment, and if still unresolved after 7 days, create an FYI ticket for Sinh
+   - This audit keeps workflow state honest — prevents tickets from being forgotten in WFR limbo
+
+6. **Produce summary** — Add a completion comment on the housekeeping ticket (if any), or create an FYI for Sinh summarizing:
    - Tickets processed from todo queue
    - Review-request tickets resolved or still waiting
    - In-progress tickets status

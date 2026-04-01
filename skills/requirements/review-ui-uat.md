@@ -6,6 +6,24 @@ You are reviewing the **user interface and user acceptance** quality of a system
 
 ---
 
+## System Type Detection
+
+Before starting the checklist, identify the system type by reading key files:
+
+1. Look for `package.json` or similar package metadata → CLI tool or Node.js project
+2. Look for `index.html`, `src/components/`, or common web frameworks → web application
+3. Look for mobile platform directories (`ios/`, `android/`) → mobile app
+4. Check the repo name and README for system description
+
+Record the detected type at the top of your findings:
+```markdown
+**System Type:** CLI / Web / Mobile / Other
+```
+
+This determines which checklist subsections are most relevant. Apply judgment — most systems are a mix (e.g., a CLI tool with a web dashboard would cover both CLI UX and web UI sections).
+
+---
+
 ## Checklist
 
 ### 1. User Workflows

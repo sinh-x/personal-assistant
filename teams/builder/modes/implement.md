@@ -65,6 +65,18 @@ git checkout <feature_branch>
 
 Now you are on the correct branch. Proceed with the plan.
 
+### Step 5 — Check for unrelated staged files
+
+```bash
+git diff --staged --name-only
+```
+
+If any files are staged, verify they are related to this work item. Unrelated staged files should be unstaged before proceeding to avoid accidentally committing unrelated changes:
+```bash
+git restore --staged <file>   # to unstage a specific file
+git reset HEAD                 # to unstage all files
+```
+
 ### Branch Naming Convention
 
 All feature branches MUST include the ticket key for traceability:

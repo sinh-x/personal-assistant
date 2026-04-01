@@ -203,7 +203,19 @@ Phase N of <item-filename>: <phase description from checklist>
 - If a phase has no mapped ACs, flag this as a gap: add a note `No acceptance criteria mapped to this phase — builder should verify deliverables match the phase description`
 - Keep the objective readable — prefer concise bullet points over paragraphs
 
-**b. Launch builder in implement mode:**
+**b. Validate line-number references:**
+Before launching the builder, verify that any line-number references in the phase context (e.g., "line 42", "edit line 15-20") still point to the correct lines in the current version of the files. Line numbers in plan documents can drift as files are edited across phases.
+
+```bash
+# For each file referenced with line numbers in the phase context:
+# 1. Read the current file
+# 2. Verify the referenced lines still contain the expected content
+# 3. If content has shifted, note the new line range in the builder objective
+```
+
+If a line reference is no longer accurate, update the objective before launching. Do not proceed with stale line numbers — this prevents the builder from editing the wrong section.
+
+**c. Launch builder in implement mode:**
 ```bash
 unset CLAUDECODE && pa deploy builder --mode implement --background --objective "<structured objective from step a>"
 ```
