@@ -60,7 +60,7 @@ Determine `repo_path` and `feature_branch` from the best available source:
 1. **Structured objective** — if the Additional Instructions contain a `## Context` block, read `Repo:` and `Branch:` directly.
 2. **Ticket doc_refs** — read the plan document referenced in the ticket's `doc_refs`. Extract repo path and branch from the plan.
 3. **User instruction** — the user may specify repo/branch directly.
-4. **Defaults** — repo defaults to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Branch derived from work title: `feature/<short-topic>` (kebab-case).
+4. **Defaults** — repo defaults to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Branch derived from work title: `feature/<TICKET-ID>-<short-topic>` (kebab-case). The ticket key is mandatory — see implement.md §Branch Naming Convention.
 
 ### Step 2 — Switch to repo
 

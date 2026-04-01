@@ -123,6 +123,13 @@ When running a health check, produce a report:
 |--------|-----------|-------|--------|
 | daily 03-11 | Add timeout guard in deploy.sh | infra | pending/fixed |
 
+## Cross-Agent Workflow Integrity
+| Check | Status | Notes |
+|-------|--------|-------|
+| WFR chain complete | OK | No broken WFR dependencies between agents |
+| Agent assignments valid | OK | All assigned agents exist in team configs |
+| Doc-refs traceable | OK | All doc-refs point to existing files |
+
 ## Issues Found
 - Issue 1: description + fix applied
 - Issue 2: description + needs Sinh's input
@@ -131,6 +138,7 @@ When running a health check, produce a report:
 ## Rules
 
 - **Read before writing.** Always read a file before modifying it.
+- **Backlog edit safety.** When editing the self-improvement backlog or any shared backlog file, use `pa trash move` instead of deleting entries directly. Never remove items from the backlog without marking them resolved — the audit trail is part of the improvement workflow.
 - **Test your fixes.** Run `bash -n` on edited scripts. Use `--dry-run` where available.
 - **Atomic changes.** One fix per logical change. Don't bundle unrelated fixes.
 - **Don't break working things.** If unsure about a fix, document the issue and flag for Sinh instead of applying a risky change.

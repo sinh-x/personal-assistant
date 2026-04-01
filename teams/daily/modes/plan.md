@@ -73,6 +73,19 @@ Plan document structure:
   (output of avo plan list after scheduling)
   ## Time Budget
   | Category | Planned | Notes |
+  ## Suggested Daily Flow
+  | Time Block | Activity | Notes |
+  |------------|---------|-------|
+  | 05:00–06:00 | Review & finalize night-agent output, prep daily plan | Before Sinh is fully awake |
+  | 06:00–08:00 | Deep work — P0 tasks (no meetings, no interruptions) | Highest cognitive energy |
+  | 08:00–09:00 | Morning email/ticket review, triage | Light processing |
+  | 09:00–12:00 | Collaborative work — reviews, syncs, reviews | Mid-morning peak |
+  | 12:00–13:00 | Lunch break | |
+  | 13:00–15:00 | Afternoon deep work — P1 tasks | Post-lunch dip, second peak |
+  | 15:00–17:00 | Administrative — ticket updates, planning, reviews | Wind-down mode |
+  | 17:00–18:00 | End-of-day wrap-up, prep tomorrow's notes | Log session, clear inbox |
+
+  > **Note:** Adjust time blocks based on actual energy patterns and meeting schedule. The above is a suggested starting point — Sinh should adapt to his natural rhythm.
   ## Open Items Carried Forward
   - [ ] item (from session/date)
   ## Today's Task List
