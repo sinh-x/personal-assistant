@@ -103,7 +103,7 @@ function formatRow(id: string, status: string, priority: string, estimate: strin
     status.padEnd(25) +
     priority.padEnd(11) +
     estimate.padEnd(6) +
-    assignee.padEnd(16) +
+    assignee.padEnd(28) +
     title
   );
 }
