@@ -112,6 +112,8 @@ interface PrimerOptions {
   };
   /** Caller-provided template variables to substitute in mode objective files. Overrides standard vars. */
   templateVars?: Record<string, string>;
+  /** Ticket ID linked to this deployment (e.g., PA-042). Injected into deployment-context for agent awareness. */
+  ticket?: string;
 }
 
 /** Format a Date as YYYY-MM-DD */
@@ -372,7 +374,7 @@ registry_file: ${registryFile}
 registry_lock: ${registryLock}
 workspace_base: ${deploymentsDir}/${deployId}
 team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
-${cwd ? `cwd: ${cwd}\n` : ""}${repoRoot ? `repo_root: ${repoRoot}\n` : ""}agents:
+${cwd ? `cwd: ${cwd}\n` : ""}${repoRoot ? `repo_root: ${repoRoot}\n` : ""}${opts.ticket ? `ticket_id: ${opts.ticket}\n` : ""}agents:
 ${agentsList}${modelsBlock}${modeBlock}
 </deployment-context>
 

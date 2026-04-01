@@ -15,7 +15,7 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 | **agent_name** | Your name (from team YAML), or `team-manager` if you are the manager |
 | **parent** | Who spawned you — `deploy.sh` for team-manager, `team-manager` for agents, agent name for sub-agents |
 | **role** | Your role description from the team definition |
-| **ticket_id** | The ticket assigned to this deployment (e.g., `PA-042`), or `none` if no ticket. Check on startup: `pa ticket list --assignee <team-name> --status implementing` |
+| **ticket_id** | From `<deployment-context>` if `--ticket` was passed at deploy time, or from `$PA_TICKET_ID` env var, or discovered via `pa ticket list --assignee <team-name> --status implementing`. Value: ticket key (e.g., `PA-042`) or `none`. |
 
 **Rules:**
 - Never use generic names like "agent", "assistant", or "Claude"
@@ -23,6 +23,34 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 - Pass your full identity chain when spawning sub-agents (see §3 in work.md)
 - Include `ticket_id` when passing identity to sub-agents — it provides work context
 - **Team-qualified assignee convention:** When setting `--assignee` on tickets, always use `<team>/<agent>` format (e.g., `builder/team-manager`, `requirements/researcher`). Bare team names (e.g., `builder`) are valid for team-level assignment. Whitelisted names (`sinh`) need no prefix. Bare agent names (e.g., `team-manager`) are deprecated and will print a warning.
+
+---
+
+## 2. Ticket-Objective Alignment (mandatory pre-work check)
+
+Before starting any work, verify that the ticket and objective are aligned. This prevents agents from working on the wrong thing.
+
+**Step 1 — Identify ticket context:**
+
+Read `ticket_id` from `<deployment-context>`. If not present, check `$PA_TICKET_ID` env var. If neither is set, ticket is `none`.
+
+**Step 2 — If ticket is set, read the ticket:**
+
+```bash
+pa ticket show <ticket_id>
+```
+
+**Step 3 — Alignment check:**
+
+| Situation | Action |
+|-----------|--------|
+| Ticket title/summary aligns with Additional Instructions objective | Proceed normally |
+| Ticket exists but objective doesn't match ticket scope | **STOP — report misalignment.** Add comment: `pa ticket comment <ticket_id> --author <agent_name> --content "MISALIGNMENT: Deployment objective does not match ticket scope. Objective: <brief>. Ticket: <brief>. Pausing for clarification."` Then exit. |
+| Ticket set but not found | **STOP — report.** Write failed work report: "Ticket <id> not found." |
+| No ticket set, but objective references a ticket ID | Look up the referenced ticket and adopt it. Set `ticket_id` internally. |
+| No ticket, no objective | Follow team-specific startup behavior (ticket scan or wait for instructions) |
+
+**Never proceed with doubt.** If the ticket and objective don't clearly align, pause and report back rather than guessing which one to follow.
 
 ---
 
