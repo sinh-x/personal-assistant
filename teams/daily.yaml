@@ -70,7 +70,8 @@ deploy_modes:
     label: End Review
     phone_visible: false
     mode_type: work
-    provider: minimax
+    provider: anthropic
+    model: opus
     agents: []  # TM spawns synthesizer interactively after Sinh confirms
     objective: teams/daily/modes/end-review.md
 
