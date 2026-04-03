@@ -1,8 +1,7 @@
 name: daily
-model: sonnet  # default for synthesis; read-only agents overridden to haiku below
+model: sonnet # default for synthesis; read-only agents overridden to haiku below
 description: Daily lifecycle team — plan, track progress, and close the day
 default_mode: plan
-
 hierarchy:
   team-manager:
     role: "Orchestrate daily lifecycle — plan, progress, end"
@@ -16,7 +15,6 @@ hierarchy:
       participates_in: [progress, end]
     - name: synthesizer
       participates_in: [progress, end-review]
-
 deploy_modes:
   - id: housekeeping
     label: Housekeeping
@@ -33,7 +31,7 @@ deploy_modes:
     phone_visible: true
     mode_type: work
     provider: minimax
-    agents: []  # solo, no sub-agents
+    agents: [] # solo, no sub-agents
     objective: teams/daily/modes/plan.md
     skills:
       - name: pa-session-log
@@ -42,8 +40,9 @@ deploy_modes:
     label: Plan Review
     phone_visible: false
     mode_type: work
-    provider: minimax
-    agents: []  # solo, no sub-agents
+    provider: anthropic
+    model: opus
+    agents: [] # solo, no sub-agents
     objective: teams/daily/modes/plan-review.md
     skills:
       - name: pa-session-log
@@ -72,42 +71,36 @@ deploy_modes:
     mode_type: work
     provider: anthropic
     model: opus
-    agents: []  # TM spawns synthesizer interactively after Sinh confirms
+    agents: [] # TM spawns synthesizer interactively after Sinh confirms
     objective: teams/daily/modes/end-review.md
-
 context:
   organization: sinh-x
   notes: "One team, three modes: plan | progress | end"
-
 variables:
   project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
   output_dir: ~/Documents/ai-usage/daily
-
 agents:
   - name: session-gatherer
     role: "Gather session logs from ai-usage folder (human + agent team)"
     skill: skills/daily-summary/gather-sessions.md
-    model: haiku  # read-only file scan; cost optimization
-
+    model: haiku # read-only file scan; cost optimization
   - name: jsonl-analyst
     role: "Analyze Claude JSONL session files for stats"
     skill: skills/daily-summary/gather-jsonl-stats.md
-    model: haiku  # structured data extraction; no synthesis
-
+    model: haiku # structured data extraction; no synthesis
   - name: time-tracker
     role: "Gather avo time tracking data"
     skill: skills/daily-summary/gather-avo.md
-    model: haiku  # reads avo output; no synthesis
-
+    model: haiku # reads avo output; no synthesis
   - name: synthesizer
     role: "Combine gathered data and produce the output document"
     skill: skills/daily-summary/synthesize.md
     # inherits team-level: sonnet — synthesis requires judgment
 
-# Objectives are defined in teams/daily/modes/<mode-id>.md and substituted
-# at runtime by daily.ts (dynamic variables: TODAY, OUTPUT_DIR, etc.).
-# Modes: plan, plan-review, progress, end, end-review
-# This field serves as fallback if mode files are not found.
+    # Objectives are defined in teams/daily/modes/<mode-id>.md and substituted
+    # at runtime by daily.ts (dynamic variables: TODAY, OUTPUT_DIR, etc.).
+    # Modes: plan, plan-review, progress, end, end-review
+    # This field serves as fallback if mode files are not found.
     skills:
       - name: pa-session-log
         inject-as: shared-skill
