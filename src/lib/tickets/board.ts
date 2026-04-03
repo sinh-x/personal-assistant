@@ -70,7 +70,8 @@ export function buildBoardView(
       // Unknown status — add to idea as fallback
       grouped.get("idea")!.push(ticket);
     }
-    assigneeCounts[ticket.assignee] = (assigneeCounts[ticket.assignee] ?? 0) + 1;
+    const assigneeKey = ticket.assignee || "unassigned";
+    assigneeCounts[assigneeKey] = (assigneeCounts[assigneeKey] ?? 0) + 1;
   }
 
   const columns: BoardColumn[] = BOARD_COLUMNS.map((status) => {
@@ -116,12 +117,13 @@ export function getTeamStatusSummaries(
   const byTeam = new Map<string, Record<TicketStatus, number>>();
 
   for (const ticket of tickets) {
-    if (!byTeam.has(ticket.assignee)) {
+    const assigneeKey = ticket.assignee || "unassigned";
+    if (!byTeam.has(assigneeKey)) {
       const zeroCounts: Record<TicketStatus, number> = {} as Record<TicketStatus, number>;
       for (const s of BOARD_COLUMNS) zeroCounts[s] = 0;
-      byTeam.set(ticket.assignee, zeroCounts);
+      byTeam.set(assigneeKey, zeroCounts);
     }
-    const counts = byTeam.get(ticket.assignee)!;
+    const counts = byTeam.get(assigneeKey)!;
     counts[ticket.status] = (counts[ticket.status] ?? 0) + 1;
   }
 
