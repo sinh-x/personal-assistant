@@ -18,13 +18,15 @@ Use it as the work item and execute it directly. If the objective contains a `##
 
 Run these **before reading any code or executing any phase**. If any check fails, stop immediately and write a failed work report — do not proceed.
 
-### Step 1 — Identify repo and branch
+**Important: Implement mode does NOT manage branches.** Branch creation, switching, and merging are the orchestrator's (or worker's) responsibility. Implement mode only verifies it is on the correct branch and executes work.
 
-Determine `repo_path` and `feature_branch` from the best available source:
+### Step 1 — Identify repo and expected branch
+
+Determine `repo_path` and `expected_branch` from the best available source:
 
 1. **Structured objective** (from orchestrator) — if the Additional Instructions contain a `## Context` block, read `Repo:` and `Branch:` directly.
-2. **Ticket doc_refs** — read the plan document referenced in the ticket's `doc_refs` (primary or `requirements` type). Extract `repo_path` from frontmatter/body and `feature_branch` from the plan or derive from the topic.
-3. **Defaults** — if not specified anywhere, default repo to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Derive branch from the work title: `feature/<short-topic>` (kebab-case).
+2. **Ticket doc_refs** — read the plan document referenced in the ticket's `doc_refs` (primary or `requirements` type). Extract `repo_path` from frontmatter/body and `expected_branch` from the plan.
+3. **Defaults** — if not specified anywhere, default repo to `/home/sinh/git-repos/sinh-x/tools/personal-assistant`. Derive expected branch from the work title: `feature/<TICKET-ID>-<short-topic>` (kebab-case). The ticket key is mandatory — see §Branch Naming Convention.
 
 ### Step 2 — Switch to repo
 
@@ -38,7 +40,7 @@ Status: failed
 Reason: Repo path not found: <repo_path>
 ```
 
-### Step 3 — Check current branch
+### Step 3 — Verify current branch (STRICT)
 
 ```bash
 git branch --show-current
@@ -48,22 +50,41 @@ Evaluate the result:
 
 | Current branch | Action |
 |----------------|--------|
-| `main` or `develop` | Proceed — create or switch to `feature_branch` |
-| `feature_branch` (matches this work) | Proceed — already on the right branch |
-| Any other branch | STOP — write failed work report |
+| `expected_branch` (matches this work) | Proceed — on the right branch |
+| Any other branch (including `main`, `develop`) | **STOP — cancel and report back** |
 
-**If the repo is on an unrelated branch**, do not switch, do not touch anything. Write a failed work report.
-
-### Step 4 — Create or switch to feature branch
-
-If on `main` or `develop`:
-```bash
-git checkout -b <feature_branch>   # creates the branch
-# or, if it already exists:
-git checkout <feature_branch>
+**Implement mode NEVER creates or switches branches.** If the repo is not already on the expected branch, write a failed work report immediately:
+```
+Status: failed
+Reason: Wrong branch. Expected: <expected_branch>, Found: <current_branch>.
+Action required: Orchestrator or user must check out the correct branch before re-launching.
 ```
 
-Now you are on the correct branch. Proceed with the plan.
+Do not switch, do not create branches, do not touch anything. Report and exit.
+
+### Step 4 — Check for unrelated staged files
+
+```bash
+git diff --staged --name-only
+```
+
+If any files are staged, verify they are related to this work item. Unrelated staged files should be unstaged before proceeding:
+```bash
+git restore --staged <file>   # to unstage a specific file
+git reset HEAD                 # to unstage all files
+```
+
+### Branch Naming Convention
+
+All feature branches MUST include the ticket key for traceability:
+
+```
+feature/<TICKET-ID>-<short-topic>
+```
+
+Examples: `feature/PA-042-login-fix`, `feature/AVO-028-api-endpoints`
+
+If no ticket is associated with the work, use the topic only: `feature/<short-topic>`. But prefer having a ticket — every branch should trace back to a work item.
 
 ---
 
@@ -183,7 +204,7 @@ pa ticket comment <id> --author team-manager --content "Implementation complete.
 2. **Check new tickets** — If nothing in-progress, run `pa ticket list --assignee builder --status pending-implementation` to find the next work item.
 3. **Claim ticket** — `pa ticket update <id> --status implementing --assignee builder/team-manager` before starting any work (see §Ticket Claim Protocol)
 4. **Read plan document** — Read `doc_refs` from the ticket (use primary or `requirements` type entry) to identify repo path, feature branch, and full scope
-5. **Pre-flight checks** — Switch to repo, check branch, create feature branch (§Pre-flight Checks). Stop here if check fails.
+5. **Pre-flight checks** — Switch to repo, verify on expected branch (§Pre-flight Checks). Stop and report if wrong branch.
 6. **Check progress** — `git log --oneline | grep 'feat('` to find completed phases
 7. **Read existing code** — Always read files before modifying them
 8. **Execute phase** — Create/modify files as the plan specifies
@@ -195,7 +216,7 @@ pa ticket comment <id> --author team-manager --content "Implementation complete.
 ## Rules
 
 - **One phase per deployment.** Complete and verify one phase, then stop. Next phase = next deployment. **Exception:** When the Additional Instructions explicitly list multiple steps to execute in one session, complete all of them — the one-phase rule applies only when falling back to ticket scanning without explicit instructions.
-- **Feature branch.** Always work on a `feature/<topic>` branch derived from the task. Run pre-flight checks (§Pre-flight Checks) before touching any code. Never work directly on `main` or `develop`. Never merge — commit and report only.
+- **No branch management.** Implement mode does NOT create, switch, or merge branches. It verifies it is on the expected branch (§Pre-flight Checks Step 3) and fails if not. Branch lifecycle is the orchestrator's or worker's responsibility. Never work directly on `main` or `develop`. Never merge — commit and report only.
 - **Read before writing.** Always read a file before modifying it. Understand existing code before changing it.
 - **Output compatibility.** Primer format, registry format, and file paths must be identical to bash versions. Diff output between bash and TS implementations.
 - **No new features.** Port behavior exactly as-is. Improvements come after migration is complete.

@@ -135,12 +135,16 @@ function __pa_projects
 end
 
 function __pa_ticket_ids
-    # List active ticket IDs with title as description. Skip header (2 lines) and summary line.
+    # List ticket keys with title as description.
+    # Uses fixed-width column positions from formatRow():
+    #   ID=0-8, STATUS=9-33, PRIORITY=34-44, EST=45-50, ASSIGNEE=51-78, TITLE=79+
+    # This avoids awk field-splitting issues when ASSIGNEE overflows its column.
     pa ticket list 2>/dev/null | awk 'NR>2 && /^[A-Z]/ {
-        id = $1;
-        title = "";
-        for (i=6; i<=NF; i++) title = title (i>6?" ":"") $i;
-        print id "\t" title
+        id = substr($0, 1, 8);
+        title = substr($0, 79);
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", id);
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", title);
+        if (id != "" && title != "") print id "\t" title
     }'
 end
 
@@ -156,8 +160,12 @@ end
 
 function __pa_assignees
     # Combine unique assignees from active tickets + team names.
-    # Filter column 5 to only valid assignee tokens (no overflow artifacts from long names).
-    set -l from_tickets (pa ticket list 2>/dev/null | awk 'NR>2 && /^[A-Z]/ {print $5}' | grep -E '^[a-z][a-z0-9/_-]*$')
+    # Uses fixed-width column position for ASSIGNEE (chars 52-78, 28 chars wide).
+    set -l from_tickets (pa ticket list 2>/dev/null | awk 'NR>2 && /^[A-Z]/ {
+        assignee = substr($0, 52, 28);
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", assignee);
+        if (assignee != "") print assignee
+    }' | grep -E '^[a-z][a-z0-9/_-]*$')
     set -l from_teams (__pa_teams)
     printf '%s\n' $from_tickets $from_teams | sort -u
 end

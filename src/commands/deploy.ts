@@ -8,6 +8,7 @@ import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent } from "../lib/registry.js";
 import { generatePrimer } from "../lib/primer.js";
 import { isTeamBlocked } from "../lib/bulletins/index.js";
+import { TicketStore } from "../lib/tickets/store.js";
 import { spawnDetached } from "../utils/process.js";
 import { resolveRepo } from "../lib/repos.js";
 import { localISOTimestamp } from "../lib/time.js";
@@ -439,7 +440,25 @@ export function deployCommand(
     PA_DEPLOYMENT_ID: deployId,
     PA_DEPLOYMENT_DIR: deployDir,
     PA_ACTIVITY_LOG: activityLog,
+    ...(opts.ticket ? { PA_TICKET_ID: opts.ticket } : {}),
   };
+
+  // Validate ticket if provided
+  if (opts.ticket) {
+    const store = new TicketStore();
+    const ticket = store.get(opts.ticket);
+    if (!ticket) {
+      console.error(`Warning: Ticket ${opts.ticket} not found. Deployment will proceed but agents may not have ticket context.`);
+    } else {
+      const validStatuses = ["pending-implementation", "implementing", "requirement-review"];
+      if (!validStatuses.includes(ticket.status)) {
+        console.error(`Warning: Ticket ${opts.ticket} has status "${ticket.status}" (expected one of: ${validStatuses.join(", ")}). Verify this is the right ticket.`);
+      }
+      if (ticket.assignee && !ticket.assignee.startsWith(teamName) && ticket.assignee !== "sinh") {
+        console.error(`Warning: Ticket ${opts.ticket} is assigned to "${ticket.assignee}", not "${teamName}". Verify team alignment.`);
+      }
+    }
+  }
 
   // Generate primer
   const primerFile = resolve(primersDir, `${teamName}-${deployId}-primer.md`);
@@ -461,6 +480,7 @@ export function deployCommand(
     homeDir: paHome,
     effectiveModels: { tmModel, agentModels },
     templateVars: opts.templateVars,
+    ticket: opts.ticket,
   });
   writeFileSync(primerFile, primerContent);
   copyFileSync(primerFile, resolve(deployDir, "primer.md"));
