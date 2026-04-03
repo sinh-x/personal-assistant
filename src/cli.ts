@@ -11,7 +11,7 @@ import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
 import { resolveProject, resolveProjectFromCwd, listRepos } from "./lib/repos.js";
-import { serveCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
+import { serveCommand, serveStopCommand, serveStatusCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
 import { createTicketCommand } from "./commands/ticket.js";
 import { createBulletinCommand } from "./commands/bulletin.js";
 import { createRegistryCommand } from "./commands/registry.js";
@@ -213,20 +213,54 @@ program
     reposCommand(sub);
   });
 
-program
+const serveCmd = program
   .command("serve")
   .description("Start the agent API server (Hono)")
   .option("--port <number>", "Port to listen on", String(DEFAULT_PORT))
   .option("--host <address>", "Host address to bind to", DEFAULT_HOST)
   .option("--background", "Run in background mode (writes PID file)")
   .option("--cors", "Enable CORS headers")
-  .action(async (opts: { port: string; host: string; background?: boolean; cors?: boolean }) => {
+  .option("--force", "Kill existing instance and restart")
+  .action(async (opts: { port: string; host: string; background?: boolean; cors?: boolean; force?: boolean }) => {
     await serveCommand({
       port: parseInt(opts.port, 10),
       host: opts.host,
       background: opts.background ?? false,
       cors: opts.cors ?? false,
+      force: opts.force ?? false,
     });
+  });
+
+serveCmd
+  .command("stop")
+  .description("Stop a running pa serve instance")
+  .action(async () => {
+    await serveStopCommand();
+  });
+
+serveCmd
+  .command("restart")
+  .description("Stop existing instance and start a new one")
+  .option("--port <number>", "Port to listen on", String(DEFAULT_PORT))
+  .option("--host <address>", "Host address to bind to", DEFAULT_HOST)
+  .option("--background", "Run in background mode (writes PID file)")
+  .option("--cors", "Enable CORS headers")
+  .action(async (opts: { port: string; host: string; background?: boolean; cors?: boolean }) => {
+    await serveStopCommand();
+    await serveCommand({
+      port: parseInt(opts.port, 10),
+      host: opts.host,
+      background: opts.background ?? false,
+      cors: opts.cors ?? false,
+      force: false,
+    });
+  });
+
+serveCmd
+  .command("status")
+  .description("Show pa serve running state, PID, and port")
+  .action(() => {
+    serveStatusCommand();
   });
 
 program.addCommand(createTicketCommand());

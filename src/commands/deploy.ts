@@ -440,6 +440,7 @@ export function deployCommand(
     PA_DEPLOYMENT_ID: deployId,
     PA_DEPLOYMENT_DIR: deployDir,
     PA_ACTIVITY_LOG: activityLog,
+    CLAUDECODE: undefined, // Strip nested-session detection from child processes
     ...(opts.ticket ? { PA_TICKET_ID: opts.ticket } : {}),
   };
 
@@ -615,10 +616,11 @@ export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
       ? `source '${envFile}' && rm -f '${envFile}'\n`
       : "";
     const bgScript = `
+unset CLAUDECODE
 ${sourceEnv}export PA_DEPLOYMENT_ID='${deployId}'
 export PA_DEPLOYMENT_DIR='${deployDir}'
 export PA_ACTIVITY_LOG='${activityLog}'
-echo '[$(date -Iseconds)] claude starting...' >> '${logFile}'
+echo "[$(date -Iseconds)] claude starting..." >> '${logFile}'
 stdbuf -oL timeout '${maxRuntime}' claude ${modelFlag ? modelFlag + " " : ""}--dangerously-skip-permissions --print '${claudePrompt.replace(/'/g, "'\\''")}' >> '${logFile}' 2>'${logFile}.err'
 exit_code=$?
 echo '' >> '${logFile}'
@@ -630,7 +632,7 @@ if [[ -s '${logFile}.err' ]]; then
 fi
 rm -f '${logFile}.err'
 if [[ $exit_code -eq 124 ]]; then
-  echo '[$(date -Iseconds)] TIMED OUT after ${maxRuntime}s' >> '${logFile}'
+  echo "[$(date -Iseconds)] TIMED OUT after ${maxRuntime}s" >> '${logFile}'
   crash_ts=$(date -Iseconds)
   crash_json='{"deployment_id":"${deployId}","team":"${teamName}","event":"crashed","timestamp":"'"$crash_ts"'","exit_code":124,"summary":"Timed out after ${maxRuntime}s"}'
   { flock -w 5 9; printf '%s\n' "$crash_json" >> '${registryFile}'; } 9>'${registryLock}'
