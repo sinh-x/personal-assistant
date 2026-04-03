@@ -16,7 +16,7 @@ import type { RegistryEvent, DeploymentStatus } from "../../types.js";
 const AI_USAGE = join(homedir(), "Documents", "ai-usage");
 const DEPLOYMENTS_DIR = join(AI_USAGE, "deployments");
 
-function parseRegistry(): RegistryEvent[] {
+export function parseRegistry(): RegistryEvent[] {
   const path = getRegistryPath();
   if (!existsSync(path)) return [];
   return readFileSync(path, "utf-8")
@@ -31,7 +31,7 @@ function parseRegistry(): RegistryEvent[] {
     });
 }
 
-function computeDeploymentStatuses(events: RegistryEvent[]): DeploymentStatus[] {
+export function computeDeploymentStatuses(events: RegistryEvent[]): DeploymentStatus[] {
   const grouped = new Map<string, RegistryEvent[]>();
   for (const ev of events) {
     const existing = grouped.get(ev.deployment_id) ?? [];
