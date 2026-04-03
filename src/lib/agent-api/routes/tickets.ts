@@ -73,7 +73,7 @@ export function ticketRoutes(): Hono {
 
   // POST /api/tickets — create ticket
   app.post("/api/tickets", async (c: Context) => {
-    let body: CreateTicketInput & { actor?: string };
+    let body: CreateTicketInput & { actor?: string; team?: string };
     try {
       body = await c.req.json();
     } catch {
@@ -81,17 +81,28 @@ export function ticketRoutes(): Hono {
     }
 
     const actor = body.actor ?? "api";
-    const { actor: _actor, ...input } = body;
+    const { actor: _actor, team, ...input } = body;
 
-    if (input.assignee) {
-      try {
-        validateAssignee(input.assignee);
-      } catch (err) {
-        return c.json(
-          { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
-          400
-        );
-      }
+    // F5: If assignee is missing but team is provided, use team as assignee
+    if (!input.assignee && team) {
+      input.assignee = team;
+    }
+
+    // F4: Require assignee (or team fallback already applied above)
+    if (!input.assignee) {
+      return c.json(
+        { error: "assignee is required (or provide team field)", code: "BAD_REQUEST" },
+        400
+      );
+    }
+
+    try {
+      validateAssignee(input.assignee);
+    } catch (err) {
+      return c.json(
+        { error: err instanceof Error ? err.message : String(err), code: "BAD_REQUEST" },
+        400
+      );
     }
 
     try {

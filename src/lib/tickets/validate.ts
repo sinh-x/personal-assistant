@@ -120,6 +120,9 @@ export function validateAssignee(assignee: string): void {
  * Supports exact match, team-prefix match, and bare-agent-suffix match.
  */
 export function matchAssignee(ticketAssignee: string, filterAssignee: string): boolean {
+  // Handle undefined/null ticketAssignee — no match possible
+  if (!ticketAssignee) return false;
+
   // Exact match
   if (ticketAssignee === filterAssignee) return true;
 

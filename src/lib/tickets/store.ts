@@ -78,6 +78,7 @@ export class TicketStore {
       blockedBy: raw.blockedBy ?? [],
       comments: raw.comments ?? [],
       doc_refs: raw.doc_refs ?? [],
+      assignee: raw.assignee ?? "",
     } as Ticket;
   }
 
