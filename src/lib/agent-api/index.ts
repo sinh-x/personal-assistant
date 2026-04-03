@@ -9,6 +9,7 @@ import { inboxRoutes } from "./routes/inbox.js";
 import { foldersRoutes } from "./routes/folders.js";
 import { configRoutes } from "./routes/config.js";
 import { deploymentsRoutes } from "./routes/deployments.js";
+import { reposRoutes } from "./routes/repos.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { deployRoutes } from "./routes/deploy.js";
 import { deployRoutingRoutes } from "./routes/deploy-routing.js";
@@ -94,6 +95,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", foldersRoutes());
   app.route("/", configRoutes());
   app.route("/", deploymentsRoutes());
+  app.route("/", reposRoutes());
   app.route("/", teamsRoutes());
   app.route("/", deployRoutes());
   app.route("/", deployRoutingRoutes());
