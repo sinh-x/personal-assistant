@@ -42,6 +42,28 @@ deploy_modes:
       - skills/requirements/review-security.md
       - skills/requirements/review-ops.md
       - skills/requirements/review-ui-uat.md
+  - id: review-auto
+    label: Review (Auto)
+    phone_visible: true
+    mode_type: work
+    agents: [reviewer]
+    objective: skills/requirements/review-objective.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+    global_docs:
+      - skills/requirements/review-code-quality.md
+      - skills/requirements/review-security.md
+      - skills/requirements/review-ops.md
+      - skills/requirements/review-ui-uat.md
   - id: spike
     label: Spike Research
     phone_visible: true
