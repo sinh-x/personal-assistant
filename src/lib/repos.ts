@@ -59,6 +59,14 @@ export function listRepos(): Array<{ name: string } & RepoEntry> {
   return Object.entries(repos).map(([name, entry]) => ({ name, ...entry }));
 }
 
+/** Load repo entry without exiting on error (for API use) */
+export function loadRepoEntry(key: string): { name: string; path: string; description?: string; prefix?: string } | null {
+  const repos = listRepos();
+  const repo = repos.find((r) => r.name === key);
+  if (!repo) return null;
+  return { name: repo.name, path: repo.path, description: repo.description, prefix: repo.prefix };
+}
+
 /** Resolve a repo name to its entry (with expanded path). Exits on error. */
 export function resolveRepo(name: string): { name: string } & RepoEntry {
   const repos = loadReposYaml();

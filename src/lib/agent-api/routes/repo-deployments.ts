@@ -7,20 +7,12 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { basename } from "node:path";
-import { listRepos } from "../../../lib/repos.js";
+import { loadRepoEntry } from "../../../lib/repos.js";
 import { isProcessAlive } from "../../../utils/process.js";
 import { parseRegistry, computeDeploymentStatuses } from "./deployments.js";
 import type { DeploymentStatus } from "../../../lib/types.js";
 
 const TERMINAL_STATUSES = new Set(["success", "partial", "failed", "crashed", "dead"]);
-
-/** Load repo entry without exiting on error (for API use) */
-function loadRepoEntry(key: string): { name: string; path: string; description?: string; prefix?: string } | null {
-  const repos = listRepos();
-  const repo = repos.find((r) => r.name === key);
-  if (!repo) return null;
-  return { name: repo.name, path: repo.path, description: repo.description, prefix: repo.prefix };
-}
 
 export function repoDeploymentsRoutes(): Hono {
   const app = new Hono();
@@ -57,21 +49,24 @@ export function repoDeploymentsRoutes(): Hono {
     // Get status filter param
     const statusFilter = c.req.query("status") || "all";
 
+    // F4: Apply liveness check to ALL deployments with status=running before filtering
+    // This ensures dead PIDs are marked as dead regardless of the status filter
+    const withLivenessCheck = filtered.map((d) => {
+      if (d.status === "running" && d.pid && !isProcessAlive(d.pid)) {
+        return { ...d, status: "dead" as const };
+      }
+      return d;
+    });
+
     // Apply status filter
     let statusFiltered: DeploymentStatus[];
     if (statusFilter === "running") {
-      statusFiltered = filtered.filter((d) => d.status === "running").map((d) => {
-        // Liveness check: verify PID is actually alive
-        if (d.pid && !isProcessAlive(d.pid)) {
-          return { ...d, status: "dead" as const };
-        }
-        return d;
-      });
+      statusFiltered = withLivenessCheck.filter((d) => d.status === "running");
     } else if (statusFilter === "finished") {
-      statusFiltered = filtered.filter((d) => TERMINAL_STATUSES.has(d.status));
+      statusFiltered = withLivenessCheck.filter((d) => TERMINAL_STATUSES.has(d.status));
     } else {
       // "all" — no status filter
-      statusFiltered = filtered;
+      statusFiltered = withLivenessCheck;
     }
 
     // Get limit param (default 50, max 200)
