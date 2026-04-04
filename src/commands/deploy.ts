@@ -363,6 +363,24 @@ export function deployCommand(
     }
   }
 
+  // Validate ticket if provided — fail fast before any workspace/primer/registry work
+  if (opts.ticket) {
+    const store = new TicketStore();
+    const ticket = store.get(opts.ticket);
+    if (!ticket) {
+      console.error(`Error: Ticket ${opts.ticket} not found. Check the ticket ID and try again.`);
+      process.exit(1);
+    } else {
+      const validStatuses = ["pending-implementation", "implementing", "requirement-review"];
+      if (!validStatuses.includes(ticket.status)) {
+        console.error(`Warning: Ticket ${opts.ticket} has status "${ticket.status}" (expected one of: ${validStatuses.join(", ")}). Verify this is the right ticket.`);
+      }
+      if (ticket.assignee && !ticket.assignee.startsWith(teamName) && ticket.assignee !== "sinh") {
+        console.error(`Warning: Ticket ${opts.ticket} is assigned to "${ticket.assignee}", not "${teamName}". Verify team alignment.`);
+      }
+    }
+  }
+
   mkdirSync(primersDir, { recursive: true });
   mkdirSync(logsDir, { recursive: true });
   mkdirSync(deploymentsDir, { recursive: true });
@@ -443,23 +461,6 @@ export function deployCommand(
     CLAUDECODE: undefined, // Strip nested-session detection from child processes
     ...(opts.ticket ? { PA_TICKET_ID: opts.ticket } : {}),
   };
-
-  // Validate ticket if provided
-  if (opts.ticket) {
-    const store = new TicketStore();
-    const ticket = store.get(opts.ticket);
-    if (!ticket) {
-      console.error(`Warning: Ticket ${opts.ticket} not found. Deployment will proceed but agents may not have ticket context.`);
-    } else {
-      const validStatuses = ["pending-implementation", "implementing", "requirement-review"];
-      if (!validStatuses.includes(ticket.status)) {
-        console.error(`Warning: Ticket ${opts.ticket} has status "${ticket.status}" (expected one of: ${validStatuses.join(", ")}). Verify this is the right ticket.`);
-      }
-      if (ticket.assignee && !ticket.assignee.startsWith(teamName) && ticket.assignee !== "sinh") {
-        console.error(`Warning: Ticket ${opts.ticket} is assigned to "${ticket.assignee}", not "${teamName}". Verify team alignment.`);
-      }
-    }
-  }
 
   // Generate primer
   const primerFile = resolve(primersDir, `${teamName}-${deployId}-primer.md`);
