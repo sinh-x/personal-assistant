@@ -6,6 +6,7 @@
  * GET    /api/tickets/:id          — get a single ticket by ID
  * GET    /api/tickets/:id/review   — review context: ticket + doc_ref_url + attachment_urls
  * PATCH  /api/tickets/:id          — update ticket fields
+ * POST   /api/tickets/:id/move    — move ticket to another project
  * GET    /api/board                — board view grouped by status (project optional)
  * GET    /api/projects             — full project metadata + active ticket counts
  *
@@ -438,6 +439,67 @@ export function ticketRoutes(): Hono {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       return c.json({ error: message, code: "PROJECTS_FAILED" }, 500);
+    }
+  });
+
+  // POST /api/tickets/:id/move — move a ticket to another project
+  // F2: REST endpoint for moving tickets between projects
+  app.post("/api/tickets/:id/move", async (c: Context) => {
+    const id = c.req.param("id") as string;
+    let body: { project: string; actor?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body", code: "BAD_REQUEST" }, 400);
+    }
+
+    if (!body.project) {
+      return c.json({ error: "project is required", code: "BAD_REQUEST" }, 400);
+    }
+
+    const actor = body.actor ?? "api";
+
+    try {
+      // First verify the ticket exists
+      const existingTicket = store.get(id);
+      if (!existingTicket) {
+        return c.json({ error: "Ticket not found", code: "NOT_FOUND" }, 404);
+      }
+
+      // Check if trying to move to same project
+      if (existingTicket.project === body.project) {
+        return c.json(
+          { error: `Ticket is already in project ${body.project}`, code: "SAME_PROJECT" },
+          400
+        );
+      }
+
+      // Attempt the move — this will throw if project is invalid
+      const ticket = store.move(id, body.project, actor);
+      return c.json({ ticket }, 200);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+
+      // Invalid project error — include valid project list
+      if (message.includes("Unknown project")) {
+        const validProjects = listRepos()
+          .filter((r) => r.prefix)
+          .map((r) => r.name)
+          .sort()
+          .join(", ");
+        return c.json(
+          { error: message, code: "INVALID_PROJECT", validProjects },
+          400
+        );
+      }
+
+      // Terminal status warning is printed to stderr by store.move, but we still proceed
+      // So any other error is a real failure
+      if (message.includes("Ticket not found")) {
+        return c.json({ error: message, code: "NOT_FOUND" }, 404);
+      }
+
+      return c.json({ error: message, code: "MOVE_FAILED" }, 400);
     }
   });
 
