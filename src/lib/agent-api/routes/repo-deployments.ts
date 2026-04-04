@@ -9,7 +9,7 @@ import type { Context } from "hono";
 import { basename } from "node:path";
 import { loadRepoEntry } from "../../../lib/repos.js";
 import { isProcessAlive } from "../../../utils/process.js";
-import { parseRegistry, computeDeploymentStatuses } from "./deployments.js";
+import { parseRegistry, computeDeploymentStatuses, getTodayDateString, isValidDateString } from "./deployments.js";
 import type { DeploymentStatus } from "../../../lib/types.js";
 
 const TERMINAL_STATUSES = new Set(["success", "partial", "failed", "crashed", "dead"]);
@@ -69,20 +69,48 @@ export function repoDeploymentsRoutes(): Hono {
       statusFiltered = withLivenessCheck;
     }
 
+    // Date filtering
+    const sinceParam = c.req.query("since");
+    const allParam = c.req.query("all");
+
+    // Validate since param if provided
+    if (sinceParam && !isValidDateString(sinceParam)) {
+      return c.json({ error: "Invalid 'since' parameter. Expected YYYY-MM-DD format.", code: "BAD_REQUEST" }, 400);
+    }
+
+    // Determine date filter
+    let since: string | undefined;
+    if (allParam === "true") {
+      since = undefined; // bypass date filtering
+    } else if (sinceParam) {
+      since = sinceParam;
+    } else {
+      since = getTodayDateString();
+    }
+
+    // Apply date filter if since is set
+    let dateFiltered: DeploymentStatus[];
+    if (since) {
+      dateFiltered = statusFiltered.filter((d) => d.started_at >= since);
+    } else {
+      dateFiltered = statusFiltered;
+    }
+
     // Get limit param (default 50, max 200)
     const limitParam = c.req.query("limit");
     const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
 
     // Apply limit
-    const limited = statusFiltered.slice(0, limit);
+    const limited = dateFiltered.slice(0, limit);
 
     return c.json({
       repo: { key: name, path, description, prefix },
       deployments: limited,
-      total: statusFiltered.length,
+      total: dateFiltered.length,
       filter: {
         status: statusFilter,
         limit,
+        since,
       },
     });
   });
