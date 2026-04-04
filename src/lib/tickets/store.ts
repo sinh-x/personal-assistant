@@ -10,6 +10,7 @@ import {
 import { resolve, join } from "node:path";
 import { tmpdir, homedir } from "node:os";
 import { getTicketsDir } from "../paths.js";
+import { normalizeSandboxPath } from "../agent-api/utils/sandbox.js";
 import { matchAssignee } from "./validate.js";
 import type {
   Ticket,
@@ -456,6 +457,13 @@ export class TicketStore {
           docRefs = docRefs.map((r) => ({ ...r, primary: false }));
         }
         const before = ticket.doc_refs ?? [];
+
+        // F1: Soft-enforcement — warn if referenced file does not exist
+        const fullPath = normalizeSandboxPath(newRef.path);
+        if (!existsSync(fullPath)) {
+          process.stderr.write(`Warning: doc_ref path does not exist: ${newRef.path}\n`);
+        }
+
         docRefs = [...docRefs, newRef];
         changes["doc_refs"] = [before, docRefs];
         this.appendAudit({

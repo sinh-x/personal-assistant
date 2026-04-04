@@ -1,7 +1,9 @@
 import { Command } from "commander";
+import { existsSync } from "node:fs";
 import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import { formatTicketCard } from "../lib/tickets/display.js";
+import { normalizeSandboxPath } from "../lib/agent-api/utils/sandbox.js";
 import type {
   Estimate,
   TicketStatus,
@@ -230,6 +232,7 @@ export function createTicketCommand(): Command {
     .option("--doc-ref <value>", "Add document reference: [type:]path (ADDS to array, does not replace). Type defaults to 'attachment'.")
     .option("--doc-ref-primary", "Mark the added doc-ref as primary (demotes any existing primary)")
     .option("--remove-doc-ref <path>", "Remove a doc-ref by exact path match")
+    .option("--force", "Suppress doc-ref file existence warnings")
     .option("--actor <name>", "Actor for audit log", "cli-user")
     .action(
       (
@@ -244,6 +247,7 @@ export function createTicketCommand(): Command {
           docRef?: string;
           docRefPrimary?: boolean;
           removeDocRef?: string;
+          force?: boolean;
           actor: string;
         }
       ) => {
@@ -270,7 +274,15 @@ export function createTicketCommand(): Command {
           input.estimate = validateEstimate(opts.estimate);
         }
         if (opts.docRef !== undefined) {
-          input.add_doc_ref = parseDocRef(opts.docRef, opts.docRefPrimary ?? false);
+          const parsedDocRef = parseDocRef(opts.docRef, opts.docRefPrimary ?? false);
+          // F2: Validate file existence unless --force is set
+          if (!opts.force) {
+            const fullPath = normalizeSandboxPath(parsedDocRef.path);
+            if (!existsSync(fullPath)) {
+              process.stderr.write(`Warning: doc_ref path does not exist: ${parsedDocRef.path}\n`);
+            }
+          }
+          input.add_doc_ref = parsedDocRef;
         }
         if (opts.removeDocRef !== undefined) {
           input.remove_doc_ref = opts.removeDocRef;
@@ -403,6 +415,46 @@ export function createTicketCommand(): Command {
         process.stderr.write(
           `Hint: This comment references an artifact path. Attach it? pa ticket update ${ticket.id} --doc-ref ${match[0]}\n`
         );
+      }
+    });
+
+  // ── check-refs ──────────────────────────────────────────────────────────────
+
+  cmd
+    .command("check-refs")
+    .description("Audit all doc_refs in a project and report orphaned (missing) references")
+    .requiredOption("--project <name>", "Project name (key from repos.yaml)")
+    .action((opts: { project: string }) => {
+      const store = new TicketStore();
+      const tickets = store.list({ project: opts.project });
+      const orphans: { ticketId: string; type: string; path: string; addedAt: string }[] = [];
+
+      for (const ticket of tickets) {
+        for (const ref of ticket.doc_refs ?? []) {
+          const fullPath = normalizeSandboxPath(ref.path);
+          if (!existsSync(fullPath)) {
+            orphans.push({
+              ticketId: ticket.id,
+              type: ref.type,
+              path: ref.path,
+              addedAt: ref.addedAt,
+            });
+          }
+        }
+      }
+
+      if (orphans.length === 0) {
+        console.log(`All doc_refs in project '${opts.project}' are valid.`);
+        process.exit(0);
+      } else {
+        console.log(`Orphaned doc_refs (${orphans.length}):`);
+        console.log("  TICKET      TYPE                 PATH");
+        console.log("  " + "-".repeat(70));
+        for (const o of orphans) {
+          const date = o.addedAt ? o.addedAt.split("T")[0] : "unknown";
+          console.log(`  ${o.ticketId.padEnd(10)} ${o.type.padEnd(19)} ${o.path} (added ${date})`);
+        }
+        process.exit(1);
       }
     });
 
