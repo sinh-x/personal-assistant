@@ -646,7 +646,8 @@ fi
 
     // Spawn background process via nohup
     const bgPid = spawnDetached("nohup", [bashPath, "-c", bgScript], {
-      cwd: process.cwd(),
+      cwd,
+      env: deployEnv,
     });
 
     console.log(`  PID: ${bgPid}`);

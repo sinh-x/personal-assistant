@@ -16,16 +16,22 @@
  *
  * Attachment routes:
  * POST   /api/tickets/:id/attachments           — add an attachment path
+ * POST   /api/tickets/:id/attachments/upload    — upload a file as an attachment (multipart)
  */
 
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { marked } from "marked";
+import { writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { join, extname } from "node:path";
+import { homedir } from "node:os";
 import { TicketStore } from "../../tickets/index.js";
 import { validateAuthor, validateAssignee } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
 import type { CreateTicketInput, UpdateTicketInput, Comment } from "../../tickets/types.js";
 import { listRepos } from "../../repos.js";
+import { validateSandboxPath } from "../utils/sandbox.js";
 
 export function ticketRoutes(): Hono {
   const app = new Hono();
@@ -309,6 +315,105 @@ export function ticketRoutes(): Hono {
       }
       return c.json({ error: message, code: "ATTACH_FAILED" }, 400);
     }
+  });
+
+  // POST /api/tickets/:id/attachments/upload — upload a file as an attachment (multipart)
+  // Accepts multipart/form-data with a 'file' field; saves to ~/Documents/ai-usage/attachments/<ticket-id>/
+  // and links it to the ticket via add_doc_ref with type: 'attachment'.
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+  const ALLOWED_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+
+  app.post("/api/tickets/:id/attachments/upload", async (c: Context) => {
+    const id = c.req.param("id") as string;
+
+    // Verify ticket exists before processing upload
+    const existingTicket = store.get(id);
+    if (!existingTicket) {
+      return c.json({ error: "Ticket not found", code: "NOT_FOUND" }, 404);
+    }
+
+    // Parse multipart body with 5 MB limit
+    let body: Record<string, unknown>;
+    try {
+      body = await c.req.parseBody({ all: true, maxSize: MAX_FILE_SIZE });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.toLowerCase().includes("body")) {
+        return c.json({ error: "File too large", code: "PAYLOAD_TOO_LARGE" }, 413);
+      }
+      return c.json({ error: "Failed to parse body", code: "BAD_REQUEST" }, 400);
+    }
+
+    const fileField = body["file"];
+
+    // F8: Return 400 if file field is missing or not a File instance
+    if (!fileField || !(fileField instanceof File)) {
+      return c.json({ error: "file field is required and must be a file", code: "BAD_REQUEST" }, 400);
+    }
+
+    const file = fileField;
+
+    // F10: Return 413 if file exceeds size limit
+    if (file.size > MAX_FILE_SIZE) {
+      return c.json({ error: "File too large", code: "PAYLOAD_TOO_LARGE" }, 413);
+    }
+
+    // F4/F9: Validate file extension against whitelist (exclude .svg)
+    const ext = extname(file.name).toLowerCase();
+    if (!ALLOWED_IMAGE_EXTENSIONS.has(ext)) {
+      return c.json(
+        { error: `File extension '${ext}' is not allowed. Allowed: png, jpg, jpeg, gif, webp`, code: "BAD_REQUEST" },
+        400
+      );
+    }
+
+    // F11: Sanitize filename to prevent path traversal
+    // Strip directory components and dangerous characters
+    const baseName = file.name.split("/").pop()!.split("\\").pop()!;
+    const sanitized = baseName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const timestamp = Date.now();
+    const storedFilename = `${timestamp}-${sanitized}`;
+
+    // Build storage path: ~/Documents/ai-usage/attachments/<ticket-id>/<timestamp>-<filename>
+    const sandboxRoot = join(homedir(), "Documents/ai-usage");
+    const attachmentDir = join(sandboxRoot, "attachments", id);
+    const storedPath = join(attachmentDir, storedFilename);
+    const relativeDocRefPath = `attachments/${id}/${storedFilename}`;
+
+    // Defense-in-depth: validate the final path is inside sandbox
+    let validatedPath: string;
+    try {
+      validatedPath = validateSandboxPath(storedPath);
+    } catch {
+      return c.json({ error: "Invalid storage path", code: "BAD_REQUEST" }, 400);
+    }
+
+    // F5: Create directory if it doesn't exist
+    if (!existsSync(attachmentDir)) {
+      await mkdir(attachmentDir, { recursive: true });
+    }
+
+    // F5: Save file to storage
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      await writeFile(validatedPath, buffer);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Failed to save file: ${message}`, code: "UPLOAD_FAILED" }, 500);
+    }
+
+    // F6: Add doc_ref to ticket
+    const actor = "api";
+    try {
+      store.update(id, { add_doc_ref: { type: "attachment", path: relativeDocRefPath } }, actor);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return c.json({ error: `Failed to link attachment: ${message}`, code: "ATTACH_FAILED" }, 400);
+    }
+
+    // F7: Return JSON response with docRef on success 201
+    return c.json({ docRef: relativeDocRefPath }, 201);
   });
 
   // GET /api/projects — full project metadata + active ticket counts
