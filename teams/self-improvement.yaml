@@ -37,6 +37,17 @@ deploy_modes:
         inject-as: shared-skill
       - name: pa-cli
         inject-as: shared-skill
+  - id: compare
+    label: Provider Comparison
+    phone_visible: false
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
 
 context:
   organization: sinh-x
