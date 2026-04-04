@@ -9,6 +9,7 @@ import { inboxRoutes } from "./routes/inbox.js";
 import { foldersRoutes } from "./routes/folders.js";
 import { configRoutes } from "./routes/config.js";
 import { deploymentsRoutes } from "./routes/deployments.js";
+import { repoDeploymentsRoutes } from "./routes/repo-deployments.js";
 import { reposRoutes } from "./routes/repos.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { deployRoutes } from "./routes/deploy.js";
@@ -49,6 +50,11 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
     const pathParam = c.req.query("path");
     if (pathParam !== undefined && !isInsideSandbox(normalizeSandboxPath(pathParam))) {
       return c.json({ error: "Path traversal denied", code: "SANDBOX_VIOLATION" }, 403);
+    }
+    // Block path traversal attempts in the URL path (e.g., /api/repos/../etc)
+    const rawPath = c.req.path;
+    if (rawPath.includes("..")) {
+      return c.json({ error: "Invalid repo key", code: "BAD_REQUEST" }, 400);
     }
     await next();
   });
@@ -96,6 +102,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", configRoutes());
   app.route("/", deploymentsRoutes());
   app.route("/", reposRoutes());
+  app.route("/", repoDeploymentsRoutes());
   app.route("/", teamsRoutes());
   app.route("/", deployRoutes());
   app.route("/", deployRoutingRoutes());

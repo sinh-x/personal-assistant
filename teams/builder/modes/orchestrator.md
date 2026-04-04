@@ -67,7 +67,13 @@ Parse the `--objective` to identify the target work.
    - If a ticket has a `doc_refs` entry (type `requirements` or primary), read that plan document
    - If multiple matches, pick the highest priority or most recent
 
-**After finding a ticket (from step 2 or 3), check for requirements doc:**
+**After finding a ticket (from step 2 or 3), claim it:**
+
+   ```bash
+   pa ticket update <id> --status implementing --assignee builder/team-manager
+   ```
+
+**Then check for requirements doc:**
 
 4. **If ticket has `doc_refs` with type `requirements` or a primary doc** → read that plan document → go to Phase 3 (Plan Analysis)
 5. **If ticket has NO `doc_refs` (no requirements doc)** → **STOP. Do not proceed.** Follow the requirements doc gate:
@@ -327,9 +333,10 @@ pa ticket create \
 ## Ticket Tracking Protocol
 
 When working with builder tickets:
-1. The builder team manages its own ticket lifecycle (claim → implementing → review-uat)
-2. Orchestrator reads the ticket and plan doc but does NOT change ticket status — the builder handles status transitions
+1. Orchestrator claims the ticket on start: `pa ticket update <id> --status implementing --assignee builder/team-manager`
+2. Implement-mode agents do NOT change ticket status — they only build and report back
 3. Orchestrator tracks progress by reading the plan document's phase checklist
+4. On completion, orchestrator hands off to review: `pa ticket update <id> --status review-uat --assignee sinh`
 
 ## Failure Modes
 

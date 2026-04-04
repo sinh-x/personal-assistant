@@ -7,7 +7,7 @@ import { createApp } from "../lib/agent-api/index.js";
 import { isProcessAlive } from "../utils/process.js";
 
 const DEFAULT_PORT = 9848;
-const DEFAULT_HOST = "0.0.0.0";
+const DEFAULT_HOST = "127.0.0.1";
 const PID_FILE = resolve(homedir(), ".local/share/personal-assistant/pa-serve.pid");
 
 export interface ServeOptions {
@@ -18,21 +18,31 @@ export interface ServeOptions {
   force: boolean;
 }
 
-/** Read PID from PID file, or null if missing/invalid */
-function readPidFile(): number | null {
+/** Read PID and port from PID file, or null if missing/invalid */
+function readPidFile(): { pid: number; port: number } | null {
   if (!existsSync(PID_FILE)) return null;
   const content = readFileSync(PID_FILE, "utf8").trim();
-  const pid = parseInt(content, 10);
-  return Number.isNaN(pid) ? null : pid;
+  // Support both "PID:PORT" (new) and just "PID" (legacy)
+  if (content.includes(":")) {
+    const [pidStr, portStr] = content.split(":");
+    const pid = parseInt(pidStr, 10);
+    const port = parseInt(portStr, 10);
+    if (Number.isNaN(pid) || Number.isNaN(port)) return null;
+    return { pid, port };
+  } else {
+    // Legacy format: just PID
+    const pid = parseInt(content, 10);
+    return Number.isNaN(pid) ? null : { pid, port: DEFAULT_PORT };
+  }
 }
 
-/** Write current process PID to PID file */
-function writePidFile(pid: number): void {
+/** Write current process PID and port to PID file */
+function writePidFile(pid: number, port: number): void {
   const pidDir = dirname(PID_FILE);
   if (!existsSync(pidDir)) {
     mkdirSync(pidDir, { recursive: true });
   }
-  writeFileSync(PID_FILE, String(pid), "utf8");
+  writeFileSync(PID_FILE, `${pid}:${port}`, "utf8");
 }
 
 /** Remove PID file if it exists */
@@ -59,6 +69,26 @@ function isPortInUse(port: number, host: string): Promise<boolean> {
       server.close(() => resolve(false));
     });
     server.listen(port, host);
+  });
+}
+
+/** Wait for a port to become free, with timeout */
+function waitForPortFree(port: number, host: string, timeoutMs = 5000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = async () => {
+      const busy = await isPortInUse(port, host);
+      if (!busy) {
+        resolve(true);
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        resolve(false);
+        return;
+      }
+      setTimeout(check, 200);
+    };
+    check();
   });
 }
 
@@ -97,23 +127,23 @@ export async function serveCommand(opts: ServeOptions): Promise<void> {
   const { port, host, cors: enableCors } = opts;
 
   // Pre-start check: PID file and port conflict
-  const existingPid = readPidFile();
+  const existingPidInfo = readPidFile();
 
-  if (existingPid !== null) {
-    if (isProcessAlive(existingPid)) {
+  if (existingPidInfo !== null) {
+    if (isProcessAlive(existingPidInfo.pid)) {
       // Existing pa serve is running
       if (opts.force) {
-        console.log(`[pa serve] Killing existing instance (PID ${existingPid})...`);
-        await killProcess(existingPid);
+        console.log(`[pa serve] Killing existing instance (PID ${existingPidInfo.pid})...`);
+        await killProcess(existingPidInfo.pid);
         removePidFile();
         console.log(`[pa serve] Existing instance stopped.`);
       } else {
-        console.error(`Port ${port} already in use (PID ${existingPid}). Use \`pa serve stop\` or \`pa serve --force\`.`);
+        console.error(`Port ${existingPidInfo.port} already in use (PID ${existingPidInfo.pid}). Use \`pa serve stop\` or \`pa serve --force\`.`);
         process.exit(1);
       }
     } else {
       // Stale PID file
-      console.log(`[pa serve] Stale PID file found (PID ${existingPid} is dead). Cleaning up.`);
+      console.log(`[pa serve] Stale PID file found (PID ${existingPidInfo.pid} is dead). Cleaning up.`);
       removePidFile();
     }
   } else {
@@ -131,7 +161,7 @@ export async function serveCommand(opts: ServeOptions): Promise<void> {
   }
 
   // Write PID file (always, both foreground and background)
-  writePidFile(process.pid);
+  writePidFile(process.pid, port);
   if (opts.background) {
     console.log(`[pa serve] Background mode — PID ${process.pid} written to ${PID_FILE}`);
   }
@@ -140,8 +170,14 @@ export async function serveCommand(opts: ServeOptions): Promise<void> {
   const cleanupPid = () => {
     removePidFile();
   };
-  process.once("SIGTERM", cleanupPid);
-  process.once("SIGINT", cleanupPid);
+  process.once("SIGTERM", () => {
+    cleanupPid();
+    process.exit(0);
+  });
+  process.once("SIGINT", () => {
+    cleanupPid();
+    process.exit(0);
+  });
   process.once("exit", cleanupPid);
 
   const { app, injectWebSocket } = createApp({ enableCors });
@@ -164,40 +200,54 @@ export async function serveCommand(opts: ServeOptions): Promise<void> {
 
 /** Stop a running pa serve instance */
 export async function serveStopCommand(): Promise<void> {
-  const pid = readPidFile();
-  if (pid === null) {
+  const pidInfo = readPidFile();
+  if (pidInfo === null) {
     console.log("No PID file found. Server may not be running.");
     return;
   }
 
-  if (!isProcessAlive(pid)) {
-    console.log(`PID ${pid} is not running. Cleaning up stale PID file.`);
+  if (!isProcessAlive(pidInfo.pid)) {
+    console.log(`PID ${pidInfo.pid} is not running. Cleaning up stale PID file.`);
     removePidFile();
     return;
   }
 
-  console.log(`Stopping pa serve (PID ${pid})...`);
-  await killProcess(pid);
+  console.log(`Stopping pa serve (PID ${pidInfo.pid})...`);
+  await killProcess(pidInfo.pid);
   removePidFile();
   console.log("Server stopped.");
 }
 
 /** Show status of pa serve */
 export function serveStatusCommand(): void {
-  const pid = readPidFile();
-  if (pid === null) {
+  const pidInfo = readPidFile();
+  if (pidInfo === null) {
     console.log("Status: stopped (no PID file)");
     return;
   }
 
-  if (isProcessAlive(pid)) {
+  if (isProcessAlive(pidInfo.pid)) {
     console.log(`Status: running`);
-    console.log(`PID:    ${pid}`);
-    console.log(`Port:   ${DEFAULT_PORT}`);
+    console.log(`PID:    ${pidInfo.pid}`);
+    console.log(`Port:   ${pidInfo.port}`);
   } else {
-    console.log(`Status: stopped (stale PID ${pid})`);
+    console.log(`Status: stopped (stale PID ${pidInfo.pid})`);
     removePidFile();
   }
+}
+
+/** Stop existing instance and restart, waiting for port to be free */
+export async function serveRestartCommand(opts: Omit<ServeOptions, "force">): Promise<void> {
+  await serveStopCommand();
+
+  // Wait for port to be released after stopping
+  const portFree = await waitForPortFree(opts.port, opts.host);
+  if (!portFree) {
+    console.error(`Port ${opts.port} still in use after stop. Check with: ss -tlnp | grep ${opts.port}`);
+    process.exit(1);
+  }
+
+  await serveCommand({ ...opts, force: false });
 }
 
 export { DEFAULT_PORT, DEFAULT_HOST };

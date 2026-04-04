@@ -11,7 +11,7 @@ import { reportCommand } from "./commands/report.js";
 import { requirementsCommand } from "./commands/requirements.js";
 import { reposCommand } from "./commands/repos.js";
 import { resolveProject, resolveProjectFromCwd, listRepos } from "./lib/repos.js";
-import { serveCommand, serveStopCommand, serveStatusCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
+import { serveCommand, serveStopCommand, serveRestartCommand, serveStatusCommand, DEFAULT_PORT, DEFAULT_HOST } from "./commands/serve.js";
 import { createTicketCommand } from "./commands/ticket.js";
 import { createBulletinCommand } from "./commands/bulletin.js";
 import { createRegistryCommand } from "./commands/registry.js";
@@ -246,13 +246,11 @@ serveCmd
   .option("--background", "Run in background mode (writes PID file)")
   .option("--cors", "Enable CORS headers")
   .action(async (opts: { port: string; host: string; background?: boolean; cors?: boolean }) => {
-    await serveStopCommand();
-    await serveCommand({
+    await serveRestartCommand({
       port: parseInt(opts.port, 10),
       host: opts.host,
       background: opts.background ?? false,
       cors: opts.cors ?? false,
-      force: false,
     });
   });
 

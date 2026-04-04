@@ -9,8 +9,8 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
-import { listRepos } from "../../repos.js";
+import { execFileSync } from "node:child_process";
+import { listRepos, loadRepoEntry } from "../../repos.js";
 
 interface BranchInfo {
   name: string;
@@ -46,7 +46,7 @@ interface GitInfoErrors {
 /** Run a git command safely, returning trimmed output or empty string on failure */
 function gitRun(args: string[], cwd: string): string {
   try {
-    return execSync(`git ${args.join(" ")}`, { cwd, encoding: "utf-8", timeout: 5000 }).trim();
+    return execFileSync("git", args, { cwd, encoding: "utf-8", timeout: 5000 }).toString().trim();
   } catch {
     return "";
   }
@@ -102,8 +102,10 @@ function getBranchInfo(branchName: string, cwd: string): BranchInfo {
 
 /** Get ahead/behind count between two branches */
 function getAheadBehind(base: string, compare: string, cwd: string): { main_ahead: number; develop_ahead: number; diverged: boolean } {
-  const mainAhead = Number(gitRun(["rev-list", "--count", `${base}..${compare}`], cwd) || "0");
-  const developAhead = Number(gitRun(["rev-list", "--count", `${compare}..${base}`], cwd) || "0");
+  // main_ahead = commits in base NOT in compare
+  // develop_ahead = commits in compare NOT in base
+  const mainAhead = Number(gitRun(["rev-list", "--count", `${compare}..${base}`], cwd) || "0");
+  const developAhead = Number(gitRun(["rev-list", "--count", `${base}..${compare}`], cwd) || "0");
   return {
     main_ahead: mainAhead,
     develop_ahead: developAhead,
@@ -127,6 +129,19 @@ function getUnmergedBranches(developBranch: string, cwd: string): FeatureBranch[
   for (const name of branchNames) {
     // Skip main and develop branches
     if (name === "main" || name === "develop" || name === "master") continue;
+
+    // F5: Filter out squash-merged branches
+    // git cherry returns patches that are different between two branches
+    // If output is empty or all lines start with "-", branch was squash-merged
+    const cherryOutput = gitRun(["cherry", developBranch, name], cwd);
+    if (cherryOutput) {
+      const cherryLines = cherryOutput.split("\n").filter((l) => l.trim());
+      const allMinus = cherryLines.length > 0 && cherryLines.every((l) => l.startsWith("-"));
+      if (allMinus) {
+        // Branch was squash-merged, skip it
+        continue;
+      }
+    }
 
     // Use newline-separated format to avoid JSON parsing issues
     const logOutput = gitRun([
@@ -171,14 +186,6 @@ function getWorkingDirStatus(cwd: string): WorkingDirectory {
     clean: lines.length === 0,
     uncommitted_count: lines.length,
   };
-}
-
-/** Load repo entry without exiting on error (for API use) */
-function loadRepoEntry(key: string): { name: string; path: string; description?: string; prefix?: string } | null {
-  const repos = listRepos();
-  const repo = repos.find((r) => r.name === key);
-  if (!repo) return null;
-  return { name: repo.name, path: repo.path, description: repo.description, prefix: repo.prefix };
 }
 
 export function reposRoutes(): Hono {
@@ -253,8 +260,23 @@ export function reposRoutes(): Hono {
     if (!key) {
       return c.json({ error: "Repo key is required", code: "BAD_REQUEST" }, 400);
     }
+
+    // F7: Validate key with same regex as repo-deployments.ts
+    if (!/^[a-zA-Z0-9-]+$/.test(key)) {
+      return c.json({ error: "Invalid repo key", code: "BAD_REQUEST" }, 400);
+    }
+
     const mainBranch = c.req.query("main") || "main";
     const developBranch = c.req.query("develop") || "develop";
+
+    // F2: Validate branch name params - only allow alphanumeric, dots, underscores, hyphens, and forward slashes
+    const branchNameRegex = /^[a-zA-Z0-9._\-\/]+$/;
+    if (!branchNameRegex.test(mainBranch)) {
+      return c.json({ error: `Invalid main branch name: ${mainBranch}`, code: "BAD_REQUEST" }, 400);
+    }
+    if (!branchNameRegex.test(developBranch)) {
+      return c.json({ error: `Invalid develop branch name: ${developBranch}`, code: "BAD_REQUEST" }, 400);
+    }
 
     // Load repo entry
     const repoEntry = loadRepoEntry(key);
