@@ -21,6 +21,7 @@ import type {
   CreateTicketInput,
   UpdateTicketInput,
   AddDocRefInput,
+  AliasRecord,
 } from "./types.js";
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
 import { resolveProject } from "../repos.js";
@@ -296,11 +297,19 @@ export class TicketStore {
 
   /**
    * Get a ticket by ID. Returns undefined if not found.
+   * Follows alias redirects transparently.
    */
   get(id: string): Ticket | undefined {
     const path = this.ticketPath(id);
     if (!existsSync(path)) return undefined;
-    return this.normalizeTicket(JSON.parse(readFileSync(path, "utf-8")));
+    const raw = JSON.parse(readFileSync(path, "utf-8"));
+
+    // Check if this is an alias file — follow the redirect
+    if (raw._alias === true && typeof raw.movedTo === "string") {
+      return this.get(raw.movedTo);
+    }
+
+    return this.normalizeTicket(raw);
   }
 
   /**
@@ -674,7 +683,10 @@ export class TicketStore {
     const tickets = files
       .map((f) => {
         try {
-          return this.normalizeTicket(JSON.parse(readFileSync(resolve(this.dir, f), "utf-8")));
+          const raw = JSON.parse(readFileSync(resolve(this.dir, f), "utf-8"));
+          // Skip alias files — they are not real tickets
+          if (raw._alias === true) return null;
+          return this.normalizeTicket(raw);
         } catch {
           return null;
         }
@@ -729,5 +741,133 @@ export class TicketStore {
       .filter(([, count]) => count > 0)
       .map(([key, count]) => ({ key, count }))
       .sort((a, b) => a.key.localeCompare(b.key));
+  }
+
+  // ── Move operation ─────────────────────────────────────────────────────────
+
+  /**
+   * Update blockedBy references in all tickets that reference the old ID.
+   * Replaces oldId with newId in blockedBy arrays atomatically under flock.
+   */
+  private updateBlockedByReferences(oldId: string, newId: string): void {
+    const tickets = this.list();
+    for (const ticket of tickets) {
+      if (!ticket.blockedBy.includes(oldId)) continue;
+
+      const ticketPath = this.ticketPath(ticket.id);
+      const lockPath = this.lockPath;
+
+      const script = [
+        "const fs = require('fs');",
+        `const tp = ${JSON.stringify(ticketPath)};`,
+        `const oldId = ${JSON.stringify(oldId)};`,
+        `const newId = ${JSON.stringify(newId)};`,
+        "const ticket = JSON.parse(fs.readFileSync(tp, 'utf8'));",
+        "ticket.blockedBy = ticket.blockedBy.map(id => id === oldId ? newId : id);",
+        "fs.writeFileSync(tp, JSON.stringify(ticket, null, 2));",
+      ].join("\n");
+
+      const tmpFile = resolve(tmpdir(), `pa-blockedby-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+      writeFileSync(tmpFile, script);
+
+      try {
+        execSync(
+          `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+        );
+      } finally {
+        try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+      }
+    }
+  }
+
+  /**
+   * Move a ticket from one project to another.
+   *
+   * Operation ordering (crash safety):
+   * 1. Allocate new ID (counter.json updated atomically under flock)
+   * 2. Write new ticket file (NEW-ID.json)
+   * 3. Add auto-comment on new ticket
+   * 4. Replace old file with alias
+   * 5. Append audit entries
+   * 6. Update blockedBy references
+   *
+   * @throws Error if ticket not found, target project is same as current, or ticket is in terminal status
+   */
+  move(id: string, targetProject: string, actor: string): Ticket {
+    // Step 0: Get the source ticket
+    const sourceTicket = this.get(id);
+    if (!sourceTicket) throw new Error(`Ticket not found: ${id}`);
+
+    // F11: Prevent moving to the same project
+    if (sourceTicket.project === targetProject) {
+      throw new Error(`Ticket is already in project ${targetProject}`);
+    }
+
+    // F12: Warn about terminal status tickets
+    if (TERMINAL_STATUSES.includes(sourceTicket.status)) {
+      process.stderr.write(`Warning: Moving a ticket in terminal status '${sourceTicket.status}'\n`);
+    }
+
+    // Step 1: Resolve target project and allocate new ID
+    const resolved = resolveProject(targetProject);
+    const { key: canonicalKey, prefix } = resolved;
+    const newId = this.allocateId(prefix);
+    const now = new Date().toISOString();
+    const oldId = sourceTicket.id;
+    const oldProject = sourceTicket.project;
+
+    // Step 2: Build new ticket with new id + project, preserving all other fields
+    const movedTicket: Ticket = {
+      ...sourceTicket,
+      id: newId,
+      project: canonicalKey,
+      updatedAt: now,
+    };
+
+    // Step 3: Write new ticket file
+    writeFileSync(this.ticketPath(newId), JSON.stringify(movedTicket, null, 2));
+
+    // Step 4: Add auto-comment on new ticket (F9)
+    const { comment: _autoComment } = this.addComment(
+      newId,
+      actor,
+      `Moved from ${oldId} (project: ${oldProject})`
+    );
+
+    // Step 5: Replace old file with alias (F5)
+    const alias: AliasRecord = {
+      _alias: true,
+      movedTo: newId,
+      movedAt: now,
+      movedBy: actor,
+    };
+    writeFileSync(this.ticketPath(oldId), JSON.stringify(alias, null, 2));
+
+    // Step 6: Append audit entries (F7) — for both old and new IDs
+    this.appendAudit({
+      ticket_id: newId,
+      action: "moved",
+      actor,
+      timestamp: now,
+      changes: {
+        id: [oldId, newId],
+        project: [oldProject, canonicalKey],
+      },
+    });
+    this.appendAudit({
+      ticket_id: oldId,
+      action: "moved",
+      actor,
+      timestamp: now,
+      changes: {
+        id: [oldId, newId],
+        project: [oldProject, canonicalKey],
+      },
+    });
+
+    // Step 7: Update blockedBy references (F8)
+    this.updateBlockedByReferences(oldId, newId);
+
+    return this.get(newId)!;
   }
 }

@@ -70,11 +70,19 @@ export interface DocRef {
 /** One entry in the JSONL audit log — records every mutation */
 export interface AuditEntry {
   ticket_id: string;
-  action: "created" | "updated" | "commented" | "attached" | "comment_edited" | "comment_deleted" | "doc_ref_added" | "doc_ref_removed" | "doc_ref_updated";
+  action: "created" | "updated" | "commented" | "attached" | "comment_edited" | "comment_deleted" | "doc_ref_added" | "doc_ref_removed" | "doc_ref_updated" | "moved";
   actor: string;
   timestamp: string;
   /** Map of field name → [old_value, new_value] */
   changes: Record<string, [unknown, unknown]>;
+}
+
+/** Alias file — replaces a ticket file when it is moved to another project */
+export interface AliasRecord {
+  _alias: true;
+  movedTo: string;
+  movedAt: string;
+  movedBy: string;
 }
 
 /** Core ticket model — stored as flat JSON files in ~/Documents/ai-usage/tickets/ */
