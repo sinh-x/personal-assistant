@@ -16,6 +16,22 @@ import type { RegistryEvent, DeploymentStatus } from "../../types.js";
 const AI_USAGE = join(homedir(), "Documents", "ai-usage");
 const DEPLOYMENTS_DIR = join(AI_USAGE, "deployments");
 
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+export function isValidDateString(dateStr: string): boolean {
+  if (!DATE_REGEX.test(dateStr)) return false;
+  const date = new Date(dateStr);
+  return !isNaN(date.getTime());
+}
+
+export function getTodayDateString(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function parseRegistry(): RegistryEvent[] {
   const path = getRegistryPath();
   if (!existsSync(path)) return [];
@@ -84,9 +100,48 @@ export function deploymentsRoutes(): Hono {
 
   // GET /api/deployments — list all deployments, latest status per deployment
   app.get("/api/deployments", (c: Context) => {
+    const sinceParam = c.req.query("since");
+    const limitParam = c.req.query("limit");
+    const allParam = c.req.query("all");
+
+    // Validate since param if provided
+    if (sinceParam && !isValidDateString(sinceParam)) {
+      return c.json({ error: "Invalid 'since' parameter. Expected YYYY-MM-DD format.", code: "BAD_REQUEST" }, 400);
+    }
+
+    // Determine date filter
+    let since: string | undefined;
+    if (allParam === "true") {
+      since = undefined; // bypass date filtering
+    } else if (sinceParam) {
+      since = sinceParam;
+    } else {
+      since = getTodayDateString();
+    }
+
+    // Parse limit (default 50, max 200)
+    const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
+
     const events = parseRegistry();
-    const deployments = computeDeploymentStatuses(events);
-    return c.json({ deployments });
+    let deployments = computeDeploymentStatuses(events);
+
+    // Apply date filter if since is set
+    if (since) {
+      deployments = deployments.filter((d) => d.started_at >= since);
+    }
+
+    const total = deployments.length;
+    const limited = deployments.slice(0, limit);
+
+    return c.json({
+      deployments: limited,
+      total,
+      filter: {
+        since,
+        limit,
+        status: "all",
+      },
+    });
   });
 
   // GET /api/deployments/:id — single deployment detail (metadata + activity)
