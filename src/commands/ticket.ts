@@ -1,5 +1,7 @@
 import { Command } from "commander";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { getTicketsDir } from "../lib/paths.js";
 import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import { formatTicketCard } from "../lib/tickets/display.js";
@@ -362,11 +364,31 @@ export function createTicketCommand(): Command {
     .option("--json", "Output raw JSON instead of formatted card")
     .action((id: string, opts: { json?: boolean }) => {
       const store = new TicketStore();
+
+      // Detect if this ID is an alias before calling get() (which follows aliases transparently)
+      const rawPath = resolve(getTicketsDir(), `${id}.json`);
+      let aliasInfo: { movedTo: string; movedAt: string; movedBy: string } | null = null;
+      if (existsSync(rawPath)) {
+        try {
+          const raw = JSON.parse(readFileSync(rawPath, "utf-8"));
+          if (raw._alias === true && typeof raw.movedTo === "string") {
+            aliasInfo = { movedTo: raw.movedTo, movedAt: raw.movedAt, movedBy: raw.movedBy };
+          }
+        } catch { /* ignore parse errors */ }
+      }
+
       const ticket = store.get(id);
       if (!ticket) {
         console.error(`Ticket not found: ${id}`);
         process.exit(1);
       }
+
+      // Print alias redirect notice before the ticket content
+      if (aliasInfo) {
+        const date = aliasInfo.movedAt ? aliasInfo.movedAt.split("T")[0] : "unknown";
+        console.log(`\n  ⚠ This ticket was moved from ${id} on ${date}\n`);
+      }
+
       if (opts.json) {
         console.log(JSON.stringify(ticket, null, 2));
         console.log("\n── Document References ──────────────────────────────────────────────");
@@ -415,6 +437,25 @@ export function createTicketCommand(): Command {
         process.stderr.write(
           `Hint: This comment references an artifact path. Attach it? pa ticket update ${ticket.id} --doc-ref ${match[0]}\n`
         );
+      }
+    });
+
+  // ── move ───────────────────────────────────────────────────────────────────
+
+  cmd
+    .command("move")
+    .description("Move a ticket to another project")
+    .argument("<id>", "Ticket ID (e.g. PA-001)")
+    .requiredOption("--project <name>", "Target project name (key from repos.yaml)")
+    .option("--actor <name>", "Actor for audit log", "cli-user")
+    .action((id: string, opts: { project: string; actor: string }) => {
+      const store = new TicketStore();
+      try {
+        const newTicket = store.move(id, opts.project, opts.actor);
+        console.log(`Moved: ${id} → ${newTicket.id}`);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
+        process.exit(1);
       }
     });
 
