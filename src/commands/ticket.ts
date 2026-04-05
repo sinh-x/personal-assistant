@@ -11,6 +11,7 @@ import type {
   TicketStatus,
   TicketPriority,
   TicketType,
+  SubTicketStatus,
   UpdateTicketInput,
   AddDocRefInput,
   DocRef,
@@ -495,6 +496,176 @@ export function createTicketCommand(): Command {
           const date = o.addedAt ? o.addedAt.split("T")[0] : "unknown";
           console.log(`  ${o.ticketId.padEnd(10)} ${o.type.padEnd(19)} ${o.path} (added ${date})`);
         }
+        process.exit(1);
+      }
+    });
+
+  // ── subticket ──────────────────────────────────────────────────────────────
+
+  const subticketCmd = cmd
+    .command("subticket")
+    .description("Manage sub-tickets embedded in parent tickets");
+
+  const SUB_STATUSES: SubTicketStatus[] = ["open", "in-progress", "done"];
+
+  // ── subticket create ───────────────────────────────────────────────────────
+
+  subticketCmd
+    .command("create")
+    .description("Create a sub-ticket on a parent ticket")
+    .argument("<parent-id>", "Parent ticket ID (e.g. PA-001)")
+    .requiredOption("--title <title>", "Sub-ticket title")
+    .option("--summary <text>", "Sub-ticket summary", "")
+    .option("--assignee <name>", "Assignee", "")
+    .option("--priority <priority>", "Priority (critical|high|medium|low)", "medium")
+    .option("--estimate <size>", "Effort estimate (XS|S|M|L|XL)", "S")
+    .option("--actor <name>", "Actor for audit log", "cli-user")
+    .action(
+      (
+        parentId: string,
+        opts: {
+          title: string;
+          summary: string;
+          assignee: string;
+          priority: string;
+          estimate: string;
+          actor: string;
+        }
+      ) => {
+        const priority = validatePriority(opts.priority);
+        const estimate = validateEstimate(opts.estimate);
+
+        const store = new TicketStore();
+        try {
+          const { subTicket } = store.addSubTicket(
+            parentId,
+            {
+              title: opts.title,
+              summary: opts.summary,
+              assignee: opts.assignee,
+              priority,
+              estimate,
+            },
+            opts.actor
+          );
+          console.log(`Created sub-ticket: ${subTicket.id}`);
+          console.log(JSON.stringify(subTicket, null, 2));
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+    );
+
+  // ── subticket update ───────────────────────────────────────────────────────
+
+  subticketCmd
+    .command("update")
+    .description("Update fields on a sub-ticket")
+    .argument("<parent-id>", "Parent ticket ID (e.g. PA-001)")
+    .argument("<subticket-id>", "Sub-ticket ID (e.g. PA-001-ST-1)")
+    .option("--status <status>", "New status (open|in-progress|done)")
+    .option("--assignee <name>", "New assignee")
+    .option("--title <title>", "New title")
+    .option("--summary <text>", "New summary")
+    .option("--priority <priority>", "New priority (critical|high|medium|low)")
+    .option("--estimate <size>", "New estimate (XS|S|M|L|XL)")
+    .option("--actor <name>", "Actor for audit log", "cli-user")
+    .action(
+      (
+        parentId: string,
+        subticketId: string,
+        opts: {
+          status?: string;
+          assignee?: string;
+          title?: string;
+          summary?: string;
+          priority?: string;
+          estimate?: string;
+          actor: string;
+        }
+      ) => {
+        const input: Record<string, unknown> = {};
+        if (opts.status !== undefined) {
+          if (!SUB_STATUSES.includes(opts.status as SubTicketStatus)) {
+            console.error(`Error: Invalid sub-ticket status "${opts.status}". Must be one of: ${SUB_STATUSES.join("|")}`);
+            process.exit(1);
+          }
+          input.status = opts.status;
+        }
+        if (opts.assignee !== undefined) input.assignee = opts.assignee;
+        if (opts.title !== undefined) input.title = opts.title;
+        if (opts.summary !== undefined) input.summary = opts.summary;
+        if (opts.priority !== undefined) input.priority = validatePriority(opts.priority);
+        if (opts.estimate !== undefined) input.estimate = validateEstimate(opts.estimate);
+
+        const store = new TicketStore();
+        try {
+          const { subTicket } = store.updateSubTicket(parentId, subticketId, input, opts.actor);
+          console.log(`Updated: ${subTicket.id}`);
+          console.log(JSON.stringify(subTicket, null, 2));
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+    );
+
+  // ── subticket complete ─────────────────────────────────────────────────────
+
+  subticketCmd
+    .command("complete")
+    .description("Mark a sub-ticket as done (shortcut for update --status done)")
+    .argument("<parent-id>", "Parent ticket ID (e.g. PA-001)")
+    .argument("<subticket-id>", "Sub-ticket ID (e.g. PA-001-ST-1)")
+    .option("--actor <name>", "Actor for audit log", "cli-user")
+    .action(
+      (parentId: string, subticketId: string, opts: { actor: string }) => {
+        const store = new TicketStore();
+        try {
+          const { subTicket } = store.updateSubTicket(
+            parentId,
+            subticketId,
+            { status: "done" },
+            opts.actor
+          );
+          console.log(`Completed: ${subTicket.id}`);
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+    );
+
+  // ── subticket list ─────────────────────────────────────────────────────────
+
+  subticketCmd
+    .command("list")
+    .description("List sub-tickets for a parent ticket")
+    .argument("<parent-id>", "Parent ticket ID (e.g. PA-001)")
+    .action((parentId: string) => {
+      const store = new TicketStore();
+      try {
+        const subTickets = store.listSubTickets(parentId);
+        if (subTickets.length === 0) {
+          console.log(`No sub-tickets on ${parentId}.`);
+          return;
+        }
+        console.log("ID".padEnd(18) + "STATUS".padEnd(14) + "PRIORITY".padEnd(11) + "EST".padEnd(6) + "ASSIGNEE".padEnd(20) + "TITLE");
+        console.log("-".repeat(80));
+        for (const st of subTickets) {
+          console.log(
+            st.id.padEnd(18) +
+            st.status.padEnd(14) +
+            st.priority.padEnd(11) +
+            st.estimate.padEnd(6) +
+            (st.assignee || "—").padEnd(20) +
+            st.title
+          );
+        }
+        console.log(`\n${subTickets.length} sub-ticket(s)`);
+      } catch (err) {
+        console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
     });
