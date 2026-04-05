@@ -78,6 +78,27 @@ deploy_modes:
         inject-as: shared-skill
       - name: pa-self-improvement
         inject-as: shared-skill
+  - id: routine
+    label: Routine
+    phone_visible: true
+    mode_type: work
+    model: opus
+    provider: minimax
+    agents: []  # solo, no sub-agents
+    objective: teams/builder/modes/routine.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+      - name: pa-registry
+        inject-as: shared-skill
 
 context:
   organization: sinh-x
