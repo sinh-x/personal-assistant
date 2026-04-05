@@ -33,9 +33,20 @@ pa ticket show <TICKET-ID> --json | jq -r '.tags[], .blockedBy[]'
 ```
 
 **CASE H — Ticket has `blocked` tag or non-empty `blockedBy`:**
-- SKIP entirely. Do NOT evaluate merge state.
-- Category: BLOCKED (list in anomaly report with blocking ticket IDs)
-- No comment needed — blocked tickets are tracked via blocking protocol.
+- Do NOT close. Check for existing sub-ticket:
+  ```bash
+  pa ticket subticket list <TICKET-ID>
+  ```
+- If open sub-ticket titled "BLOCKED: ..." exists: SKIP (record in SKIPPED)
+- Otherwise create sub-ticket:
+  ```bash
+  pa ticket subticket create <TICKET-ID> \
+    --title "BLOCKED: Waiting on dependencies" \
+    --summary "Ticket has blocked tag or blockedBy: <blocking-ids>. Action: check blocking ticket status, unblock if resolved." \
+    --assignee sinh --priority low --estimate XS \
+    --actor builder/team-manager
+  ```
+- Category: BLOCKED (sub-ticket created or skipped)
 
 #### PR Search
 
@@ -60,32 +71,68 @@ gh pr list --repo sinh-x/personal-assistant --state all --search "<TICKET-ID>" -
 - Category: CLOSED
 
 **CASE B — PR found, state=OPEN, mergeable=MERGEABLE, checks=PASS:**
-- Do NOT close. Add comment:
+- Do NOT close. Check for existing sub-ticket:
   ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> is open, mergeable, CI checks passing. Ready for manual merge review."
+  pa ticket subticket list <TICKET-ID>
   ```
-- Category: READY-TO-MERGE (anomaly report)
+- If open sub-ticket titled "READY-TO-MERGE: ..." exists: SKIP (record in SKIPPED)
+- Otherwise create sub-ticket:
+  ```bash
+  pa ticket subticket create <TICKET-ID> \
+    --title "READY-TO-MERGE: PR #<number> awaiting merge" \
+    --summary "PR #<number> is open, mergeable, CI checks passing. Action: review and merge. PR URL: <url>" \
+    --assignee sinh --priority medium --estimate XS \
+    --actor builder/team-manager
+  ```
+- Category: READY-TO-MERGE (sub-ticket created or skipped)
 
 **CASE C — PR found, state=OPEN, mergeable=CONFLICTING:**
-- Do NOT close. Add comment:
+- Do NOT close. Check for existing sub-ticket:
   ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> has merge conflicts. Requires conflict resolution before merge."
+  pa ticket subticket list <TICKET-ID>
   ```
-- Category: CONFLICT (anomaly report)
+- If open sub-ticket titled "CONFLICT: ..." exists: SKIP (record in SKIPPED)
+- Otherwise create sub-ticket:
+  ```bash
+  pa ticket subticket create <TICKET-ID> \
+    --title "CONFLICT: PR #<number> has merge conflicts" \
+    --summary "PR #<number> targeting develop has merge conflicts. Action: resolve conflicts and push, or close PR and create new one. PR URL: <url>" \
+    --assignee sinh --priority high --estimate XS \
+    --actor builder/team-manager
+  ```
+- Category: CONFLICT (sub-ticket created or skipped)
 
 **CASE D — PR found, state=OPEN, checks=FAILING:**
-- Do NOT close. Add comment:
+- Do NOT close. Check for existing sub-ticket:
   ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> has failing CI checks. Fix required before merge."
+  pa ticket subticket list <TICKET-ID>
   ```
-- Category: CI-FAILURE (anomaly report)
+- If open sub-ticket titled "CI-FAILURE: ..." exists: SKIP (record in SKIPPED)
+- Otherwise create sub-ticket:
+  ```bash
+  pa ticket subticket create <TICKET-ID> \
+    --title "CI-FAILURE: PR #<number> checks failing" \
+    --summary "PR #<number> has failing CI checks: <check-names>. Action: review failures, fix code, push update. PR URL: <url>" \
+    --assignee sinh --priority high --estimate XS \
+    --actor builder/team-manager
+  ```
+- Category: CI-FAILURE (sub-ticket created or skipped)
 
 **CASE E — PR found, state=CLOSED (not merged):**
-- Do NOT close. Add comment:
+- Do NOT close. Check for existing sub-ticket:
   ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> was closed without merging on <date>. May need new PR or reopening."
+  pa ticket subticket list <TICKET-ID>
   ```
-- Category: ABANDONED (anomaly report)
+- If open sub-ticket titled "ABANDONED: ..." exists: SKIP (record in SKIPPED)
+- Otherwise create sub-ticket:
+  ```bash
+  pa ticket subticket create <TICKET-ID> \
+    --title "ABANDONED: PR #<number> closed without merge" \
+    --summary "PR #<number> was closed without merging on <date>. Action: reopen PR, create new PR, or cancel parent ticket. PR URL: <url>" \
+    --assignee sinh --priority medium --estimate XS \
+    --actor builder/team-manager
+  ```
+- Category: ABANDONED (sub-ticket created or skipped)
 
 **CASE F — No PR found, but commits exist on develop:**
 - Fall back to git log search:
@@ -101,18 +148,37 @@ gh pr list --repo sinh-x/personal-assistant --state all --search "<TICKET-ID>" -
 - **If no commits found:** → Case G
 
 **CASE G — No PR found AND no matching commits:**
-- Do NOT close. Add comment:
+- Do NOT close. Check for existing sub-ticket:
   ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "No PR or commits found for <TICKET-ID>. Ticket may be orphaned or work done under different ID."
+  pa ticket subticket list <TICKET-ID>
   ```
-- Category: ORPHAN (anomaly report)
+- If open sub-ticket titled "ORPHAN: ..." exists: SKIP (record in SKIPPED)
+- Otherwise create sub-ticket:
+  ```bash
+  pa ticket subticket create <TICKET-ID> \
+    --title "ORPHAN: No PR or commits found" \
+    --summary "No PR or commits found matching <TICKET-ID>. Action: verify work was done, check for alternate branch/commit naming, or reassign for implementation." \
+    --assignee sinh --priority medium --estimate XS \
+    --actor builder/team-manager
+  ```
+- Category: ORPHAN (sub-ticket created or skipped)
 
 **CASE I — Multiple PRs found for same ticket:**
-- Check if ANY PR is merged. If yes → close with note about all PRs. If none merged → report all PRs:
-  ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Multiple PRs found: #<N1> (<state1>), #<N2> (<state2>). <action taken>."
-  ```
-- Category: CLOSED if any merged, MULTI-PR (anomaly report) if none merged
+- Check if ANY PR is merged. If yes → Case A (close with note). If none merged:
+  - Check for existing sub-ticket:
+    ```bash
+    pa ticket subticket list <TICKET-ID>
+    ```
+  - If open sub-ticket titled "MULTI-PR: ..." exists: SKIP (record in SKIPPED)
+  - Otherwise create sub-ticket:
+    ```bash
+    pa ticket subticket create <TICKET-ID> \
+      --title "MULTI-PR: Multiple open PRs" \
+      --summary "Multiple PRs found: #<N1> (<state1>), #<N2> (<state2>). Action: determine canonical PR, close duplicates. URLs: <urls>" \
+      --assignee sinh --priority medium --estimate XS \
+      --actor builder/team-manager
+    ```
+- Category: CLOSED if any merged, MULTI-PR (sub-ticket created or skipped) if none merged
 
 #### Error Handling
 
@@ -154,14 +220,22 @@ After processing all tickets, produce a structured summary as a ticket comment o
 | PA-XXXX | commits (direct push) | Via git log |
 
 ---
-### ANOMALIES: N tickets
-**BLOCKED: N** (ticket IDs + blocking deps)
-**READY-TO-MERGE: N** (list with PR refs)
-**CONFLICT: N** (list with PR refs)
-**CI-FAILURE: N** (list with PR refs + failing check names)
-**ABANDONED: N** (list with PR refs)
-**ORPHAN: N** (list ticket IDs)
-**MULTI-PR: N** (list with all PR refs)
+### SUB-TICKETS CREATED: N
+| Parent | Anomaly | Sub-Ticket ID | Action |
+|--------|---------|---------------|--------|
+| PA-XXXX | READY-TO-MERGE | PA-XXXX-ST-1 | Review and merge PR #N |
+| PA-XXXX | CONFLICT | PA-XXXX-ST-1 | Resolve merge conflicts |
+| PA-XXXX | CI-FAILURE | PA-XXXX-ST-1 | Fix failing CI checks |
+| PA-XXXX | ABANDONED | PA-XXXX-ST-1 | Reopen or cancel |
+| PA-XXXX | ORPHAN | PA-XXXX-ST-1 | Verify work status |
+| PA-XXXX | BLOCKED | PA-XXXX-ST-1 | Check blocking deps |
+| PA-XXXX | MULTI-PR | PA-XXXX-ST-1 | Determine canonical PR |
+
+### SKIPPED (existing sub-tickets): N
+| Parent | Anomaly | Existing Sub-Ticket | Status |
+|--------|---------|---------------------|--------|
+| PA-XXXX | CONFLICT | PA-XXXX-ST-2 | open |
+| PA-XXXX | ORPHAN | PA-XXXX-ST-1 | open |
 
 ---
 ### ERRORS: N tickets
@@ -210,9 +284,9 @@ pa registry complete $PA_DEPLOYMENT_ID \
 - **No destructive git operations.** Read-only git access — only ticket status changes are made.
 - **Per-ticket error isolation.** One ticket's failure must not block others. Log errors and continue.
 - **Graceful degradation.** If `gh` CLI fails, fall back to git-log-only and note DEGRADED mode.
-- **Skip blocked tickets.** If a ticket has `blocked` tag or `blockedBy` field, skip it entirely (Case H).
-- **Never close anomaly tickets.** Tickets with CONFLICT, CI-FAILURE, ABANDONED, ORPHAN, or MULTI-PR status are NOT closed — only commented.
-- **One comment per closed/anomaly ticket.** Each ticket gets exactly one completion or status comment.
+- **Dedup before sub-ticket.** Always check `pa ticket subticket list` before creating a new sub-ticket. Skip if matching open sub-ticket exists.
+- **Never close anomaly tickets.** Tickets with CONFLICT, CI-FAILURE, ABANDONED, ORPHAN, MULTI-PR, or BLOCKED status are NOT closed — create sub-tickets instead.
+- **One sub-ticket per anomaly type.** Each ticket gets at most one open sub-ticket per anomaly type (dedup prevents duplicates).
 - **Graceful handling of empty results.** If no `review-uat` tickets are found, produce an FYI noting "0 tickets processed, none pending".
 - **20-ticket cap.** Process by priority (critical > high > medium > low). Note TRUNCATED if over 20.
 - **Copyable pattern.** Other teams can copy this objective file and adapt for their own use.
