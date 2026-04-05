@@ -73,6 +73,40 @@ Create `daily/YYYY-MM-DD-extract.md` with:
 - Duplicate items found (with existing IMP IDs and updated recurrence)
 - Items auto-elevated to P1
 
+### Step 5.5 — Provider Summary (Lightweight)
+
+After writing the daily extract, correlate scanned sessions with provider information:
+
+1. **Extract deployment IDs** from session headers — read each scanned session file and extract the `Deployment:` field from the header (format: `> Deployment: d-XXXXX`)
+
+2. **Correlate with registry** — for each deployment ID, look up the corresponding `started` event in `registry.jsonl` to get the primer path
+
+3. **Determine provider** — read the primer file and extract the model from the `models:` section:
+   - If model is `opus`, `sonnet`, or `haiku` → provider = **Anthropic**
+   - If model is `mini` or contains `minimax` → provider = **MiniMax**
+
+4. **Count tool calls** — for each deployment ID, read `~/Documents/ai-usage/deployments/<deploy-id>/activity.jsonl` and count `tool_call` events
+
+5. **Compute metrics per provider:**
+   - Total sessions by provider
+   - Total tool calls by provider
+   - Average tool calls per session = total tool calls / total sessions
+
+6. **Append to daily extract** — read the daily extract file and append:
+
+```markdown
+## Provider Summary
+
+| Provider | Sessions | Total Tool Calls | Avg Tool Calls/Session |
+|----------|----------|------------------|------------------------|
+| Anthropic | N | M | X.X |
+| MiniMax | N | M | X.X |
+
+_Sessions scanned: YYYY-MM-DD, N deployments total_
+```
+
+If a deployment has no `activity.jsonl`, skip it and note in the summary as "(N sessions missing activity data)".
+
 ### Step 6 — Update Last Scanned
 
 Update the `Last Scanned` timestamp at the bottom of `improvement-backlog.md` with today's date.

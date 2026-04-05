@@ -53,6 +53,27 @@ export function scheduleCommand(
     execCmd = `${paCmd} requirements ${requirementsMode}`;
     unitName = `pa-requirements-${requirementsMode}`;
     description = `personal-assistant requirements ${requirementsMode}`;
+  } else if (spec.includes(":")) {
+    // team:mode syntax (e.g., self-improvement:daily-extract)
+    const [teamName, mode] = spec.split(":");
+    if (!teamName || !mode) {
+      console.error(`Error: Invalid team:mode syntax '${spec}'. Expected <team>:<mode>.`);
+      process.exit(1);
+    }
+    // Verify team exists
+    let teamFile = "";
+    if (config.configDir && existsSync(resolve(config.configDir, "teams", `${teamName}.yaml`))) {
+      teamFile = resolve(config.configDir, "teams", `${teamName}.yaml`);
+    } else if (existsSync(resolve(paHome, "teams", `${teamName}.yaml`))) {
+      teamFile = resolve(paHome, "teams", `${teamName}.yaml`);
+    }
+    if (!teamFile) {
+      console.error(`Error: Team not found: ${teamName}`);
+      process.exit(1);
+    }
+    execCmd = `${paCmd} deploy ${teamName} --mode ${mode} --background`;
+    unitName = `pa-${teamName}-${mode}`;
+    description = `personal-assistant ${teamName}:${mode}`;
   } else {
     const teamName = spec;
     // Verify team exists
@@ -76,7 +97,21 @@ export function scheduleCommand(
   let timeDisplay = "";
 
   for (const t of times) {
+    // Validate time format: must contain colon and have both hour and min
+    if (!t.includes(":")) {
+      console.error(`Error: Invalid time format '${t}'. Expected HH:MM.`);
+      process.exit(1);
+    }
     const [hour, min] = t.split(":");
+    if (!hour || !min) {
+      console.error(`Error: Invalid time format '${t}'. Expected HH:MM.`);
+      process.exit(1);
+    }
+    // Validate numeric values
+    if (isNaN(parseInt(hour, 10)) || isNaN(parseInt(min, 10))) {
+      console.error(`Error: Invalid time format '${t}'. Hour and minute must be numeric.`);
+      process.exit(1);
+    }
     let cal: string;
     switch (repeat) {
       case "hourly":
