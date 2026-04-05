@@ -146,7 +146,7 @@ function showAllTeams(all = false): void {
           excludeStatuses: TERMINAL_STATUSES,
         });
     for (const s of summaries) {
-      ticketMap.set(s.team, s.counts as Record<string, number>);
+      ticketMap.set(s.assignee, s.counts as Record<string, number>);
     }
   } catch {
     /* ticket system may not be initialized yet */

@@ -32,7 +32,7 @@ export interface BoardView {
 
 /** Per-assignee ticket counts broken down by status */
 export interface TeamStatusSummary {
-  team: string;
+  assignee: string;
   counts: Record<TicketStatus, number>;
   total: number;
 }
@@ -114,21 +114,21 @@ export function getTeamStatusSummaries(
     ? allTickets.filter((t) => !filters.excludeStatuses!.includes(t.status))
     : allTickets;
 
-  const byTeam = new Map<string, Record<TicketStatus, number>>();
+  const byAssignee = new Map<string, Record<TicketStatus, number>>();
 
   for (const ticket of tickets) {
     const assigneeKey = ticket.assignee || "unassigned";
-    if (!byTeam.has(assigneeKey)) {
+    if (!byAssignee.has(assigneeKey)) {
       const zeroCounts: Record<TicketStatus, number> = {} as Record<TicketStatus, number>;
       for (const s of BOARD_COLUMNS) zeroCounts[s] = 0;
-      byTeam.set(assigneeKey, zeroCounts);
+      byAssignee.set(assigneeKey, zeroCounts);
     }
-    const counts = byTeam.get(assigneeKey)!;
+    const counts = byAssignee.get(assigneeKey)!;
     counts[ticket.status] = (counts[ticket.status] ?? 0) + 1;
   }
 
-  return Array.from(byTeam.entries()).map(([team, counts]) => ({
-    team,
+  return Array.from(byAssignee.entries()).map(([assignee, counts]) => ({
+    assignee,
     counts,
     total: Object.values(counts).reduce((sum, n) => sum + n, 0),
   }));
