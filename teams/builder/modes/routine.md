@@ -24,52 +24,156 @@ For each ticket, you will check if the associated work has been merged.
 
 ### Step 3 — Cross-Reference Each Ticket Against GitHub
 
-For each ticket found, search for a matching PR:
+For each ticket, first check if it has a `blocked` tag or `blockedBy` field, then search for a matching PR.
+
+#### Pre-Check: Blocked Tickets
 
 ```bash
-gh pr list --repo sinh-x/personal-assistant --state all --search "<TICKET-ID>" --json number,state,mergedAt,url
+pa ticket show <TICKET-ID> --json | jq -r '.tags[], .blockedBy[]'
+```
+
+**CASE H — Ticket has `blocked` tag or non-empty `blockedBy`:**
+- SKIP entirely. Do NOT evaluate merge state.
+- Category: BLOCKED (list in anomaly report with blocking ticket IDs)
+- No comment needed — blocked tickets are tracked via blocking protocol.
+
+#### PR Search
+
+For tickets that pass the blocked check, search for matching PRs:
+
+```bash
+gh pr list --repo sinh-x/personal-assistant --state all --search "<TICKET-ID>" --json number,state,headRefName,mergeable,statusCheckRollup,mergedAt,closedAt,url
 ```
 
 #### Decision Tree
 
-**CASE A — PR found with state MERGED:**
+**CASE A — PR found, state=MERGED:**
 - The ticket work is confirmed merged
 - Update ticket to `done`:
   ```bash
   pa ticket update <TICKET-ID> --status done
   ```
-- Add completion comment citing PR number and merge date:
+- Add completion comment:
   ```bash
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Closed: work confirmed merged via PR #<number> (<date>)."
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-closed: PR #<number> merged on <date>. Confirmed via gh."
   ```
-- Record in your working notes: ticket closed, PR reference captured
+- Category: CLOSED
 
-**CASE F — No PR found:**
-- Fall back to git log search on `develop` branch:
+**CASE B — PR found, state=OPEN, mergeable=MERGEABLE, checks=PASS:**
+- Do NOT close. Add comment:
+  ```bash
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> is open, mergeable, CI checks passing. Ready for manual merge review."
+  ```
+- Category: READY-TO-MERGE (anomaly report)
+
+**CASE C — PR found, state=OPEN, mergeable=CONFLICTING:**
+- Do NOT close. Add comment:
+  ```bash
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> has merge conflicts. Requires conflict resolution before merge."
+  ```
+- Category: CONFLICT (anomaly report)
+
+**CASE D — PR found, state=OPEN, checks=FAILING:**
+- Do NOT close. Add comment:
+  ```bash
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> has failing CI checks. Fix required before merge."
+  ```
+- Category: CI-FAILURE (anomaly report)
+
+**CASE E — PR found, state=CLOSED (not merged):**
+- Do NOT close. Add comment:
+  ```bash
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "PR #<number> was closed without merging on <date>. May need new PR or reopening."
+  ```
+- Category: ABANDONED (anomaly report)
+
+**CASE F — No PR found, but commits exist on develop:**
+- Fall back to git log search:
   ```bash
   git log develop --oneline --grep="<TICKET-ID>" | head -5
   ```
 - **If commits found:** Direct-push commit (no PR). Close ticket:
   ```bash
   pa ticket update <TICKET-ID> --status done
-  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Closed: direct-push commit confirmed in git log (no PR)."
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-closed: Commits found on develop matching <TICKET-ID> (direct push, no PR). Commits: <list>."
   ```
-- **If no commits found:** Skip — do not close. The work may not be merged yet. Leave a note in your working record: ticket skipped, no merge evidence found.
+- Category: CLOSED
+- **If no commits found:** → Case G
 
-### Step 4 — Produce Summary FYI Ticket
+**CASE G — No PR found AND no matching commits:**
+- Do NOT close. Add comment:
+  ```bash
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "No PR or commits found for <TICKET-ID>. Ticket may be orphaned or work done under different ID."
+  ```
+- Category: ORPHAN (anomaly report)
 
-After processing all tickets, create an FYI ticket summarizing actions taken:
+**CASE I — Multiple PRs found for same ticket:**
+- Check if ANY PR is merged. If yes → close with note about all PRs. If none merged → report all PRs:
+  ```bash
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Multiple PRs found: #<N1> (<state1>), #<N2> (<state2>). <action taken>."
+  ```
+- Category: CLOSED if any merged, MULTI-PR (anomaly report) if none merged
 
-```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "FYI: Routine mode run — tickets closed/summary" \
-  --type fyi \
-  --assignee sinh \
-  --priority normal \
-  --estimate XS \
-  --summary "Routine mode processed N review-uat tickets. Closed: M. Skipped: K. See ticket comments for individual closures."
+#### Error Handling
+
+During ticket processing, handle errors gracefully so one failure does not block others:
+
+| Error Type | Action | Category |
+|------------|--------|----------|
+| `gh` CLI fails (auth/network) | Log error. Fall back to git-log-only detection. Note DEGRADED in summary header. | DEGRADED |
+| `pa ticket update` fails | Log error, continue to next ticket | ERROR (per-ticket) |
+| `pa ticket comment` fails | Log error, continue (non-critical) | — |
+| `git log` fails | Log error, skip git-based detection | ERROR |
+| Too many tickets (>20) | Process first 20 by priority. Note TRUNCATED in summary. | TRUNCATED |
+| Timeout approaching (>4 min) | Stop processing. Produce partial summary. | TIMEOUT |
+
+#### Per-Ticket Error Isolation
+
+Process tickets in batch. If one ticket fails:
+1. Log the error with ticket ID and error message
+2. Continue to next ticket
+3. Record in ERRORS section of summary
+4. Do NOT abort the entire run
+
+### Step 4 — Produce Structured Summary
+
+After processing all tickets, produce a structured summary as a ticket comment on the last processed ticket (or create an FYI ticket if no tickets were processed):
+
+**Summary Template:**
+
 ```
+## Routine Mode Summary — d-<deployment-id>
+
+**Mode:** routine | **Runtime:** <elapsed> | **Provider:** MiniMax
+
+---
+### CLOSED: N tickets
+| Ticket | PR/Commit | Note |
+|--------|-----------|------|
+| PA-XXXX | PR #N (merged <date>) | Via gh |
+| PA-XXXX | commits (direct push) | Via git log |
+
+---
+### ANOMALIES: N tickets
+**BLOCKED: N** (ticket IDs + blocking deps)
+**READY-TO-MERGE: N** (list with PR refs)
+**CONFLICT: N** (list with PR refs)
+**CI-FAILURE: N** (list with PR refs + failing check names)
+**ABANDONED: N** (list with PR refs)
+**ORPHAN: N** (list ticket IDs)
+**MULTI-PR: N** (list with all PR refs)
+
+---
+### ERRORS: N tickets
+| Ticket | Error |
+|--------|-------|
+| PA-XXXX | <error message> |
+
+---
+**NOTES:** [DEGRADED / TRUNCATED / TIMEOUT if applicable]
+```
+
+**If no tickets to process:** Post comment noting "0 tickets processed, none pending."
 
 ### Step 5 — Session Log and Registry Completion
 
@@ -104,10 +208,14 @@ pa registry complete $PA_DEPLOYMENT_ID \
 
 - **Solo operator.** Do not spawn sub-agents.
 - **No destructive git operations.** Read-only git access — only ticket status changes are made.
-- **Skip blocked tickets.** If a ticket has `blocked` tag, skip it (do not attempt to close).
-- **One comment per closed ticket.** Each closed ticket gets exactly one completion comment with PR/commit reference.
+- **Per-ticket error isolation.** One ticket's failure must not block others. Log errors and continue.
+- **Graceful degradation.** If `gh` CLI fails, fall back to git-log-only and note DEGRADED mode.
+- **Skip blocked tickets.** If a ticket has `blocked` tag or `blockedBy` field, skip it entirely (Case H).
+- **Never close anomaly tickets.** Tickets with CONFLICT, CI-FAILURE, ABANDONED, ORPHAN, or MULTI-PR status are NOT closed — only commented.
+- **One comment per closed/anomaly ticket.** Each ticket gets exactly one completion or status comment.
 - **Graceful handling of empty results.** If no `review-uat` tickets are found, produce an FYI noting "0 tickets processed, none pending".
-- **Copyable pattern.** Other teams can copy this objective file and adapt the `gh pr list --repo` and `git log` commands for their own use.
+- **20-ticket cap.** Process by priority (critical > high > medium > low). Note TRUNCATED if over 20.
+- **Copyable pattern.** Other teams can copy this objective file and adapt for their own use.
 
 ---
 
