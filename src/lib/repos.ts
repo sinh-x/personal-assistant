@@ -10,6 +10,8 @@ export interface RepoEntry {
   path: string;
   description?: string;
   prefix?: string;
+  developBranch?: string; // default: "develop", "none" to skip
+  mainBranch?: string;   // default: "main"
 }
 
 /** Expand ~ to home directory */
@@ -39,11 +41,13 @@ function loadReposYaml(): Record<string, RepoEntry> {
       const raw = yaml.load(content) as { repos?: Record<string, unknown> };
       const repos: Record<string, RepoEntry> = {};
       for (const [name, entry] of Object.entries(raw.repos ?? {})) {
-        const e = entry as { path: string; description?: string; prefix?: string };
+        const e = entry as { path: string; description?: string; prefix?: string; developBranch?: string; mainBranch?: string };
         repos[name] = {
           path: expandHome(e.path),
           description: e.description,
           prefix: e.prefix,
+          developBranch: e.developBranch,
+          mainBranch: e.mainBranch,
         };
       }
       return repos;
@@ -60,11 +64,11 @@ export function listRepos(): Array<{ name: string } & RepoEntry> {
 }
 
 /** Load repo entry without exiting on error (for API use) */
-export function loadRepoEntry(key: string): { name: string; path: string; description?: string; prefix?: string } | null {
+export function loadRepoEntry(key: string): { name: string; path: string; description?: string; prefix?: string; developBranch?: string; mainBranch?: string } | null {
   const repos = listRepos();
   const repo = repos.find((r) => r.name === key);
   if (!repo) return null;
-  return { name: repo.name, path: repo.path, description: repo.description, prefix: repo.prefix };
+  return { name: repo.name, path: repo.path, description: repo.description, prefix: repo.prefix, developBranch: repo.developBranch, mainBranch: repo.mainBranch };
 }
 
 /** Resolve a repo name to its entry (with expanded path). Exits on error. */

@@ -223,14 +223,20 @@ export function reposRoutes(): Hono {
           } else {
             currentBranch = getCurrentBranch(repo.path);
             isDirty = !getWorkingDirStatus(repo.path).clean;
-            const features = getUnmergedBranches("develop", repo.path);
+
+            // Resolve per-repo branch config
+            const mainBranch = repo.mainBranch || "main";
+            const developBranch = repo.developBranch === "none" ? null : (repo.developBranch || "develop");
+
+            // Get unmerged branches for the resolved develop branch
+            const features = developBranch ? getUnmergedBranches(developBranch, repo.path) : [];
             featureBranchCount = features.length;
 
-            // Calculate develop ahead of main
-            const mainExists = branchExists("main", repo.path);
-            const developExists = branchExists("develop", repo.path);
+            // Calculate develop ahead of main using per-repo config
+            const mainExists = branchExists(mainBranch, repo.path);
+            const developExists = !!developBranch && branchExists(developBranch, repo.path);
             if (mainExists && developExists) {
-              const aheadBehind = getAheadBehind("main", "develop", repo.path);
+              const aheadBehind = getAheadBehind(mainBranch, developBranch, repo.path);
               developAheadOfMain = aheadBehind.develop_ahead;
             }
           }
@@ -266,22 +272,28 @@ export function reposRoutes(): Hono {
       return c.json({ error: "Invalid repo key", code: "BAD_REQUEST" }, 400);
     }
 
-    const mainBranch = c.req.query("main") || "main";
-    const developBranch = c.req.query("develop") || "develop";
+    // Load repo entry first to get per-repo branch config
+    const repoEntry = loadRepoEntry(key);
+    if (!repoEntry) {
+      return c.json({ error: `Repo key not found: ${key}`, code: "NOT_FOUND" }, 404);
+    }
+
+    // Fallback chain: query param → repo config → hardcoded default
+    const configuredMainBranch = repoEntry.mainBranch || "main";
+    const configuredDevelopBranch = repoEntry.developBranch || "develop";
+    const mainBranch = c.req.query("main") || configuredMainBranch;
+    const developBranch = c.req.query("develop") || configuredDevelopBranch;
+
+    // Check if develop branch is "none" (skip develop checks)
+    const skipDevelopChecks = developBranch === "none";
 
     // F2: Validate branch name params - only allow alphanumeric, dots, underscores, hyphens, and forward slashes
     const branchNameRegex = /^[a-zA-Z0-9._\-\/]+$/;
     if (!branchNameRegex.test(mainBranch)) {
       return c.json({ error: `Invalid main branch name: ${mainBranch}`, code: "BAD_REQUEST" }, 400);
     }
-    if (!branchNameRegex.test(developBranch)) {
+    if (!skipDevelopChecks && !branchNameRegex.test(developBranch)) {
       return c.json({ error: `Invalid develop branch name: ${developBranch}`, code: "BAD_REQUEST" }, 400);
-    }
-
-    // Load repo entry
-    const repoEntry = loadRepoEntry(key);
-    if (!repoEntry) {
-      return c.json({ error: `Repo key not found: ${key}`, code: "NOT_FOUND" }, 404);
     }
 
     const { name, path, description, prefix } = repoEntry;
@@ -310,30 +322,36 @@ export function reposRoutes(): Hono {
       mainBranchInfo = getBranchInfo(mainBranch, path);
     }
 
-    // Get develop branch info
+    // Get develop branch info (skip if developBranch === "none")
     let developBranchInfo: BranchInfo;
-    if (!branchExists(developBranch, path)) {
+    if (skipDevelopChecks) {
+      developBranchInfo = { name: "none", exists: false };
+    } else if (!branchExists(developBranch, path)) {
       errors.develop = `Branch '${developBranch}' not found`;
       developBranchInfo = { name: developBranch, exists: false };
     } else {
       developBranchInfo = getBranchInfo(developBranch, path);
     }
 
-    // Get ahead/behind between main and develop
+    // Get ahead/behind between main and develop (skip if developBranch === "none")
     let mainVsDevelop: { main_ahead: number; develop_ahead: number; diverged: boolean };
-    if (mainBranchInfo.exists && developBranchInfo.exists) {
-      mainVsDevelop = getAheadBehind(mainBranch, developBranch, path);
-    } else {
+    if (skipDevelopChecks || !mainBranchInfo.exists || !developBranchInfo.exists) {
       mainVsDevelop = { main_ahead: 0, develop_ahead: 0, diverged: false };
+    } else {
+      mainVsDevelop = getAheadBehind(mainBranch, developBranch, path);
     }
 
-    // Get feature branches not merged to develop
+    // Get feature branches not merged to develop (skip if developBranch === "none")
     let featureBranches: FeatureBranch[];
-    try {
-      featureBranches = getUnmergedBranches(developBranch, path);
-    } catch (e) {
-      errors.featureBranches = e instanceof Error ? e.message : "Failed to get feature branches";
+    if (skipDevelopChecks) {
       featureBranches = [];
+    } else {
+      try {
+        featureBranches = getUnmergedBranches(developBranch, path);
+      } catch (e) {
+        errors.featureBranches = e instanceof Error ? e.message : "Failed to get feature branches";
+        featureBranches = [];
+      }
     }
 
     // Get working directory status
