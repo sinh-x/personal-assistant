@@ -24,6 +24,8 @@ import type {
   AliasRecord,
   SubTicket,
   SubTicketStatus,
+  TicketStatus,
+  TicketType,
   TicketPriority,
   Estimate,
 } from "./types.js";
@@ -74,19 +76,40 @@ export class TicketStore {
   }
 
   /**
-   * Normalize a raw ticket object from disk, ensuring required array fields
-   * are never undefined. Only adds defaults for missing fields — never overwrites.
+   * Normalize a raw ticket object from disk, ensuring all fields have safe defaults.
+   * Only adds defaults for missing/null fields — never overwrites existing values.
    */
   private normalizeTicket(raw: Record<string, unknown>): Ticket {
+    // Warn if id is missing (should always exist)
+    if (!raw.id) {
+      process.stderr.write(`Warning: Ticket missing 'id' field — please repair the ticket file\n`);
+    }
+
     return {
       ...raw,
+      // Scalar fields with defaults
+      id: raw.id as string ?? "(unknown)",
+      project: (raw.project as string) ?? "unknown",
+      title: (raw.title as string) ?? "(untitled)",
+      summary: (raw.summary as string) ?? "",
+      description: (raw.description as string) ?? "",
+      status: (raw.status as TicketStatus) ?? "idea",
+      priority: (raw.priority as TicketPriority) ?? "medium",
+      type: (raw.type as TicketType) ?? "task",
+      estimate: (raw.estimate as Estimate) ?? "M",
+      from: (raw.from as string) ?? "",
+      to: (raw.to as string) ?? "",
+      createdAt: (raw.createdAt as string) ?? new Date().toISOString(),
+      updatedAt: (raw.updatedAt as string) ?? new Date().toISOString(),
+      resolvedAt: raw.resolvedAt !== undefined ? (raw.resolvedAt as string | null) : null,
+      // Array fields with defaults
       tags: raw.tags ?? [],
       blockedBy: raw.blockedBy ?? [],
       comments: raw.comments ?? [],
       doc_refs: raw.doc_refs ?? [],
-      assignee: raw.assignee ?? "",
+      assignee: (raw.assignee as string) ?? "",
       subTickets: raw.subTickets ?? [],
-      nextSubTicketCounter: raw.nextSubTicketCounter ?? 0,
+      nextSubTicketCounter: (raw.nextSubTicketCounter as number) ?? 0,
     } as Ticket;
   }
 
