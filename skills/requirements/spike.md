@@ -58,6 +58,41 @@ Explore the resolved `repo_root` to understand how the topic relates to the exis
 
 ---
 
+### Phase S2b: Data Validation
+
+Validate any data files referenced in the ticket before proceeding to research.
+
+> **Security Note:** Agents are restricted from reading raw data files directly (claudeignore/sanitize blocks direct file access to prevent data leakage to model providers). Data clearance is **folder-dependent**:
+> - `~/Documents/ai-usage/` — cleared for agent access (safe to validate)
+> - Per-project folders (e.g., `~/git-repos/sinh-x/tools/personal-assistant`, `avodah`) — not cleared for raw data reads
+> 1. Check for **metadata/schema summary** provided by user or pre-existing documentation
+> 2. If no summary exists, **do not read raw data** — flag as a risk and defer to manual review or a separate data-access protocol
+> 3. Only perform data file validation when user has explicitly provided allowed data access via a defined protocol (future work)
+> 4. Flag per-project data files as requiring explicit user-provided summary — do not attempt direct validation
+
+**Trigger check:** Scan ticket title, summary, description, and doc_refs for data file references (`.xlsx`, `.csv`, `.json`, `.yaml`, `.tsv`, `.parquet`, `.db`, `.sqlite`).
+
+**Steps:**
+1. **Scan for data file references:** Search ticket title, summary, description, and doc_refs paths for data file patterns: `.xlsx`, `.csv`, `.json`, `.yaml`, `.tsv`, `.parquet`, `.db`, `.sqlite`
+2. **If no data files referenced:** Log `No data files referenced — skipping S2b` and proceed to Phase S3
+3. **If data files found:**
+   a. Check clearance: files in `~/Documents/ai-usage/` are cleared; files in per-project folders require user-provided schema summary
+   b. **If cleared (ai-usage folder) and metadata/schema summary available:** Validate schema/structure against summary. Log: `Data validation: N files validated against provided schema`
+   c. **If cleared but no summary available:** Attempt basic validation (file exists, readable, non-empty) — do NOT read raw contents. Log: `Data validation: N files cleared, basic check passed (no schema summary)`
+   d. **If not cleared (per-project folder) and no summary available:** Flag as risk for S4. Log: `Data validation: N files in per-project folder — no schema summary available, skipping per security policy`
+   e. Flag issues as risks for Phase S4 complexity assessment
+4. **Output:** Add a `Data Files Validated` section to the spike report documenting: files checked, validation status, any security restrictions encountered.
+
+**Boundaries:**
+- S2b is conditional — skip entirely when no data files are referenced (avoids overhead on code-only tickets)
+- Do NOT read raw data file contents — only validate against user-provided metadata/schema summaries
+- If raw data access is needed, flag as open question and defer to future data-access protocol
+- Anchor all paths to the repo root or absolute paths found in doc_refs
+
+**Output:** `Data Files Validated` section in spike report with: files checked, validation status per file, security notes, any issues found.
+
+---
+
 ### Phase S3: Web Research
 
 Search the web for external context to supplement codebase findings.

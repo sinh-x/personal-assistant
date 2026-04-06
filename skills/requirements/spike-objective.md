@@ -43,6 +43,24 @@ Follow each phase in order. Log gate status after each phase before proceeding.
 
 ---
 
+### Phase S2b: Data Validation
+**Goal:** Validate data files referenced in the ticket before research proceeds. Note: Agents cannot read raw data files directly due to security controls (claudeignore/sanitize). Validation uses user-provided metadata/schema summaries only.
+
+**Actions:**
+- [ ] Scan ticket title, summary, description, and doc_refs for data file references (`.xlsx`, `.csv`, `.json`, `.yaml`, `.tsv`, `.parquet`, `.db`, `.sqlite`)
+- [ ] If no data files found: log "No data files referenced — skipping S2b" and proceed to S3
+- [ ] If data files found: check if metadata/schema summary is available (user-provided or pre-existing)
+- [ ] If summary available: validate against schema/summary, log validation status
+- [ ] If no summary available: flag as risk per security policy, log "skipped — no schema summary available"
+- [ ] Flag issues as risks for S4 complexity assessment
+- [ ] Add "Data Files Validated" section to spike report with findings and security notes
+
+**Gate Criteria:** Do not proceed until: (1) data file scan complete, (2) all referenced files validated against summary or skipped per security policy, (3) findings documented in report.
+
+**Output Expectation:** `Data Files Validated` section in spike report with files checked, validation status, and security notes.
+
+---
+
 ### Phase S3: Web Research
 **Goal:** Search web for external context.
 
