@@ -370,6 +370,10 @@ interface ActivityEvent {
   data: Record<string, unknown>;
 }
 
+/** ANSI color codes */
+const RED = "\x1b[31m";
+const RESET = "\x1b[0m";
+
 /** Format a single activity event line for timeline display */
 function formatActivityLine(evt: ActivityEvent): string {
   // Extract HH:MM:SS from ISO timestamp (handles both Z and +HH:MM offsets)
@@ -408,6 +412,44 @@ function formatActivityLine(evt: ActivityEvent): string {
       const summary = typeof evt.data.summary === "string" ? evt.data.summary.slice(0, 80) : "";
       detail = tool;
       if (summary) detail += ` — ${summary}`;
+      break;
+    }
+    case "tool_success": {
+      const tool = typeof evt.data.tool === "string" ? evt.data.tool : "";
+      const summary = typeof evt.data.summary === "string" ? evt.data.summary.slice(0, 80) : "";
+      detail = tool;
+      if (summary) detail += ` — ${summary}`;
+      break;
+    }
+    case "tool_failure": {
+      const tool = typeof evt.data.tool === "string" ? evt.data.tool : "";
+      const error = typeof evt.data.error === "string" ? evt.data.error.slice(0, 80) : "";
+      detail = `${RED}${tool} — ${error}${RESET}`;
+      break;
+    }
+    case "session_stop": {
+      const stopReason = typeof evt.data.stop_reason === "string" ? evt.data.stop_reason : "";
+      detail = stopReason;
+      break;
+    }
+    case "session_stop_failure": {
+      const errorType = typeof evt.data.error_type === "string" ? evt.data.error_type : "";
+      const errorMsg = typeof evt.data.error_message === "string" ? evt.data.error_message.slice(0, 80) : "";
+      detail = `${RED}${errorType}: ${errorMsg}${RESET}`;
+      break;
+    }
+    case "context_compacting": {
+      detail = "compacting...";
+      break;
+    }
+    case "context_compacted": {
+      detail = "compacted";
+      break;
+    }
+    case "permission_denied": {
+      const tool = typeof evt.data.tool === "string" ? evt.data.tool : "";
+      const reason = typeof evt.data.reason === "string" ? evt.data.reason.slice(0, 80) : "";
+      detail = `${RED}${tool} — ${reason}${RESET}`;
       break;
     }
     case "child_deployment": {
