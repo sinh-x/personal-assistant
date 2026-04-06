@@ -3,6 +3,8 @@ export type {
   TicketPriority,
   TicketType,
   Estimate,
+  SubTicketStatus,
+  SubTicket,
   Comment,
   AuditEntry,
   DocRef,

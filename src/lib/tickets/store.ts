@@ -22,6 +22,10 @@ import type {
   UpdateTicketInput,
   AddDocRefInput,
   AliasRecord,
+  SubTicket,
+  SubTicketStatus,
+  TicketPriority,
+  Estimate,
 } from "./types.js";
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
 import { resolveProject } from "../repos.js";
@@ -81,6 +85,8 @@ export class TicketStore {
       comments: raw.comments ?? [],
       doc_refs: raw.doc_refs ?? [],
       assignee: raw.assignee ?? "",
+      subTickets: raw.subTickets ?? [],
+      nextSubTicketCounter: raw.nextSubTicketCounter ?? 0,
     } as Ticket;
   }
 
@@ -265,6 +271,8 @@ export class TicketStore {
       ...input,
       project: canonicalKey,
       id,
+      subTickets: [],
+      nextSubTicketCounter: 0,
       createdAt: now,
       updatedAt: now,
       resolvedAt: input.resolvedAt ?? null,
@@ -325,6 +333,19 @@ export class TicketStore {
       throw new Error(
         `Invalid status '${input.status}'. Valid statuses: ${ALL_VALID_STATUSES.join(", ")}`
       );
+    }
+
+    // Step 1b: Block done status if open sub-tickets exist
+    if (input.status === "done" && (ticket.subTickets ?? []).length > 0) {
+      const openSubs = (ticket.subTickets ?? []).filter(
+        (st) => st.status !== "done"
+      );
+      if (openSubs.length > 0) {
+        const ids = openSubs.map((st) => `${st.id} (${st.status})`).join(", ");
+        throw new Error(
+          `Cannot mark ${id} as done — ${openSubs.length} sub-ticket(s) still open: ${ids}. Complete all sub-tickets first.`
+        );
+      }
     }
 
     // Step 0: Warn when advancing pipeline stage without setting assignee
@@ -658,6 +679,157 @@ export class TicketStore {
    */
   attach(id: string, attachment: string, actor: string): Ticket {
     return this.update(id, { add_doc_ref: { type: "attachment", path: attachment } }, actor);
+  }
+
+  // ── Sub-ticket operations ────────────────────────────────────────────────
+
+  /**
+   * Add a sub-ticket to a parent ticket atomically (flock-protected).
+   * Auto-generates the sub-ticket ID from the parent's counter.
+   */
+  addSubTicket(
+    parentId: string,
+    input: { title: string; summary: string; assignee: string; priority: TicketPriority; estimate: Estimate },
+    actor: string
+  ): { ticket: Ticket; subTicket: SubTicket } {
+    const ticket = this.get(parentId);
+    if (!ticket) throw new Error(`Ticket not found: ${parentId}`);
+
+    const now = new Date().toISOString();
+    const counter = (ticket.nextSubTicketCounter ?? 0) + 1;
+    const subTicketId = `${parentId}-ST-${counter}`;
+
+    const subTicket: SubTicket = {
+      id: subTicketId,
+      title: input.title,
+      summary: input.summary,
+      status: "open",
+      assignee: input.assignee,
+      priority: input.priority,
+      estimate: input.estimate,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const ticketPath = this.ticketPath(parentId);
+    const lockPath = this.lockPath;
+
+    const script = [
+      "const fs = require('fs');",
+      `const tp = ${JSON.stringify(ticketPath)};`,
+      `const subTicket = ${JSON.stringify(subTicket)};`,
+      `const counter = ${JSON.stringify(counter)};`,
+      `const now = ${JSON.stringify(now)};`,
+      "const ticket = JSON.parse(fs.readFileSync(tp, 'utf8'));",
+      "if (!ticket.subTickets) ticket.subTickets = [];",
+      "ticket.subTickets.push(subTicket);",
+      "ticket.nextSubTicketCounter = counter;",
+      "ticket.updatedAt = now;",
+      "fs.writeFileSync(tp, JSON.stringify(ticket, null, 2));",
+      "process.stdout.write(JSON.stringify(ticket));",
+    ].join("\n");
+
+    const tmpFile = resolve(tmpdir(), `pa-subticket-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+    writeFileSync(tmpFile, script);
+
+    let updatedTicket: Ticket;
+    try {
+      const result = execSync(
+        `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+      ).toString();
+      updatedTicket = JSON.parse(result) as Ticket;
+    } finally {
+      try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+    }
+
+    this.appendAudit({
+      ticket_id: parentId,
+      action: "updated",
+      actor,
+      timestamp: now,
+      changes: { subTickets: [null, subTicket] },
+    });
+
+    return { ticket: this.normalizeTicket(updatedTicket as unknown as Record<string, unknown>), subTicket };
+  }
+
+  /**
+   * Update fields on an existing sub-ticket atomically (flock-protected).
+   */
+  updateSubTicket(
+    parentId: string,
+    subTicketId: string,
+    input: { status?: SubTicketStatus; assignee?: string; title?: string; summary?: string; priority?: TicketPriority; estimate?: Estimate },
+    actor: string
+  ): { ticket: Ticket; subTicket: SubTicket } {
+    const ticket = this.get(parentId);
+    if (!ticket) throw new Error(`Ticket not found: ${parentId}`);
+
+    const subIdx = (ticket.subTickets ?? []).findIndex((st) => st.id === subTicketId);
+    if (subIdx === -1) throw new Error(`Sub-ticket not found: ${subTicketId} on ${parentId}`);
+
+    const now = new Date().toISOString();
+    const oldSub = ticket.subTickets[subIdx];
+
+    const ticketPath = this.ticketPath(parentId);
+    const lockPath = this.lockPath;
+
+    const script = [
+      "const fs = require('fs');",
+      `const tp = ${JSON.stringify(ticketPath)};`,
+      `const subTicketId = ${JSON.stringify(subTicketId)};`,
+      `const updates = ${JSON.stringify(input)};`,
+      `const now = ${JSON.stringify(now)};`,
+      "const ticket = JSON.parse(fs.readFileSync(tp, 'utf8'));",
+      "const idx = (ticket.subTickets || []).findIndex(st => st.id === subTicketId);",
+      "if (idx === -1) { process.stderr.write('Sub-ticket not found\\n'); process.exit(2); }",
+      "Object.assign(ticket.subTickets[idx], updates, { updatedAt: now });",
+      "ticket.updatedAt = now;",
+      "fs.writeFileSync(tp, JSON.stringify(ticket, null, 2));",
+      "process.stdout.write(JSON.stringify({ ticket, subTicket: ticket.subTickets[idx] }));",
+    ].join("\n");
+
+    const tmpFile = resolve(tmpdir(), `pa-subticket-upd-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`);
+    writeFileSync(tmpFile, script);
+
+    let result: { ticket: Ticket; subTicket: SubTicket };
+    try {
+      const raw = execSync(
+        `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+      ).toString();
+      result = JSON.parse(raw) as { ticket: Ticket; subTicket: SubTicket };
+    } finally {
+      try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+    }
+
+    const changes: Record<string, [unknown, unknown]> = {};
+    for (const [key, val] of Object.entries(input)) {
+      if (val !== undefined) {
+        changes[`subTicket.${key}`] = [oldSub[key as keyof SubTicket], val];
+      }
+    }
+
+    this.appendAudit({
+      ticket_id: parentId,
+      action: "updated",
+      actor,
+      timestamp: now,
+      changes: { subTicketId: [subTicketId, subTicketId], ...changes },
+    });
+
+    return {
+      ticket: this.normalizeTicket(result.ticket as unknown as Record<string, unknown>),
+      subTicket: result.subTicket,
+    };
+  }
+
+  /**
+   * List sub-tickets for a parent ticket.
+   */
+  listSubTickets(parentId: string): SubTicket[] {
+    const ticket = this.get(parentId);
+    if (!ticket) throw new Error(`Ticket not found: ${parentId}`);
+    return ticket.subTickets ?? [];
   }
 
   // ── Listing & filtering ───────────────────────────────────────────────────

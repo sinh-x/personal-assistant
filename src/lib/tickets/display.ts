@@ -1,6 +1,6 @@
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
-import type { Ticket, Comment, DocRef } from "./types.js";
+import type { Ticket, Comment, DocRef, SubTicket } from "./types.js";
 
 // Configure marked with terminal renderer
 const terminalRenderer = markedTerminal({
@@ -91,9 +91,42 @@ function formatMetadata(ticket: Ticket): string {
 }
 
 /**
+ * Format sub-tickets section for display in ticket card.
+ * Returns empty string if no sub-tickets exist.
+ */
+function formatSubTicketsSection(subTickets: SubTicket[]): string {
+  if (!subTickets || subTickets.length === 0) return "";
+  const statusBadge = (s: string) => {
+    switch (s) {
+      case "done": return "[done]";
+      case "in-progress": return "[in-progress]";
+      default: return "[open]";
+    }
+  };
+  const header = "  ID".padEnd(20) + "STATUS".padEnd(16) + "PRI".padEnd(10) + "EST".padEnd(6) + "ASSIGNEE".padEnd(18) + "TITLE";
+  const sep = "  " + "-".repeat(78);
+  const rows = subTickets.map((st) =>
+    "  " +
+    st.id.padEnd(18) +
+    statusBadge(st.status).padEnd(16) +
+    st.priority.padEnd(10) +
+    st.estimate.padEnd(6) +
+    (st.assignee || "—").padEnd(18) +
+    st.title
+  );
+  return [
+    `  ── Sub-Tickets (${subTickets.length}) ──────────────────────────────────────`,
+    "",
+    header,
+    sep,
+    ...rows,
+  ].join("\n");
+}
+
+/**
  * Format a Ticket object as a human-readable terminal card view.
  *
- * Renders: header bar, title, summary, description, doc_refs, comments, metadata.
+ * Renders: header bar, title, summary, description, doc_refs, sub-tickets, comments, metadata.
  * Uses `marked` + `marked-terminal` for markdown rendering with ANSI formatting.
  * Gracefully handles malformed markdown by falling back to plain text.
  */
@@ -144,6 +177,9 @@ export function formatTicketCard(ticket: Ticket): string {
     "",
     formatDocRefsTable(ticket.doc_refs),
     "",
+    ...((ticket.subTickets ?? []).length > 0
+      ? [formatSubTicketsSection(ticket.subTickets ?? []), ""]
+      : []),
     `  ── Comments (${ticket.comments.length}) ────────────────────────────────────────`,
     "",
     commentsSection,
