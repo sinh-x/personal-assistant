@@ -101,15 +101,15 @@ function formatDocRefsTable(docRefs: DocRef[]): string {
   return [header, sep, ...rows].join("\n");
 }
 
-/** Format a ticket row for the list view */
+/** Format a ticket row for the list view — defensive null checks for all fields */
 function formatRow(id: string, status: string, priority: string, estimate: string, assignee: string, title: string): string {
   return (
-    id.padEnd(9) +
-    status.padEnd(25) +
-    priority.padEnd(11) +
-    estimate.padEnd(6) +
+    (id ?? "").padEnd(9) +
+    (status ?? "").padEnd(25) +
+    (priority ?? "").padEnd(11) +
+    (estimate ?? "").padEnd(6) +
     (assignee ?? "").padEnd(28) +
-    title
+    (title ?? "")
   );
 }
 

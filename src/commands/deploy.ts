@@ -612,42 +612,70 @@ export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
       writeFileSync(envFile, envContent, { mode: 0o600 });
     }
 
-    // Build background script
+    // Pre-write crash JSON files before bgScriptContent evaluation (avoids inline JSON construction in shell)
+    const crashTimeoutJson = resolve(deployDir, "crash-timeout.json");
+    const crashErrorJson = resolve(deployDir, "crash-error.json");
+    writeFileSync(crashTimeoutJson, JSON.stringify({
+      deployment_id: deployId,
+      team: teamName,
+      event: "crashed",
+      timestamp: new Date().toISOString(),
+      exit_code: 124,
+      summary: `Timed out after ${maxRuntime}s`,
+    }));
+    writeFileSync(crashErrorJson, JSON.stringify({
+      deployment_id: deployId,
+      team: teamName,
+      event: "crashed",
+      timestamp: new Date().toISOString(),
+      exit_code: 0,
+    }));
+
+    // Build background script — uses env vars exclusively (no inline interpolation)
+    // so that objectives with quotes/metacharacters cannot break the shell command.
     const sourceEnv = provider === "minimax"
       ? `source '${envFile}' && rm -f '${envFile}'\n`
       : "";
-    const bgScript = `
-unset CLAUDECODE
-${sourceEnv}export PA_DEPLOYMENT_ID='${deployId}'
-export PA_DEPLOYMENT_DIR='${deployDir}'
-export PA_ACTIVITY_LOG='${activityLog}'
-echo "[$(date -Iseconds)] claude starting..." >> '${logFile}'
-stdbuf -oL timeout '${maxRuntime}' claude ${modelFlag ? modelFlag + " " : ""}--dangerously-skip-permissions --print '${claudePrompt.replace(/'/g, "'\\''")}' >> '${logFile}' 2>'${logFile}.err'
+    const bgScriptContent =
+      sourceEnv +
+      `unset CLAUDECODE
+echo "[$(date -Iseconds)] claude starting..." >> "$PA_LOG_FILE"
+stdbuf -oL timeout "$PA_MAX_RUNTIME" claude ${modelFlag ? modelFlag + " " : ""}--dangerously-skip-permissions --print "$PA_CLAUDE_PROMPT" >> "$PA_LOG_FILE" 2>"$PA_LOG_FILE.err"
 exit_code=$?
-echo '' >> '${logFile}'
-echo "[$(date -Iseconds)] claude exited with code $exit_code" >> '${logFile}'
-if [[ -s '${logFile}.err' ]]; then
-  echo '' >> '${logFile}'
-  echo '=== STDERR ===' >> '${logFile}'
-  cat '${logFile}.err' >> '${logFile}'
+echo "" >> "$PA_LOG_FILE"
+echo "[$(date -Iseconds)] claude exited with code $exit_code" >> "$PA_LOG_FILE"
+if [[ -s "$PA_LOG_FILE.err" ]]; then
+  echo "" >> "$PA_LOG_FILE"
+  echo "=== STDERR ===" >> "$PA_LOG_FILE"
+  cat "$PA_LOG_FILE.err" >> "$PA_LOG_FILE"
 fi
-rm -f '${logFile}.err'
+rm -f "$PA_LOG_FILE.err"
 if [[ $exit_code -eq 124 ]]; then
-  echo "[$(date -Iseconds)] TIMED OUT after ${maxRuntime}s" >> '${logFile}'
-  crash_ts=$(date -Iseconds)
-  crash_json='{"deployment_id":"${deployId}","team":"${teamName}","event":"crashed","timestamp":"'"$crash_ts"'","exit_code":124,"summary":"Timed out after ${maxRuntime}s"}'
-  { flock -w 5 9; printf '%s\n' "$crash_json" >> '${registryFile}'; } 9>'${registryLock}'
+  echo "[$(date -Iseconds)] TIMED OUT after $PA_MAX_RUNTIME s" >> "$PA_LOG_FILE"
+  { flock -w 5 9; cat '${crashTimeoutJson}' >> "$PA_REGISTRY_FILE"; } 9>"$PA_REGISTRY_LOCK"
 elif [[ $exit_code -ne 0 ]]; then
-  crash_ts=$(date -Iseconds)
-  crash_json='{"deployment_id":"${deployId}","team":"${teamName}","event":"crashed","timestamp":"'"$crash_ts"'","exit_code":'"$exit_code"'}'
-  { flock -w 5 9; printf '%s\n' "$crash_json" >> '${registryFile}'; } 9>'${registryLock}'
+  { flock -w 5 9; cat '${crashErrorJson}' >> "$PA_REGISTRY_FILE"; } 9>"$PA_REGISTRY_LOCK"
 fi
-`.trim();
+`.trimStart();
 
-    // Spawn background process via nohup
-    const bgPid = spawnDetached("nohup", [bashPath, "-c", bgScript], {
+    // Write bgScript to temp file and execute from there (no inline interpolation)
+    const bgScriptFile = resolve(deployDir, "bg-runner.sh");
+    writeFileSync(bgScriptFile, bgScriptContent + "\n", { mode: 0o700 });
+
+    // Build env for background script — extends deployEnv with script-specific vars
+    const bgScriptEnv = {
+      ...deployEnv,
+      PA_LOG_FILE: logFile,
+      PA_MAX_RUNTIME: maxRuntime,
+      PA_CLAUDE_PROMPT: claudePrompt,
+      PA_REGISTRY_FILE: registryFile,
+      PA_REGISTRY_LOCK: registryLock,
+    };
+
+    // Spawn background process via nohup — runs the script file, not inline string
+    const bgPid = spawnDetached("nohup", [bashPath, bgScriptFile], {
       cwd,
-      env: deployEnv,
+      env: bgScriptEnv,
     });
 
     console.log(`  PID: ${bgPid}`);
