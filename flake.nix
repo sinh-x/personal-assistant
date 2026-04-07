@@ -39,11 +39,19 @@
             pnpm
             pnpmConfigHook
             makeWrapper
+            python3
+            pkg-config
+            sqlite.dev
+            node-gyp
+          ];
+
+          buildInputs = with pkgs; [
+            sqlite.out
           ];
 
           pnpmDeps = pkgs.fetchPnpmDeps {
             inherit (finalAttrs) pname src;
-            hash = "sha256-MqLpogT0ptyQe7wb82I8Q6+74i2yNde5qbxV2e1LH50=";
+            hash = "sha256-m8frSTrDcs9jO81OlUBKWp4cw3QGxm8aHLXqKH3HheA=";
             fetcherVersion = 3;
           };
 
@@ -81,8 +89,16 @@
             mkdir -p $out/share/fish/vendor_completions.d
             cp completions/pa.fish $out/share/fish/vendor_completions.d/pa.fish
 
+            # --- Rebuild better-sqlite3 native addon using local node headers ---
+            cd $out/share/personal-assistant/node_modules/better-sqlite3
+            patchShebangs .
+            export NODEDIR=${pkgs.nodejs_22}/include/node
+            npm_config_build_from_source=true node-gyp rebuild --nodedir=$NODEDIR --openssl-fips=false
+
             runHook postInstall
           '';
+
+          dontStrip = true;
 
           meta = with pkgs.lib; {
             description = "CLI agent team orchestrator for NixOS";
