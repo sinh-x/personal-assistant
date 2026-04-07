@@ -88,6 +88,13 @@ export function createRegistryCommand(): Command {
           process.exit(1);
         }
 
+        // Warn if no rating flags provided
+        if (!opts.ratingSource && opts.ratingOverall === undefined) {
+          console.error(
+            "Warning: No rating provided. Consider adding --rating-overall for analytics."
+          );
+        }
+
         // Build rating object if any rating options are provided
         let rating: Rating | undefined;
         if (opts.ratingSource || opts.ratingOverall !== undefined) {

@@ -10,8 +10,8 @@ import type { Context } from "hono";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { getRegistryPath } from "../../paths.js";
-import type { RegistryEvent, DeploymentStatus } from "../../types.js";
+import { readRegistry, computeDeploymentStatuses } from "../../registry.js";
+import type { DeploymentStatus } from "../../types.js";
 
 const AI_USAGE = join(homedir(), "Documents", "ai-usage");
 const DEPLOYMENTS_DIR = join(AI_USAGE, "deployments");
@@ -30,69 +30,6 @@ export function getTodayDateString(): string {
   const month = String(now.getMonth() + 1).padStart(2, "0");
   const day = String(now.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-}
-
-export function parseRegistry(): RegistryEvent[] {
-  const path = getRegistryPath();
-  if (!existsSync(path)) return [];
-  return readFileSync(path, "utf-8")
-    .split("\n")
-    .filter((l) => l.trim())
-    .flatMap((line) => {
-      try {
-        return [JSON.parse(line) as RegistryEvent];
-      } catch {
-        return [];
-      }
-    });
-}
-
-export function computeDeploymentStatuses(events: RegistryEvent[]): DeploymentStatus[] {
-  const grouped = new Map<string, RegistryEvent[]>();
-  for (const ev of events) {
-    const existing = grouped.get(ev.deployment_id) ?? [];
-    existing.push(ev);
-    grouped.set(ev.deployment_id, existing);
-  }
-
-  const statuses: DeploymentStatus[] = [];
-  for (const [deployId, evs] of grouped) {
-    const started = evs.find((e) => e.event === "started");
-    const completed = evs.find((e) => e.event === "completed");
-    const crashed = evs.find((e) => e.event === "crashed");
-    const pidEv = evs.find((e) => e.event === "pid");
-
-    let status: DeploymentStatus["status"] = "unknown";
-    if (completed) {
-      status = (completed.status as DeploymentStatus["status"]) ?? "success";
-    } else if (crashed) {
-      status = "crashed";
-    } else if (started) {
-      status = "running";
-    }
-
-    statuses.push({
-      deploy_id: deployId,
-      team: started?.team ?? evs[0]?.team ?? "",
-      status,
-      started_at: started?.timestamp ?? evs[0]?.timestamp ?? "",
-      completed_at: completed?.timestamp ?? crashed?.timestamp,
-      pid: pidEv?.pid,
-      agents: started?.agents ?? [],
-      summary: completed?.summary,
-      log_file: started?.log_file,
-      primer: started?.primer,
-      ticket_id: started?.ticket_id,
-      objective: started?.objective,
-      models: started?.models,
-      provider: started?.provider,
-      repo: started?.repo,
-    });
-  }
-
-  // Sort by started_at descending (newest first)
-  statuses.sort((a, b) => b.started_at.localeCompare(a.started_at));
-  return statuses;
 }
 
 export function deploymentsRoutes(): Hono {
@@ -122,7 +59,7 @@ export function deploymentsRoutes(): Hono {
     // Parse limit (default 50, max 200)
     const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
 
-    const events = parseRegistry();
+    const events = readRegistry();
     let deployments = computeDeploymentStatuses(events);
 
     // Apply date filter if since is set
@@ -154,7 +91,7 @@ export function deploymentsRoutes(): Hono {
     }
 
     // Filter registry events for this deployment
-    const events = parseRegistry().filter((e) => e.deployment_id === id);
+    const events = readRegistry().filter((e) => e.deployment_id === id);
 
     if (events.length === 0) {
       return c.json({ error: "Deployment not found", code: "NOT_FOUND" }, 404);
@@ -230,7 +167,7 @@ export function deploymentsRoutes(): Hono {
     }
 
     // First check registry events for this deployment
-    const events = parseRegistry().filter((e) => e.deployment_id === id);
+    const events = readRegistry().filter((e) => e.deployment_id === id);
 
     // Also check activity.jsonl in the deployment workspace
     const activityPath = join(DEPLOYMENTS_DIR, id, "activity.jsonl");
