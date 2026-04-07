@@ -18,6 +18,7 @@ import { ideasRoutes } from "./routes/ideas.js";
 import { timersRoutes } from "./routes/timers.js";
 import { sinhInputsRoutes } from "./routes/sinh-inputs.js";
 import { ticketRoutes } from "./routes/tickets.js";
+import { focusRoutes } from "./routes/focus.js";
 import { bulletinRoutes } from "./routes/bulletin.js";
 import { documentsRoutes } from "./routes/documents.js";
 import { hub } from "./ws/hub.js";
@@ -110,6 +111,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", timersRoutes());
   app.route("/", sinhInputsRoutes());
   app.route("/", ticketRoutes());
+  app.route("/", focusRoutes());
   app.route("/", bulletinRoutes());
   app.route("/", documentsRoutes());
 

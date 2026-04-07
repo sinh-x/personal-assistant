@@ -40,3 +40,18 @@ export type {
 export { validateAuthor, validateAssignee, matchAssignee, getValidTeamNames } from "./validate.js";
 
 export { formatTicketCard } from "./display.js";
+
+export {
+  buildFocusList,
+  calculateStaleness,
+  isTicketStale,
+  detectBottlenecks,
+  readLatestFocusReport,
+} from "./focus.js";
+export type {
+  FocusItem,
+  WipSummary,
+  Suggestion,
+  FocusResult,
+  FocusFilters,
+} from "./focus.js";

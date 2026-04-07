@@ -44,13 +44,18 @@ export function scheduleCommand(
     description = `personal-assistant daily ${dailyMode}`;
   } else if (spec.startsWith("requirements:")) {
     const requirementsMode = spec.slice("requirements:".length);
-    if (!["ideas"].includes(requirementsMode)) {
+    if (!["ideas", "focus"].includes(requirementsMode)) {
       console.error(
-        `Error: Invalid requirements mode '${requirementsMode}'. Use: ideas`
+        `Error: Invalid requirements mode '${requirementsMode}'. Use: ideas | focus`
       );
       process.exit(1);
     }
-    execCmd = `${paCmd} requirements ${requirementsMode}`;
+    // focus mode runs via deploy (MiniMax agent), others via requirements command
+    if (requirementsMode === "focus") {
+      execCmd = `${paCmd} deploy requirements --mode focus --background`;
+    } else {
+      execCmd = `${paCmd} requirements ${requirementsMode}`;
+    }
     unitName = `pa-requirements-${requirementsMode}`;
     description = `personal-assistant requirements ${requirementsMode}`;
   } else if (spec.includes(":")) {
