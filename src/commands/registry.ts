@@ -6,13 +6,14 @@ import {
   computeDeploymentStatuses,
   queryDeploymentStatuses,
   queryDeploymentStatus,
+  checkJsonlDeprecation,
 } from "../lib/registry.js";
 import { localISOTimestamp } from "../lib/time.js";
 import type { Rating, RegistryEvent } from "../lib/types.js";
 import { getRegistryPath, getRegistryDbPath } from "../lib/paths.js";
 import { getDb } from "../lib/registry-db.js";
 import { execSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync, renameSync } from "node:fs";
 import { resolve } from "node:path";
 
 const VALID_STATUSES = ["success", "partial", "failed"] as const;
@@ -609,6 +610,169 @@ export function createRegistryCommand(): Command {
       console.log(
         `Migration complete: ${finalEventCount.count} events, ${finalDeployCount.count} deployments. DB size: ${dbSizeKB} KB`
       );
+    });
+
+  // pa registry search <query>
+  cmd
+    .command("search <query>")
+    .description("Search deployments using FTS5 full-text search")
+    .option("--limit <N>", "Maximum results (default 20)", parseInt)
+    .action((query: string, opts: { limit?: number }) => {
+      // Check JSONL deprecation on each command run
+      checkJsonlDeprecation();
+
+      const limit = opts.limit ?? 20;
+      const db = getDb();
+
+      // FTS5 MATCH with snippet highlighting
+      // snippet() returns: [start], matched text, [end], ... context, max_tokens
+      const rows = db
+        .prepare(`
+          SELECT d.deployment_id, d.team, d.status, d.started_at,
+                 snippet(deployments_fts, 1, '[', ']', '...', 20) as snippet
+          FROM deployments_fts f
+          JOIN deployments d ON d.rowid = f.rowid
+          WHERE deployments_fts MATCH ?
+          ORDER BY rank
+          LIMIT ?
+        `)
+        .all(query, limit) as Array<{
+          deployment_id: string;
+          team: string;
+          status: string;
+          started_at: string;
+          snippet: string;
+        }>;
+
+      if (rows.length === 0) {
+        console.log("No results found.");
+        return;
+      }
+
+      console.log(
+        `${"DEPLOY_ID".padEnd(12)} ${"TEAM".padEnd(12)} ${"STATUS".padEnd(10)} ${"STARTED_AT".padEnd(25)} SNIPPET`
+      );
+      console.log("-".repeat(100));
+      for (const r of rows) {
+        const snippet = r.snippet ?? "-";
+        console.log(
+          `${r.deployment_id.padEnd(12)} ${r.team.padEnd(12)} ${r.status.padEnd(10)} ${r.started_at.padEnd(25)} ${snippet}`
+        );
+      }
+      console.log(`\n(${rows.length} result${rows.length !== 1 ? "s" : ""})`);
+    });
+
+  // pa registry analytics
+  cmd
+    .command("analytics")
+    .description("Show analytics views: deployments per day, team activity, rating trends")
+    .option("--view <name>", "Filter by view (v_deployments_per_day|v_team_activity|v_rating_trends)")
+    .option("--team <name>", "Filter by team (for v_team_activity)")
+    .option("--since <YYYY-MM-DD>", "Filter deployments since date")
+    .action((opts: { view?: string; team?: string; since?: string }) => {
+      checkJsonlDeprecation();
+
+      const db = getDb();
+
+      // Deployments per day
+      if (!opts.view || opts.view === "v_deployments_per_day") {
+        const deployDaySql = opts.since
+          ? "SELECT day, count, successes, failures FROM v_deployments_per_day WHERE day >= ? ORDER BY day DESC LIMIT 30"
+          : "SELECT day, count, successes, failures FROM v_deployments_per_day ORDER BY day DESC LIMIT 30";
+        const rows = (opts.since
+          ? db.prepare(deployDaySql).all(opts.since)
+          : db.prepare(deployDaySql).all()) as Array<{
+            day: string;
+            count: number;
+            successes: number;
+            failures: number;
+          }>;
+
+        console.log("=== Deployments Per Day ===");
+        console.log(
+          `${"DAY".padEnd(12)} ${"COUNT".padEnd(8)} ${"SUCCESSES".padEnd(10)} ${"FAILURES"}`
+        );
+        console.log("-".repeat(50));
+        for (const r of rows) {
+          console.log(
+            `${r.day.padEnd(12)} ${String(r.count).padEnd(8)} ${String(r.successes).padEnd(10)} ${r.failures}`
+          );
+        }
+        console.log();
+      }
+
+      // Team activity
+      if (!opts.view || opts.view === "v_team_activity") {
+        const teamSql = opts.team
+          ? "SELECT team, total, last_deployment FROM v_team_activity WHERE team = ? ORDER BY total DESC"
+          : "SELECT team, total, last_deployment FROM v_team_activity ORDER BY total DESC";
+        const rows = (opts.team
+          ? db.prepare(teamSql).all(opts.team)
+          : db.prepare(teamSql).all()) as Array<{
+            team: string;
+            total: number;
+            last_deployment: string;
+          }>;
+
+        console.log("=== Team Activity ===");
+        console.log(
+          `${"TEAM".padEnd(20)} ${"TOTAL".padEnd(8)} ${"LAST_DEPLOYMENT"}`
+        );
+        console.log("-".repeat(60));
+        for (const r of rows) {
+          console.log(
+            `${r.team.padEnd(20)} ${String(r.total).padEnd(8)} ${r.last_deployment}`
+          );
+        }
+        console.log();
+      }
+
+      // Rating trends
+      if (!opts.view || opts.view === "v_rating_trends") {
+        const ratingSql = opts.since
+          ? "SELECT day, team, avg_overall, avg_productivity, avg_quality FROM v_rating_trends WHERE day >= ? ORDER BY day DESC, team LIMIT 60"
+          : "SELECT day, team, avg_overall, avg_productivity, avg_quality FROM v_rating_trends ORDER BY day DESC, team LIMIT 60";
+        const rows = (opts.since
+          ? db.prepare(ratingSql).all(opts.since)
+          : db.prepare(ratingSql).all()) as Array<{
+            day: string;
+            team: string;
+            avg_overall: number | null;
+            avg_productivity: number | null;
+            avg_quality: number | null;
+          }>;
+
+        console.log("=== Rating Trends ===");
+        console.log(
+          `${"DAY".padEnd(12)} ${"TEAM".padEnd(16)} ${"AVG_O".padEnd(8)} ${"AVG_P".padEnd(8)} ${"AVG_Q"}`
+        );
+        console.log("-".repeat(60));
+        for (const r of rows) {
+          const avgO = r.avg_overall !== null ? (r.avg_overall as number).toFixed(2) : "N/A";
+          const avgP = r.avg_productivity !== null ? (r.avg_productivity as number).toFixed(2) : "N/A";
+          const avgQ = r.avg_quality !== null ? (r.avg_quality as number).toFixed(2) : "N/A";
+          console.log(
+            `${r.day.padEnd(12)} ${r.team.padEnd(16)} ${avgO.padEnd(8)} ${avgP.padEnd(8)} ${avgQ}`
+          );
+        }
+      }
+    });
+
+  // pa registry archive-jsonl
+  cmd
+    .command("archive-jsonl")
+    .description("Archive the legacy JSONL registry file to registry.jsonl.bak")
+    .action(() => {
+      const registryPath = getRegistryPath();
+      const bakPath = registryPath + ".bak";
+
+      if (!existsSync(registryPath)) {
+        console.log("No JSONL registry file found. Nothing to archive.");
+        return;
+      }
+
+      renameSync(registryPath, bakPath);
+      console.log(`Archived registry.jsonl to ${bakPath}`);
     });
 
   return cmd;
