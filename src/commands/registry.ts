@@ -1,10 +1,18 @@
 import { Command } from "commander";
-import { appendRegistryEvent, getDeploymentEvents, readRegistry, computeDeploymentStatuses } from "../lib/registry.js";
+import {
+  appendRegistryEvent,
+  getDeploymentEvents,
+  readRegistry,
+  computeDeploymentStatuses,
+  queryDeploymentStatuses,
+  queryDeploymentStatus,
+} from "../lib/registry.js";
 import { localISOTimestamp } from "../lib/time.js";
 import type { Rating, RegistryEvent } from "../lib/types.js";
-import { getRegistryPath } from "../lib/paths.js";
+import { getRegistryPath, getRegistryDbPath } from "../lib/paths.js";
+import { getDb } from "../lib/registry-db.js";
 import { execSync } from "node:child_process";
-import { readdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const VALID_STATUSES = ["success", "partial", "failed"] as const;
@@ -149,7 +157,7 @@ export function createRegistryCommand(): Command {
     .action(
       (opts: { team?: string; status?: string; since?: string; limit?: number }) => {
         const limit = opts.limit ?? 20;
-        const statuses = computeDeploymentStatuses(readRegistry());
+        const statuses = queryDeploymentStatuses();
 
         let filtered = statuses;
         if (opts.team) {
@@ -194,8 +202,11 @@ export function createRegistryCommand(): Command {
         process.exit(1);
       }
 
-      const statuses = computeDeploymentStatuses(events);
-      const status = statuses[0];
+      const status = queryDeploymentStatus(deployId);
+      if (!status) {
+        console.error(`Error: Deployment "${deployId}" not found in deployments table.`);
+        process.exit(1);
+      }
 
       // Header
       console.log(`=== Deployment: ${deployId} ===`);
@@ -245,7 +256,7 @@ export function createRegistryCommand(): Command {
         const thresholdMs = thresholdHours * 60 * 60 * 1000;
         const now = Date.now();
 
-        const statuses = computeDeploymentStatuses(readRegistry());
+        const statuses = queryDeploymentStatuses();
         const orphans = statuses.filter((d) => {
           if (d.status !== "running") return false;
           const startedTime = new Date(d.started_at).getTime();
@@ -403,6 +414,202 @@ export function createRegistryCommand(): Command {
         }
       }
     );
+
+  // pa registry migrate
+  cmd
+    .command("migrate")
+    .description("Migrate existing JSONL registry to SQLite")
+    .option("--force", "Force re-migration even if data exists")
+    .action((opts: { force?: boolean }) => {
+      const registryPath = getRegistryPath();
+      const dbPath = getRegistryDbPath();
+
+      // Check if JSONL file exists
+      if (!existsSync(registryPath)) {
+        console.log("No JSONL registry found. Nothing to migrate.");
+        return;
+      }
+
+      // Open SQLite DB
+      const db = getDb();
+
+      // Idempotent check
+      const existingCount = db
+        .prepare("SELECT COUNT(*) as count FROM registry_events")
+        .get() as { count: number };
+
+      if (existingCount.count > 0 && !opts.force) {
+        console.log(
+          `Registry already has ${existingCount.count} events. Use --force to re-migrate.`
+        );
+        return;
+      }
+
+      // If force, clear existing data
+      if (opts.force && existingCount.count > 0) {
+        console.log(`Clearing existing ${existingCount.count} events...`);
+        db.exec("DELETE FROM registry_events");
+        db.exec("DELETE FROM deployments");
+      }
+
+      // Read JSONL directly (readRegistry() now queries SQLite, so read JSONL directly here)
+      const fileContent = readFileSync(registryPath, "utf-8");
+      const lines = fileContent.split("\n").filter((l) => l.trim());
+      const jsonlCount = lines.length;
+
+      if (jsonlCount === 0) {
+        console.log("JSONL registry is empty. Nothing to migrate.");
+        return;
+      }
+
+      console.log(`Migrating ${jsonlCount} events from JSONL to SQLite...`);
+
+      // Begin transaction
+      const migrateStmt = db.prepare(`
+        INSERT INTO registry_events (
+          deployment_id, team, event, timestamp, pid, status, summary,
+          log_file, primer, agents, models, error, exit_code,
+          ticket_id, provider, rating, objective, repo
+        ) VALUES (
+          @deployment_id, @team, @event, @timestamp, @pid, @status, @summary,
+          @log_file, @primer, @agents, @models, @error, @exit_code,
+          @ticket_id, @provider, @rating, @objective, @repo
+        )
+      `);
+
+      const insertDeploymentStmt = db.prepare(`
+        INSERT INTO deployments (
+          deployment_id, team, status, started_at, pid, primer,
+          agents, models, ticket_id, objective, repo, provider
+        ) VALUES (
+          @deployment_id, @team, 'running', @started_at, @pid, @primer,
+          @agents, @models, @ticket_id, @objective, @repo, @provider
+        )
+      `);
+
+      const updateDeploymentStmt = db.prepare(`
+        UPDATE deployments SET
+          status = @status,
+          completed_at = @completed_at,
+          summary = @summary,
+          log_file = @log_file,
+          rating = @rating,
+          exit_code = @exit_code
+        WHERE deployment_id = @deployment_id
+      `);
+
+      const crashDeploymentStmt = db.prepare(`
+        UPDATE deployments SET
+          status = 'crashed',
+          completed_at = @completed_at,
+          error = @error,
+          exit_code = @exit_code
+        WHERE deployment_id = @deployment_id
+      `);
+
+      db.exec("BEGIN TRANSACTION");
+
+      const BATCH_SIZE = 1000;
+      let insertedCount = 0;
+      const seenDeployments = new Set<string>();
+
+      for (let i = 0; i < lines.length; i++) {
+        try {
+          const event = JSON.parse(lines[i]) as RegistryEvent;
+
+          // INSERT INTO registry_events
+          migrateStmt.run({
+            deployment_id: event.deployment_id,
+            team: event.team,
+            event: event.event,
+            timestamp: event.timestamp,
+            pid: event.pid ?? null,
+            status: event.status ?? null,
+            summary: event.summary ?? null,
+            log_file: event.log_file ?? null,
+            primer: event.primer ?? null,
+            agents: event.agents ? JSON.stringify(event.agents) : null,
+            models: event.models ? JSON.stringify(event.models) : null,
+            error: event.error ?? null,
+            exit_code: event.exit_code ?? null,
+            ticket_id: event.ticket_id ?? null,
+            provider: event.provider ?? null,
+            rating: event.rating ? JSON.stringify(event.rating) : null,
+            objective: event.objective ?? null,
+            repo: event.repo ?? null,
+          });
+          insertedCount++;
+
+          // UPSERT into deployments
+          if (!seenDeployments.has(event.deployment_id)) {
+            seenDeployments.add(event.deployment_id);
+
+            if (event.event === "started") {
+              insertDeploymentStmt.run({
+                deployment_id: event.deployment_id,
+                team: event.team,
+                started_at: event.timestamp,
+                pid: event.pid ?? null,
+                primer: event.primer ?? null,
+                agents: event.agents ? JSON.stringify(event.agents) : null,
+                models: event.models ? JSON.stringify(event.models) : null,
+                ticket_id: event.ticket_id ?? null,
+                objective: event.objective ?? null,
+                repo: event.repo ?? null,
+                provider: event.provider ?? null,
+              });
+            }
+          }
+
+          if (event.event === "completed") {
+            updateDeploymentStmt.run({
+              deployment_id: event.deployment_id,
+              status: event.status ?? "success",
+              completed_at: event.timestamp,
+              summary: event.summary ?? null,
+              log_file: event.log_file ?? null,
+              rating: event.rating ? JSON.stringify(event.rating) : null,
+              exit_code: event.exit_code ?? null,
+            });
+          } else if (event.event === "crashed") {
+            crashDeploymentStmt.run({
+              deployment_id: event.deployment_id,
+              completed_at: event.timestamp,
+              error: event.error ?? null,
+              exit_code: event.exit_code ?? null,
+            });
+          }
+
+          // Commit in batches
+          if ((i + 1) % BATCH_SIZE === 0) {
+            db.exec("COMMIT");
+            db.exec("BEGIN TRANSACTION");
+            process.stdout.write(`\r  Inserted ${i + 1}/${jsonlCount} events...`);
+          }
+        } catch (err) {
+          console.error(`\nError parsing line ${i + 1}: ${err}`);
+        }
+      }
+
+      db.exec("COMMIT");
+      console.log(`\r  Inserted ${insertedCount}/${jsonlCount} events.`);
+
+      // Verify counts
+      const finalEventCount = db
+        .prepare("SELECT COUNT(*) as count FROM registry_events")
+        .get() as { count: number };
+      const finalDeployCount = db
+        .prepare("SELECT COUNT(*) as count FROM deployments")
+        .get() as { count: number };
+
+      // Get DB size
+      const dbStats = statSync(dbPath);
+      const dbSizeKB = (dbStats.size / 1024).toFixed(1);
+
+      console.log(
+        `Migration complete: ${finalEventCount.count} events, ${finalDeployCount.count} deployments. DB size: ${dbSizeKB} KB`
+      );
+    });
 
   return cmd;
 }
