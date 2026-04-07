@@ -224,13 +224,13 @@ export function reposRoutes(): Hono {
             currentBranch = getCurrentBranch(repo.path);
             isDirty = !getWorkingDirStatus(repo.path).clean;
             const repoMainBranch = repo.mainBranch || "main";
-            const repoDevelopBranch = repo.developBranch || "develop";
-            const features = getUnmergedBranches(repoDevelopBranch, repo.path);
+            const repoDevelopBranch = repo.developBranch === "none" ? null : (repo.developBranch || "develop");
+            const features = repoDevelopBranch ? getUnmergedBranches(repoDevelopBranch, repo.path) : [];
             featureBranchCount = features.length;
 
             // Calculate develop ahead of main
             const mainExists = branchExists(repoMainBranch, repo.path);
-            const developExists = branchExists(repoDevelopBranch, repo.path);
+            const developExists = !!repoDevelopBranch && branchExists(repoDevelopBranch, repo.path);
             if (mainExists && developExists) {
               const aheadBehind = getAheadBehind(repoMainBranch, repoDevelopBranch, repo.path);
               developAheadOfMain = aheadBehind.develop_ahead;
@@ -275,14 +275,16 @@ export function reposRoutes(): Hono {
     }
 
     const mainBranch = c.req.query("main") || repoEntry.mainBranch || "main";
-    const developBranch = c.req.query("develop") || repoEntry.developBranch || "develop";
+    const configuredDevelop = c.req.query("develop") || repoEntry.developBranch || "develop";
+    const skipDevelopChecks = configuredDevelop === "none";
+    const developBranch = skipDevelopChecks ? "none" : configuredDevelop;
 
     // F2: Validate branch name params - only allow alphanumeric, dots, underscores, hyphens, and forward slashes
     const branchNameRegex = /^[a-zA-Z0-9._\-\/]+$/;
     if (!branchNameRegex.test(mainBranch)) {
       return c.json({ error: `Invalid main branch name: ${mainBranch}`, code: "BAD_REQUEST" }, 400);
     }
-    if (!branchNameRegex.test(developBranch)) {
+    if (!skipDevelopChecks && !branchNameRegex.test(developBranch)) {
       return c.json({ error: `Invalid develop branch name: ${developBranch}`, code: "BAD_REQUEST" }, 400);
     }
 
@@ -312,30 +314,36 @@ export function reposRoutes(): Hono {
       mainBranchInfo = getBranchInfo(mainBranch, path);
     }
 
-    // Get develop branch info
+    // Get develop branch info (skip if developBranch === "none")
     let developBranchInfo: BranchInfo;
-    if (!branchExists(developBranch, path)) {
+    if (skipDevelopChecks) {
+      developBranchInfo = { name: "none", exists: false };
+    } else if (!branchExists(developBranch, path)) {
       errors.develop = `Branch '${developBranch}' not found`;
       developBranchInfo = { name: developBranch, exists: false };
     } else {
       developBranchInfo = getBranchInfo(developBranch, path);
     }
 
-    // Get ahead/behind between main and develop
+    // Get ahead/behind between main and develop (skip if developBranch === "none")
     let mainVsDevelop: { main_ahead: number; develop_ahead: number; diverged: boolean };
-    if (mainBranchInfo.exists && developBranchInfo.exists) {
-      mainVsDevelop = getAheadBehind(mainBranch, developBranch, path);
-    } else {
+    if (skipDevelopChecks || !mainBranchInfo.exists || !developBranchInfo.exists) {
       mainVsDevelop = { main_ahead: 0, develop_ahead: 0, diverged: false };
+    } else {
+      mainVsDevelop = getAheadBehind(mainBranch, developBranch, path);
     }
 
-    // Get feature branches not merged to develop
+    // Get feature branches not merged to develop (skip if developBranch === "none")
     let featureBranches: FeatureBranch[];
-    try {
-      featureBranches = getUnmergedBranches(developBranch, path);
-    } catch (e) {
-      errors.featureBranches = e instanceof Error ? e.message : "Failed to get feature branches";
+    if (skipDevelopChecks) {
       featureBranches = [];
+    } else {
+      try {
+        featureBranches = getUnmergedBranches(developBranch, path);
+      } catch (e) {
+        errors.featureBranches = e instanceof Error ? e.message : "Failed to get feature branches";
+        featureBranches = [];
+      }
     }
 
     // Get working directory status
