@@ -223,14 +223,16 @@ export function reposRoutes(): Hono {
           } else {
             currentBranch = getCurrentBranch(repo.path);
             isDirty = !getWorkingDirStatus(repo.path).clean;
-            const features = getUnmergedBranches("develop", repo.path);
+            const repoMainBranch = repo.mainBranch || "main";
+            const repoDevelopBranch = repo.developBranch || "develop";
+            const features = getUnmergedBranches(repoDevelopBranch, repo.path);
             featureBranchCount = features.length;
 
             // Calculate develop ahead of main
-            const mainExists = branchExists("main", repo.path);
-            const developExists = branchExists("develop", repo.path);
+            const mainExists = branchExists(repoMainBranch, repo.path);
+            const developExists = branchExists(repoDevelopBranch, repo.path);
             if (mainExists && developExists) {
-              const aheadBehind = getAheadBehind("main", "develop", repo.path);
+              const aheadBehind = getAheadBehind(repoMainBranch, repoDevelopBranch, repo.path);
               developAheadOfMain = aheadBehind.develop_ahead;
             }
           }
@@ -266,8 +268,14 @@ export function reposRoutes(): Hono {
       return c.json({ error: "Invalid repo key", code: "BAD_REQUEST" }, 400);
     }
 
-    const mainBranch = c.req.query("main") || "main";
-    const developBranch = c.req.query("develop") || "develop";
+    // Load repo entry
+    const repoEntry = loadRepoEntry(key);
+    if (!repoEntry) {
+      return c.json({ error: `Repo key not found: ${key}`, code: "NOT_FOUND" }, 404);
+    }
+
+    const mainBranch = c.req.query("main") || repoEntry.mainBranch || "main";
+    const developBranch = c.req.query("develop") || repoEntry.developBranch || "develop";
 
     // F2: Validate branch name params - only allow alphanumeric, dots, underscores, hyphens, and forward slashes
     const branchNameRegex = /^[a-zA-Z0-9._\-\/]+$/;
@@ -276,12 +284,6 @@ export function reposRoutes(): Hono {
     }
     if (!branchNameRegex.test(developBranch)) {
       return c.json({ error: `Invalid develop branch name: ${developBranch}`, code: "BAD_REQUEST" }, 400);
-    }
-
-    // Load repo entry
-    const repoEntry = loadRepoEntry(key);
-    if (!repoEntry) {
-      return c.json({ error: `Repo key not found: ${key}`, code: "NOT_FOUND" }, 404);
     }
 
     const { name, path, description, prefix } = repoEntry;
