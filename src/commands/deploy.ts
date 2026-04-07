@@ -6,11 +6,11 @@ import { loadConfig } from "../lib/config.js";
 import { getHomeDir, getDataDir, getRegistryPath, getRegistryLockPath } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent } from "../lib/registry.js";
-import { generatePrimer } from "../lib/primer.js";
+import { generatePrimer, resolveGhRepo } from "../lib/primer.js";
+import { resolveRepo, listRepos } from "../lib/repos.js";
 import { isTeamBlocked } from "../lib/bulletins/index.js";
 import { TicketStore } from "../lib/tickets/store.js";
 import { spawnDetached } from "../utils/process.js";
-import { resolveRepo } from "../lib/repos.js";
 import { localISOTimestamp } from "../lib/time.js";
 import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
 
@@ -381,6 +381,17 @@ export function deployCommand(
     }
   }
 
+  // Handle --repo all: spawn one deployment per repo that has a prefix field
+  if (opts.repo === "all") {
+    const allRepos = listRepos().filter((r) => r.prefix);
+    console.log(`Deploying routine for ${allRepos.length} repos with ticket prefixes...`);
+    for (const repo of allRepos) {
+      console.log(`Deploying routine for repo: ${repo.name} [${repo.prefix}]`);
+      deployCommand(spec, { ...opts, repo: repo.name });
+    }
+    return;
+  }
+
   mkdirSync(primersDir, { recursive: true });
   mkdirSync(logsDir, { recursive: true });
   mkdirSync(deploymentsDir, { recursive: true });
@@ -422,6 +433,23 @@ export function deployCommand(
     const resolved = resolveRepo(opts.repo);
     cwd = resolved.path;
     repoRoot = resolved.path;
+  }
+
+  // Look up RepoEntry after repoRoot resolution to get prefix, developBranch, mainBranch
+  // Compute repo-aware template vars to pass to primer generation
+  let repoTemplateVars: Record<string, string> = {};
+  if (repoRoot) {
+    const allRepos = listRepos();
+    const repoEntry = allRepos.find((r) => r.path === repoRoot);
+    if (repoEntry) {
+      const ghRepo = resolveGhRepo(repoRoot);
+      repoTemplateVars = {
+        ...(repoEntry.prefix ? { PROJECT_PREFIX: repoEntry.prefix } : {}),
+        ...(ghRepo ? { GH_REPO: ghRepo } : {}),
+        DEVELOP_BRANCH: repoEntry.developBranch ?? "develop",
+        MAIN_BRANCH: repoEntry.mainBranch ?? "main",
+      };
+    }
   }
 
   // Resolve effective models — always call resolveEffectiveModels to populate tmModel/agentModels
@@ -481,7 +509,7 @@ export function deployCommand(
     configDir: config.configDir,
     homeDir: paHome,
     effectiveModels: { tmModel, agentModels },
-    templateVars: opts.templateVars,
+    templateVars: { ...repoTemplateVars, ...opts.templateVars },
     ticket: opts.ticket,
   });
   writeFileSync(primerFile, primerContent);

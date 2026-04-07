@@ -70,6 +70,7 @@ deploy_modes:
     phone_visible: true
     mode_type: work
     agents: [researcher]
+    provider: minimax
     objective: skills/requirements/spike-objective.md
     skills:
       - name: pa-cli

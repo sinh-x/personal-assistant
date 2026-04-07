@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, basename } from "node:path";
 import { homedir } from "node:os";
+import { execSync } from "node:child_process";
 import type { TeamConfig, DeployMode } from "./types.js";
 import { BulletinStore } from "./bulletins/index.js";
 import { listRepos } from "./repos.js";
@@ -162,6 +163,26 @@ function resolveRepoSlug(repoRoot: string): string {
   return basename(repoRoot);
 }
 
+/**
+ * Resolve GitHub owner/repo from a repo's git remote URL.
+ * Handles both SSH (git@github.com:owner/repo.git) and HTTPS (https://github.com/owner/repo.git) formats.
+ * Returns undefined if no remote is configured.
+ */
+export function resolveGhRepo(repoRoot: string): string | undefined {
+  try {
+    const url = execSync(`git -C "${repoRoot}" remote get-url origin`, { encoding: "utf-8" }).trim();
+    // SSH: git@github.com:owner/repo.git → owner/repo
+    const sshMatch = url.match(/github\.com[:/](.+?)(?:\.git)?$/);
+    if (sshMatch) return sshMatch[1];
+    // HTTPS: https://github.com/owner/repo.git → owner/repo
+    const httpsMatch = url.match(/github\.com\/(.+?)(?:\.git)?$/);
+    if (httpsMatch) return httpsMatch[1];
+  } catch {
+    // No remote or not a git repo — fall through to undefined
+  }
+  return undefined;
+}
+
 interface ReferenceDoc {
   name: string;
   path: string;
@@ -307,6 +328,18 @@ export function generatePrimer(opts: PrimerOptions): string {
   const expandedOutputDir = rawOutputDir
     ? rawOutputDir.replace(/^~/, homeDir)
     : undefined;
+
+  // Look up repo entry from repos.yaml to get prefix, developBranch, mainBranch
+  let repoEntry: { name: string; path: string; prefix?: string; mainBranch?: string; developBranch?: string } | undefined;
+  if (repoRoot) {
+    try {
+      repoEntry = listRepos().find((r) => r.path === repoRoot);
+    } catch {
+      // repos.yaml unavailable — repoEntry stays undefined
+    }
+  }
+
+  const ghRepo = repoRoot ? resolveGhRepo(repoRoot) : undefined;
   const standardVars: Record<string, string> = {
     TODAY: todayStr,
     YEAR: yearStr,
@@ -317,6 +350,10 @@ export function generatePrimer(opts: PrimerOptions): string {
     DEPLOY_ID: deployId,
     ...(expandedOutputDir ? { OUTPUT_DIR: `${expandedOutputDir}/${yearStr}/${monthStr}` } : {}),
     ...(repoRoot ? { REPO_KEY: resolveRepoSlug(repoRoot) } : {}),
+    ...(repoEntry?.prefix ? { PROJECT_PREFIX: repoEntry.prefix } : {}),
+    ...(ghRepo ? { GH_REPO: ghRepo } : {}),
+    ...(repoRoot ? { DEVELOP_BRANCH: repoEntry?.developBranch ?? "develop" } : {}),
+    ...(repoRoot ? { MAIN_BRANCH: repoEntry?.mainBranch ?? "main" } : {}),
   };
   // Caller-provided vars override standard vars (e.g. daily.ts sets TODAY to a custom date)
   const allTemplateVars: Record<string, string> = { ...standardVars, ...(opts.templateVars ?? {}) };
