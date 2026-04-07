@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { deployCommand } from "./deploy.js";
-import { buildFocusList } from "../lib/tickets/focus.js";
+import { buildFocusList, detectBottlenecks } from "../lib/tickets/focus.js";
 
 /** Build the ideas triage objective */
 function ideasObjective(flags: { force?: boolean; dryRun?: boolean }): string {
@@ -77,6 +77,17 @@ function handleFocusMode(args: string[]): void {
     }
   }
   console.log();
+
+  // Print bottleneck detection (projects with >3 items in late pipeline stages)
+  const bottlenecks = detectBottlenecks(result.focus);
+  const bottleneckEntries = Object.entries(bottlenecks);
+  if (bottleneckEntries.length > 0) {
+    console.log("## Bottlenecks Detected");
+    for (const [proj, count] of bottleneckEntries) {
+      console.log(`  ${proj}: ${count} items in late pipeline stages`);
+    }
+    console.log();
+  }
 
   // Print focus items
   console.log("## Focus Items\n");

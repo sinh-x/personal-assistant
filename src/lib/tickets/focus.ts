@@ -220,6 +220,8 @@ export function detectBottlenecks(focusItems: FocusItem[]): Record<string, numbe
 
 // ── Focus report reader ───────────────────────────────────────────────────────
 
+const MAX_FOCUS_REPORTS = 7;
+
 /**
  * Read the latest cached focus report from agent-teams/requirements/artifacts/.
  * Returns null if no report exists yet.
@@ -248,6 +250,9 @@ export function readLatestFocusReport(): {
 
   if (files.length === 0) return null;
 
+  // Prune old reports — keep only the last 7
+  pruneOldFocusReports(files);
+
   const latest = files[0];
   const reportPath = join(artifactsDir, latest.name);
 
@@ -260,6 +265,25 @@ export function readLatestFocusReport(): {
     return { suggestions, age_minutes };
   } catch {
     return null;
+  }
+}
+
+/**
+ * Prune focus reports older than the 7 most recent.
+ * Called after reading the file list; files parameter is already sorted descending.
+ */
+function pruneOldFocusReports(files: Array<{ name: string; mtime: Date }>): void {
+  if (files.length <= MAX_FOCUS_REPORTS) return;
+
+  const artifactsDir = join(homedir(), "Documents/ai-usage/agent-teams/requirements/artifacts");
+  const toDelete = files.slice(MAX_FOCUS_REPORTS);
+
+  for (const { name } of toDelete) {
+    try {
+      require("node:fs").unlinkSync(join(artifactsDir, name));
+    } catch {
+      // Ignore deletion errors — will retry next time
+    }
   }
 }
 
