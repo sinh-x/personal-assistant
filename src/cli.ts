@@ -176,18 +176,28 @@ program
 
 program
   .command("requirements")
-  .description("Requirements lifecycle (ideas)")
-  .argument("<mode>", "Mode: ideas")
+  .description("Requirements lifecycle (ideas | focus)")
+  .argument("<mode>", "Mode: ideas, focus")
   .option("--force", "Re-triage all ideas, not just new ones")
   .option("--dry-run", "Generate primer and print it, no execution")
   .option("--background", "Run in background (default for ideas)")
   .option("--interactive", "Run in foreground, user approves each tool call")
-  .action((mode: string, opts: { force?: boolean; dryRun?: boolean; background?: boolean; interactive?: boolean }) => {
+  .option("--project <name>", "Filter focus list by project")
+  .option("--assignee <name>", "Filter focus list by assignee")
+  .option("--all", "Include idea and requirement-review stages in focus list")
+  .option("--mine", "Short for --assignee sinh")
+  .option("--enrich", "Include AI suggestions from latest cached focus report")
+  .action((mode: string, opts: { force?: boolean; dryRun?: boolean; background?: boolean; interactive?: boolean; project?: string; assignee?: string; all?: boolean; mine?: boolean; enrich?: boolean }) => {
     const args: string[] = [];
     if (opts.force) args.push("--force");
     if (opts.dryRun) args.push("--dry-run");
     else if (opts.background) args.push("--background");
     else if (opts.interactive) args.push("--interactive");
+    if (opts.project) { args.push("--project", opts.project); }
+    if (opts.assignee) { args.push("--assignee", opts.assignee); }
+    if (opts.all) args.push("--all");
+    if (opts.mine) args.push("--mine");
+    if (opts.enrich) args.push("--enrich");
     requirementsCommand(mode, args);
   });
 
