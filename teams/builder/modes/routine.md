@@ -17,7 +17,7 @@ Team artifacts directory already exists at `~/Documents/ai-usage/agent-teams/bui
 
 Get all PA project tickets in `review-uat` status:
 ```bash
-pa ticket list --project pa --status review-uat --assignee sinh
+pa ticket list --project {{REPO_KEY}} --status review-uat --assignee sinh
 ```
 
 For each ticket, you will check if the associated work has been merged.
@@ -53,7 +53,7 @@ pa ticket show <TICKET-ID> --json | jq -r '.tags[], .blockedBy[]'
 For tickets that pass the blocked check, search for matching PRs:
 
 ```bash
-gh pr list --repo sinh-x/personal-assistant --state all --search "<TICKET-ID>" --json number,state,headRefName,mergeable,statusCheckRollup,mergedAt,closedAt,url
+gh pr list --repo {{GH_REPO}} --state all --search "<TICKET-ID>" --json number,state,headRefName,mergeable,statusCheckRollup,mergedAt,closedAt,url
 ```
 
 #### Decision Tree
@@ -137,7 +137,7 @@ gh pr list --repo sinh-x/personal-assistant --state all --search "<TICKET-ID>" -
 **CASE F — No PR found, but commits exist on develop:**
 - Fall back to git log search:
   ```bash
-  git log develop --oneline --grep="<TICKET-ID>" | head -5
+  git log {{DEVELOP_BRANCH}} --oneline --grep="<TICKET-ID>" | head -5
   ```
 - **If commits found:** Direct-push commit (no PR). Close ticket:
   ```bash
