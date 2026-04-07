@@ -199,7 +199,35 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
  * Get events for a specific deployment ID.
  */
 export function getDeploymentEvents(deployId: string): RegistryEvent[] {
-  return readRegistry().filter((e) => e.deployment_id === deployId);
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM registry_events WHERE deployment_id = ? ORDER BY id")
+    .all(deployId) as Record<string, unknown>[];
+
+  return rows.map((row) => {
+    return {
+      deployment_id: row.deployment_id as string,
+      team: row.team as string,
+      event: row.event as RegistryEvent["event"],
+      timestamp: row.timestamp as string,
+      pid: row.pid as number | undefined,
+      status: row.status as RegistryEvent["status"],
+      summary: row.summary as string | undefined,
+      log_file: row.log_file as string | undefined,
+      primer: row.primer as string | undefined,
+      agents: row.agents ? (JSON.parse(row.agents as string) as string[]) : undefined,
+      models: row.models
+        ? (JSON.parse(row.models as string) as Record<string, string>)
+        : undefined,
+      error: row.error as string | undefined,
+      exit_code: row.exit_code as number | undefined,
+      ticket_id: row.ticket_id as string | undefined,
+      provider: row.provider as string | undefined,
+      rating: row.rating ? (JSON.parse(row.rating as string) as RegistryEvent["rating"]) : undefined,
+      objective: row.objective as string | undefined,
+      repo: row.repo as string | undefined,
+    };
+  });
 }
 
 /**
@@ -356,7 +384,7 @@ export function checkJsonlDeprecation(): void {
       "[PA REGISTRY WARNING] The legacy JSONL registry file was modified more recently than the SQLite database. " +
         "JSONL is deprecated — all writes now go to SQLite only. " +
         "To maintain backwards compatibility during migration, set PA_REGISTRY_DUAL_WRITE=1. " +
-        "Run 'pa registry migrate --incremental' to sync external JSONL changes to SQLite."
+        "Run 'pa registry migrate --force' to sync external JSONL changes to SQLite."
     );
   }
 }

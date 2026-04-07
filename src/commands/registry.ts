@@ -23,7 +23,7 @@ const VALID_RATING_SOURCES = ["agent", "system", "user"] as const;
 type RatingSource = (typeof VALID_RATING_SOURCES)[number];
 
 export function createRegistryCommand(): Command {
-  const cmd = new Command("registry").description("Manage deployment registry");
+  const cmd = new Command("registry").description("Manage deployment registry (data, search, analytics, migration)");
 
   cmd
     .command("complete <deploy-id>")
@@ -165,10 +165,17 @@ export function createRegistryCommand(): Command {
           filtered = filtered.filter((d) => d.team === opts.team);
         }
         if (opts.status) {
+          const validStatuses = ["running", "success", "partial", "failed", "crashed", "dead"];
+          if (!validStatuses.includes(opts.status)) {
+            console.error(
+              `Error: Invalid status '${opts.status}'. Must be one of: ${validStatuses.join(", ")}`
+            );
+            process.exit(1);
+          }
           filtered = filtered.filter((d) => d.status === opts.status);
         }
         if (opts.since) {
-          filtered = filtered.filter((d) => d.started_at.startsWith(opts.since!));
+          filtered = filtered.filter((d) => d.started_at >= opts.since!);
         }
         filtered = filtered.slice(0, limit);
 
@@ -308,6 +315,12 @@ export function createRegistryCommand(): Command {
     .option("--dry-run", "Show what would be archived/deleted without modifying")
     .action(
       (opts: { retention?: number; dryRun?: boolean }) => {
+        // Deprecation warning
+        console.error(
+          "Warning: 'pa registry rotate' is deprecated. SQLite storage does not require JSONL rotation. " +
+            "Use 'pa registry clean' to manage orphaned deployments and 'pa registry archive-jsonl' to archive the legacy JSONL file."
+        );
+
         const retentionDays = opts.retention ?? 90;
         const registryPath = getRegistryPath();
         const registryDir = resolve(registryPath, "..");
@@ -621,28 +634,49 @@ export function createRegistryCommand(): Command {
       // Check JSONL deprecation on each command run
       checkJsonlDeprecation();
 
+      // Validate non-empty query
+      if (!query || query.trim() === "") {
+        console.error("Error: Search query cannot be empty.");
+        process.exit(1);
+      }
+
       const limit = opts.limit ?? 20;
       const db = getDb();
 
       // FTS5 MATCH with snippet highlighting
       // snippet() returns: [start], matched text, [end], ... context, max_tokens
-      const rows = db
-        .prepare(`
-          SELECT d.deployment_id, d.team, d.status, d.started_at,
-                 snippet(deployments_fts, 1, '[', ']', '...', 20) as snippet
-          FROM deployments_fts f
-          JOIN deployments d ON d.rowid = f.rowid
-          WHERE deployments_fts MATCH ?
-          ORDER BY rank
-          LIMIT ?
-        `)
-        .all(query, limit) as Array<{
-          deployment_id: string;
-          team: string;
-          status: string;
-          started_at: string;
-          snippet: string;
-        }>;
+      let rows: Array<{
+        deployment_id: string;
+        team: string;
+        status: string;
+        started_at: string;
+        snippet: string;
+      }>;
+      try {
+        rows = db
+          .prepare(`
+            SELECT d.deployment_id, d.team, d.status, d.started_at,
+                   snippet(deployments_fts, 1, '[', ']', '...', 20) as snippet
+            FROM deployments_fts f
+            JOIN deployments d ON d.rowid = f.rowid
+            WHERE deployments_fts MATCH ?
+            ORDER BY rank
+            LIMIT ?
+          `)
+          .all(query, limit) as Array<{
+            deployment_id: string;
+            team: string;
+            status: string;
+            started_at: string;
+            snippet: string;
+          }>;
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("fts5")) {
+          console.error("Error: Invalid search query. Use simple keywords (e.g., \"sqlite migration\").");
+          process.exit(1);
+        }
+        throw err;
+      }
 
       if (rows.length === 0) {
         console.log("No results found.");
@@ -666,7 +700,7 @@ export function createRegistryCommand(): Command {
   cmd
     .command("analytics")
     .description("Show analytics views: deployments per day, team activity, rating trends")
-    .option("--view <name>", "Filter by view (v_deployments_per_day|v_team_activity|v_rating_trends)")
+    .option("--view <name>", "Filter by view (daily|teams|ratings or SQL view names)")
     .option("--team <name>", "Filter by team (for v_team_activity)")
     .option("--since <YYYY-MM-DD>", "Filter deployments since date")
     .action((opts: { view?: string; team?: string; since?: string }) => {
@@ -674,8 +708,16 @@ export function createRegistryCommand(): Command {
 
       const db = getDb();
 
+      // Map user-friendly names to SQL view names
+      const viewMap: Record<string, string> = {
+        daily: "v_deployments_per_day",
+        teams: "v_team_activity",
+        ratings: "v_rating_trends",
+      };
+      const resolvedView = opts.view ? (viewMap[opts.view] ?? opts.view) : undefined;
+
       // Deployments per day
-      if (!opts.view || opts.view === "v_deployments_per_day") {
+      if (!resolvedView || resolvedView === "v_deployments_per_day") {
         const deployDaySql = opts.since
           ? "SELECT day, count, successes, failures FROM v_deployments_per_day WHERE day >= ? ORDER BY day DESC LIMIT 30"
           : "SELECT day, count, successes, failures FROM v_deployments_per_day ORDER BY day DESC LIMIT 30";
@@ -702,7 +744,7 @@ export function createRegistryCommand(): Command {
       }
 
       // Team activity
-      if (!opts.view || opts.view === "v_team_activity") {
+      if (!resolvedView || resolvedView === "v_team_activity") {
         const teamSql = opts.team
           ? "SELECT team, total, last_deployment FROM v_team_activity WHERE team = ? ORDER BY total DESC"
           : "SELECT team, total, last_deployment FROM v_team_activity ORDER BY total DESC";
@@ -728,7 +770,7 @@ export function createRegistryCommand(): Command {
       }
 
       // Rating trends
-      if (!opts.view || opts.view === "v_rating_trends") {
+      if (!resolvedView || resolvedView === "v_rating_trends") {
         const ratingSql = opts.since
           ? "SELECT day, team, avg_overall, avg_productivity, avg_quality FROM v_rating_trends WHERE day >= ? ORDER BY day DESC, team LIMIT 60"
           : "SELECT day, team, avg_overall, avg_productivity, avg_quality FROM v_rating_trends ORDER BY day DESC, team LIMIT 60";
