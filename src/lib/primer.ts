@@ -168,7 +168,7 @@ function resolveRepoSlug(repoRoot: string): string {
  * Handles both SSH (git@github.com:owner/repo.git) and HTTPS (https://github.com/owner/repo.git) formats.
  * Returns undefined if no remote is configured.
  */
-function resolveGhRepo(repoRoot: string): string | undefined {
+export function resolveGhRepo(repoRoot: string): string | undefined {
   try {
     const url = execSync(`git -C "${repoRoot}" remote get-url origin`, { encoding: "utf-8" }).trim();
     // SSH: git@github.com:owner/repo.git → owner/repo
