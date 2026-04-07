@@ -92,8 +92,8 @@
             # --- Rebuild better-sqlite3 native addon using local node headers ---
             cd $out/share/personal-assistant/node_modules/better-sqlite3
             patchShebangs .
-            export NODEDIR=${pkgs.nodejs_22}/include/node
-            npm_config_build_from_source=true node-gyp rebuild --nodedir=$NODEDIR --openssl-fips=false
+            export npm_config_nodedir=${pkgs.nodejs_22}
+            ${pkgs.nodejs_22}/bin/node ${pkgs.nodejs_22}/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js rebuild --nodedir=${pkgs.nodejs_22} --openssl-fips=false
 
             runHook postInstall
           '';
