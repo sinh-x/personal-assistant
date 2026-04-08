@@ -95,9 +95,11 @@ function formatDocRefsTable(docRefs: DocRef[]): string {
   if (docRefs.length === 0) return "  (none)";
   const header = "  TYPE".padEnd(22) + "PATH".padEnd(60) + "PRIMARY";
   const sep = "  " + "-".repeat(80);
-  const rows = docRefs.map((r) =>
-    "  " + r.type.padEnd(20) + r.path.padEnd(60) + (r.primary ? "✓" : "")
-  );
+  const rows = docRefs.map((r) => {
+    const isUrl = r.path.startsWith("http://") || r.path.startsWith("https://");
+    const displayPath = isUrl ? `[url] ${r.path}` : r.path;
+    return "  " + r.type.padEnd(20) + displayPath.padEnd(60) + (r.primary ? "✓" : "");
+  });
   return [header, sep, ...rows].join("\n");
 }
 
@@ -278,11 +280,14 @@ export function createTicketCommand(): Command {
         }
         if (opts.docRef !== undefined) {
           const parsedDocRef = parseDocRef(opts.docRef, opts.docRefPrimary ?? false);
-          // F2: Validate file existence unless --force is set
+          // F2: Validate file existence unless --force is set (skip for URLs)
           if (!opts.force) {
-            const fullPath = normalizeSandboxPath(parsedDocRef.path);
-            if (!existsSync(fullPath)) {
-              process.stderr.write(`Warning: doc_ref path does not exist: ${parsedDocRef.path}\n`);
+            const isUrl = parsedDocRef.path.startsWith("http://") || parsedDocRef.path.startsWith("https://");
+            if (!isUrl) {
+              const fullPath = normalizeSandboxPath(parsedDocRef.path);
+              if (!existsSync(fullPath)) {
+                process.stderr.write(`Warning: doc_ref path does not exist: ${parsedDocRef.path}\n`);
+              }
             }
           }
           input.add_doc_ref = parsedDocRef;
@@ -473,6 +478,9 @@ export function createTicketCommand(): Command {
 
       for (const ticket of tickets) {
         for (const ref of ticket.doc_refs ?? []) {
+          // Skip URL-type or URL-path doc_refs — they don't have local file existence
+          const isUrl = ref.path.startsWith("http://") || ref.path.startsWith("https://");
+          if (isUrl || ref.type === "url") continue;
           const fullPath = normalizeSandboxPath(ref.path);
           if (!existsSync(fullPath)) {
             orphans.push({

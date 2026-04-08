@@ -47,14 +47,18 @@ function formatDocRefsTable(docRefs: DocRef[]): string {
   const pathWidth = width - typeWidth - 12;
   const header = "  TYPE".padEnd(typeWidth) + "PATH".padEnd(pathWidth) + "PRIMARY";
   const sep = "  " + "-".repeat(width);
-  const rows = docRefs.map((r) =>
-    "  " +
-    r.type.padEnd(typeWidth - 2) +
-    (r.path.length > pathWidth - 3
-      ? r.path.slice(0, pathWidth - 6) + "..."
-      : r.path).padEnd(pathWidth - 2) +
-    (r.primary ? "✓" : "")
-  );
+  const rows = docRefs.map((r) => {
+    const isUrl = r.path.startsWith("http://") || r.path.startsWith("https://");
+    const displayPath = isUrl ? `[url] ${r.path}` : r.path;
+    return (
+      "  " +
+      r.type.padEnd(typeWidth - 2) +
+      (displayPath.length > pathWidth - 3
+        ? displayPath.slice(0, pathWidth - 6) + "..."
+        : displayPath).padEnd(pathWidth - 2) +
+      (r.primary ? "✓" : "")
+    );
+  });
   return [header, sep, ...rows].join("\n");
 }
 
