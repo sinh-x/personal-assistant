@@ -123,6 +123,8 @@ export function teamsRoutes(): Hono {
             name: config.name,
             description: config.description ?? "",
             deploy_modes: modes,
+            default_provider: config.default_provider ?? null,
+            default_model: config.default_model ?? null,
           });
         } catch {
           // skip malformed YAML

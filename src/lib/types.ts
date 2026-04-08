@@ -56,6 +56,10 @@ export interface TeamConfig {
   agents: Agent[];
   objective: string;
   model?: 'haiku' | 'sonnet' | 'opus';
+  /** Team-level default API provider — used when no per-mode provider is set */
+  default_provider?: 'anthropic' | 'minimax';
+  /** Team-level default model — used when no per-mode model is set */
+  default_model?: 'haiku' | 'sonnet' | 'opus';
   /** Available deployment modes for this team */
   deploy_modes?: DeployMode[];
   /** Default mode to use when no --mode flag is provided */
