@@ -85,3 +85,5 @@ Agents shut down in this order:
 3. **Team manager** collects all results → writes own session log → writes registry completion marker → shuts down team → exits
 
 **Never shut down without logging.** If you're told to shut down, log first.
+
+**Post-completion work:** If user interaction or follow-up work occurs after the completion marker was written, amend the registry (`pa registry amend <deploy-id>`) and update the session log with `[AMENDED]` markers before shutting down.

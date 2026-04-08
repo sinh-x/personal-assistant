@@ -2,18 +2,12 @@ import { Command } from "commander";
 import {
   appendRegistryEvent,
   getDeploymentEvents,
-  readRegistry,
   queryDeploymentStatuses,
   queryDeploymentStatus,
-  checkJsonlDeprecation,
 } from "../lib/registry.js";
 import { localISOTimestamp } from "../lib/time.js";
 import type { Rating, RegistryEvent } from "../lib/types.js";
-import { getRegistryPath, getRegistryDbPath } from "../lib/paths.js";
 import { getDb } from "../lib/registry-db.js";
-import { execSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync, renameSync } from "node:fs";
-import { resolve } from "node:path";
 
 const VALID_STATUSES = ["success", "partial", "failed"] as const;
 type CompletionStatus = (typeof VALID_STATUSES)[number];
@@ -306,333 +300,12 @@ export function createRegistryCommand(): Command {
       }
     );
 
-  // pa registry rotate
-  cmd
-    .command("rotate")
-    .description("Archive old registry events to monthly archive files")
-    .option("--retention <days>", "Delete archives older than N days (default 90)", parseInt)
-    .option("--dry-run", "Show what would be archived/deleted without modifying")
-    .action(
-      (opts: { retention?: number; dryRun?: boolean }) => {
-        // Deprecation warning
-        console.error(
-          "Warning: 'pa registry rotate' is deprecated. SQLite storage does not require JSONL rotation. " +
-            "Use 'pa registry clean' to manage orphaned deployments and 'pa registry archive-jsonl' to archive the legacy JSONL file."
-        );
-
-        const retentionDays = opts.retention ?? 90;
-        const registryPath = getRegistryPath();
-        const registryDir = resolve(registryPath, "..");
-
-        // Get current month prefix for filtering
-        const now = new Date();
-        const currentYear = now.getFullYear();
-        const currentMonth = now.getMonth() + 1;
-
-        // Read current registry
-        const events = readRegistry();
-
-        // Partition events: current month vs older
-        const olderEvents: RegistryEvent[] = [];
-        const currentMonthEvents: RegistryEvent[] = [];
-
-        for (const ev of events) {
-          const evDate = new Date(ev.timestamp);
-          if (evDate.getFullYear() < currentYear ||
-              (evDate.getFullYear() === currentYear && evDate.getMonth() + 1 < currentMonth)) {
-            olderEvents.push(ev);
-          } else {
-            currentMonthEvents.push(ev);
-          }
-        }
-
-        // Group older events by year-month
-        const byMonth = new Map<string, RegistryEvent[]>();
-        for (const ev of olderEvents) {
-          const d = new Date(ev.timestamp);
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-          const group = byMonth.get(key) ?? [];
-          group.push(ev);
-          byMonth.set(key, group);
-        }
-
-        console.log(`Registry has ${events.length} total events.`);
-        console.log(`Current month events: ${currentMonthEvents.length}.`);
-        console.log(`Events to archive: ${olderEvents.length}.`);
-
-        if (opts.dryRun) {
-          if (olderEvents.length > 0) {
-            console.log("\nWould archive the following months:");
-            for (const [month, monthEvents] of byMonth) {
-              console.log(`  ${month}: ${monthEvents.length} events → registry-${month}.jsonl.gz`);
-            }
-          } else {
-            console.log("\nNo events to archive.");
-          }
-
-          // Check retention
-          const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-          console.log(`\nRetention: ${retentionDays} days. Archives older than ${new Date(cutoffMs).toISOString().slice(0, 10)} would be deleted.`);
-
-          // Find existing archives
-          const archives = readdirSync(registryDir).filter((f) => f.startsWith("registry-") && f.endsWith(".jsonl.gz"));
-          const oldArchives = archives.filter((f) => {
-            const match = f.match(/registry-(\d{4}-\d{2})\.jsonl\.gz/);
-            if (!match) return false;
-            const archDate = new Date(match[1] + "-01");
-            return archDate.getTime() < cutoffMs;
-          });
-
-          if (oldArchives.length > 0) {
-            console.log("\nArchives that would be deleted:");
-            for (const f of oldArchives) {
-              console.log(`  ${f}`);
-            }
-          } else {
-            console.log("\nNo archives to delete.");
-          }
-        } else {
-          // Actually archive
-          for (const [month, monthEvents] of byMonth) {
-            const archivePath = resolve(registryDir, `registry-${month}.jsonl.gz`);
-            const jsonlContent = monthEvents.map((e) => JSON.stringify(e)).join("\n") + "\n";
-
-            // Compress to gzip
-            const tempFile = archivePath + ".tmp";
-            writeFileSync(tempFile, jsonlContent);
-            // Use gzip command for compression
-            execSync(`gzip -c "${tempFile}" > "${archivePath}"`);
-            unlinkSync(tempFile);
-            console.log(`Archived: ${archivePath} (${monthEvents.length} events)`);
-          }
-
-          // Rewrite current month events to registry.jsonl (remove older events)
-          const currentJsonl = currentMonthEvents.map((e) => JSON.stringify(e)).join("\n") + "\n";
-          writeFileSync(registryPath, currentJsonl);
-
-          // Delete old archives per retention
-          const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000;
-          const archives = readdirSync(registryDir).filter((f) => f.startsWith("registry-") && f.endsWith(".jsonl.gz"));
-          for (const f of archives) {
-            const match = f.match(/registry-(\d{4}-\d{2})\.jsonl\.gz/);
-            if (!match) continue;
-            const archDate = new Date(match[1] + "-01");
-            if (archDate.getTime() < cutoffMs) {
-              unlinkSync(resolve(registryDir, f));
-              console.log(`Deleted old archive: ${f}`);
-            }
-          }
-
-          console.log("Rotation complete.");
-        }
-      }
-    );
-
-  // pa registry migrate
-  cmd
-    .command("migrate")
-    .description("Migrate existing JSONL registry to SQLite")
-    .option("--force", "Force re-migration even if data exists")
-    .action((opts: { force?: boolean }) => {
-      const registryPath = getRegistryPath();
-      const dbPath = getRegistryDbPath();
-
-      // Check if JSONL file exists
-      if (!existsSync(registryPath)) {
-        console.log("No JSONL registry found. Nothing to migrate.");
-        return;
-      }
-
-      // Open SQLite DB
-      const db = getDb();
-
-      // Idempotent check
-      const existingCount = db
-        .prepare("SELECT COUNT(*) as count FROM registry_events")
-        .get() as { count: number };
-
-      if (existingCount.count > 0 && !opts.force) {
-        console.log(
-          `Registry already has ${existingCount.count} events. Use --force to re-migrate.`
-        );
-        return;
-      }
-
-      // If force, clear existing data
-      if (opts.force && existingCount.count > 0) {
-        console.log(`Clearing existing ${existingCount.count} events...`);
-        db.exec("DELETE FROM registry_events");
-        db.exec("DELETE FROM deployments");
-      }
-
-      // Read JSONL directly (readRegistry() now queries SQLite, so read JSONL directly here)
-      const fileContent = readFileSync(registryPath, "utf-8");
-      const lines = fileContent.split("\n").filter((l) => l.trim());
-      const jsonlCount = lines.length;
-
-      if (jsonlCount === 0) {
-        console.log("JSONL registry is empty. Nothing to migrate.");
-        return;
-      }
-
-      console.log(`Migrating ${jsonlCount} events from JSONL to SQLite...`);
-
-      // Begin transaction
-      const migrateStmt = db.prepare(`
-        INSERT INTO registry_events (
-          deployment_id, team, event, timestamp, pid, status, summary,
-          log_file, primer, agents, models, error, exit_code,
-          ticket_id, provider, rating, objective, repo
-        ) VALUES (
-          @deployment_id, @team, @event, @timestamp, @pid, @status, @summary,
-          @log_file, @primer, @agents, @models, @error, @exit_code,
-          @ticket_id, @provider, @rating, @objective, @repo
-        )
-      `);
-
-      const insertDeploymentStmt = db.prepare(`
-        INSERT INTO deployments (
-          deployment_id, team, status, started_at, pid, primer,
-          agents, models, ticket_id, objective, repo, provider
-        ) VALUES (
-          @deployment_id, @team, 'running', @started_at, @pid, @primer,
-          @agents, @models, @ticket_id, @objective, @repo, @provider
-        )
-      `);
-
-      const updateDeploymentStmt = db.prepare(`
-        UPDATE deployments SET
-          status = @status,
-          completed_at = @completed_at,
-          summary = @summary,
-          log_file = @log_file,
-          rating = @rating,
-          exit_code = @exit_code
-        WHERE deployment_id = @deployment_id
-      `);
-
-      const crashDeploymentStmt = db.prepare(`
-        UPDATE deployments SET
-          status = 'crashed',
-          completed_at = @completed_at,
-          error = @error,
-          exit_code = @exit_code
-        WHERE deployment_id = @deployment_id
-      `);
-
-      db.exec("BEGIN TRANSACTION");
-
-      const BATCH_SIZE = 1000;
-      let insertedCount = 0;
-      const seenDeployments = new Set<string>();
-
-      for (let i = 0; i < lines.length; i++) {
-        try {
-          const event = JSON.parse(lines[i]) as RegistryEvent;
-
-          // INSERT INTO registry_events
-          migrateStmt.run({
-            deployment_id: event.deployment_id,
-            team: event.team,
-            event: event.event,
-            timestamp: event.timestamp,
-            pid: event.pid ?? null,
-            status: event.status ?? null,
-            summary: event.summary ?? null,
-            log_file: event.log_file ?? null,
-            primer: event.primer ?? null,
-            agents: event.agents ? JSON.stringify(event.agents) : null,
-            models: event.models ? JSON.stringify(event.models) : null,
-            error: event.error ?? null,
-            exit_code: event.exit_code ?? null,
-            ticket_id: event.ticket_id ?? null,
-            provider: event.provider ?? null,
-            rating: event.rating ? JSON.stringify(event.rating) : null,
-            objective: event.objective ?? null,
-            repo: event.repo ?? null,
-          });
-          insertedCount++;
-
-          // UPSERT into deployments
-          if (!seenDeployments.has(event.deployment_id)) {
-            seenDeployments.add(event.deployment_id);
-
-            if (event.event === "started") {
-              insertDeploymentStmt.run({
-                deployment_id: event.deployment_id,
-                team: event.team,
-                started_at: event.timestamp,
-                pid: event.pid ?? null,
-                primer: event.primer ?? null,
-                agents: event.agents ? JSON.stringify(event.agents) : null,
-                models: event.models ? JSON.stringify(event.models) : null,
-                ticket_id: event.ticket_id ?? null,
-                objective: event.objective ?? null,
-                repo: event.repo ?? null,
-                provider: event.provider ?? null,
-              });
-            }
-          }
-
-          if (event.event === "completed") {
-            updateDeploymentStmt.run({
-              deployment_id: event.deployment_id,
-              status: event.status ?? "success",
-              completed_at: event.timestamp,
-              summary: event.summary ?? null,
-              log_file: event.log_file ?? null,
-              rating: event.rating ? JSON.stringify(event.rating) : null,
-              exit_code: event.exit_code ?? null,
-            });
-          } else if (event.event === "crashed") {
-            crashDeploymentStmt.run({
-              deployment_id: event.deployment_id,
-              completed_at: event.timestamp,
-              error: event.error ?? null,
-              exit_code: event.exit_code ?? null,
-            });
-          }
-
-          // Commit in batches
-          if ((i + 1) % BATCH_SIZE === 0) {
-            db.exec("COMMIT");
-            db.exec("BEGIN TRANSACTION");
-            process.stdout.write(`\r  Inserted ${i + 1}/${jsonlCount} events...`);
-          }
-        } catch (err) {
-          console.error(`\nError parsing line ${i + 1}: ${err}`);
-        }
-      }
-
-      db.exec("COMMIT");
-      console.log(`\r  Inserted ${insertedCount}/${jsonlCount} events.`);
-
-      // Verify counts
-      const finalEventCount = db
-        .prepare("SELECT COUNT(*) as count FROM registry_events")
-        .get() as { count: number };
-      const finalDeployCount = db
-        .prepare("SELECT COUNT(*) as count FROM deployments")
-        .get() as { count: number };
-
-      // Get DB size
-      const dbStats = statSync(dbPath);
-      const dbSizeKB = (dbStats.size / 1024).toFixed(1);
-
-      console.log(
-        `Migration complete: ${finalEventCount.count} events, ${finalDeployCount.count} deployments. DB size: ${dbSizeKB} KB`
-      );
-    });
-
   // pa registry search <query>
   cmd
     .command("search <query>")
     .description("Search deployments using FTS5 full-text search")
     .option("--limit <N>", "Maximum results (default 20)", parseInt)
     .action((query: string, opts: { limit?: number }) => {
-      // Check JSONL deprecation on each command run
-      checkJsonlDeprecation();
-
       // Validate non-empty query
       if (!query || query.trim() === "") {
         console.error("Error: Search query cannot be empty.");
@@ -703,8 +376,6 @@ export function createRegistryCommand(): Command {
     .option("--team <name>", "Filter by team (for v_team_activity)")
     .option("--since <YYYY-MM-DD>", "Filter deployments since date")
     .action((opts: { view?: string; team?: string; since?: string }) => {
-      checkJsonlDeprecation();
-
       const db = getDb();
 
       // Map user-friendly names to SQL view names
@@ -799,22 +470,53 @@ export function createRegistryCommand(): Command {
       }
     });
 
-  // pa registry archive-jsonl
+  // pa registry amend <deploy-id>
   cmd
-    .command("archive-jsonl")
-    .description("Archive the legacy JSONL registry file to registry.jsonl.bak")
-    .action(() => {
-      const registryPath = getRegistryPath();
-      const bakPath = registryPath + ".bak";
+    .command("amend <deploy-id>")
+    .description("Append an amendment note to a completed deployment")
+    .requiredOption("--summary <text>", "Amendment summary to append")
+    .option("--log-file <path>", "Session log file path (optional)")
+    .action(
+      (
+        deployId: string,
+        opts: {
+          summary: string;
+          logFile?: string;
+        }
+      ) => {
+        // Validate deployment exists and has a completed event
+        const events = getDeploymentEvents(deployId);
+        const started = events.find((e) => e.event === "started");
+        if (!started) {
+          console.error(
+            `Error: Deployment "${deployId}" not found in registry (no started event).`
+          );
+          process.exit(1);
+        }
 
-      if (!existsSync(registryPath)) {
-        console.log("No JSONL registry file found. Nothing to archive.");
-        return;
+        const completed = events.find((e) => e.event === "completed");
+        if (!completed) {
+          console.error(
+            `Error: Deployment "${deployId}" has not been completed. Use "pa registry complete" first.`
+          );
+          process.exit(1);
+        }
+
+        const event: RegistryEvent = {
+          deployment_id: deployId,
+          team: started.team,
+          event: "amended",
+          timestamp: localISOTimestamp(),
+          summary: opts.summary,
+          ...(opts.logFile ? { log_file: opts.logFile } : {}),
+        };
+
+        appendRegistryEvent(event);
+        console.log(
+          `Amended: ${deployId} — ${opts.summary}`
+        );
       }
-
-      renameSync(registryPath, bakPath);
-      console.log(`Archived registry.jsonl to ${bakPath}`);
-    });
+    );
 
   return cmd;
 }

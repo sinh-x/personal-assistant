@@ -1,7 +1,5 @@
 import { getDb } from "./registry-db.js";
 import type { RegistryEvent, DeploymentStatus } from "./types.js";
-import { getRegistryPath, getRegistryDbPath } from "./paths.js";
-import { existsSync, statSync, appendFileSync } from "node:fs";
 
 /**
  * Validate a registry event has required fields.
@@ -106,12 +104,6 @@ export function appendRegistryEvent(event: RegistryEvent): void {
 
   // UPSERT INTO deployments materialized view
   upsertDeployment(db, event);
-
-  // Dual-write: also append to JSONL if PA_REGISTRY_DUAL_WRITE=1
-  if (process.env["PA_REGISTRY_DUAL_WRITE"] === "1") {
-    const jsonlPath = getRegistryPath();
-    appendFileSync(jsonlPath, JSON.stringify(event) + "\n");
-  }
 }
 
 /**
@@ -190,6 +182,17 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
         completed_at: event.timestamp,
         error: event.error ?? null,
         exit_code: event.exit_code ?? null,
+      });
+      break;
+
+    case "amended":
+      db.prepare(`
+        UPDATE deployments SET
+          summary = COALESCE(summary, '') || '\n[AMENDED] ' || @summary
+        WHERE deployment_id = @deployment_id
+      `).run({
+        deployment_id: event.deployment_id,
+        summary: event.summary ?? "",
       });
       break;
   }
@@ -361,30 +364,4 @@ export function queryDeploymentStatus(deployId: string): DeploymentStatus | null
     provider: row.provider as string | undefined,
     repo: row.repo as string | undefined,
   };
-}
-
-/**
- * Check if the legacy JSONL registry file is newer than the SQLite database.
- * If so, and dual-write is not enabled, emit a deprecation warning to stderr.
- * This should be called on startup or before any registry write.
- */
-export function checkJsonlDeprecation(): void {
-  if (process.env["PA_REGISTRY_DUAL_WRITE"] === "1") {
-    return; // dual-write active, JSONL is expected to be updated
-  }
-  const jsonlPath = getRegistryPath();
-  const dbPath = getRegistryDbPath();
-  if (!existsSync(jsonlPath)) {
-    return; // no JSONL file, nothing to warn about
-  }
-  const jsonlStat = statSync(jsonlPath);
-  const dbStat = statSync(dbPath);
-  if (jsonlStat.mtimeMs > dbStat.mtimeMs) {
-    console.error(
-      "[PA REGISTRY WARNING] The legacy JSONL registry file was modified more recently than the SQLite database. " +
-        "JSONL is deprecated — all writes now go to SQLite only. " +
-        "To maintain backwards compatibility during migration, set PA_REGISTRY_DUAL_WRITE=1. " +
-        "Run 'pa registry migrate --force' to sync external JSONL changes to SQLite."
-    );
-  }
 }

@@ -93,11 +93,11 @@ export interface Rating {
   insight?: number;
 }
 
-/** Events written to the deployment registry JSONL */
+/** Events written to the deployment registry SQLite */
 export interface RegistryEvent {
   deployment_id: string;
   team: string;
-  event: "started" | "pid" | "completed" | "crashed";
+  event: "started" | "pid" | "completed" | "crashed" | "amended";
   timestamp: string;
   pid?: number;
   status?: "success" | "partial" | "failed";

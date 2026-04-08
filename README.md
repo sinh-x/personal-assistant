@@ -63,7 +63,7 @@ See [docs/architecture.md](docs/architecture.md) for details.
 │   │   ├── types.ts         # Shared types (TeamConfig, RegistryEvent, etc.)
 │   │   ├── config.ts        # Config loader (user overrides + env vars)
 │   │   ├── paths.ts         # Path resolution (PA_HOME, PA_DATA, etc.)
-│   │   ├── registry.ts      # Registry JSONL read/write with flock
+│   │   ├── registry.ts      # Registry SQLite read/write (WAL mode)
 │   │   ├── yaml-parser.ts   # Team YAML loader
 │   │   └── primer.ts        # Primer document generator
 │   └── utils/

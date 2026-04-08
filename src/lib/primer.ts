@@ -97,8 +97,7 @@ interface PrimerOptions {
   teamConfig: TeamConfig;
   teamFile: string;
   deployTs: string;
-  registryFile: string;
-  registryLock: string;
+  registryDb: string;
   deploymentsDir: string;
   extraObjective?: string;
   deployMode?: string;
@@ -306,8 +305,7 @@ export function generatePrimer(opts: PrimerOptions): string {
     teamName,
     teamConfig,
     deployTs,
-    registryFile,
-    registryLock,
+    registryDb,
     deploymentsDir,
     extraObjective,
     deployMode,
@@ -407,8 +405,7 @@ deployment_id: ${deployId}
 team_name: ${teamName}
 team_display_name: ${teamConfig.name}
 deployed_at: ${deployTs}
-registry_file: ${registryFile}
-registry_lock: ${registryLock}
+registry_db: ${registryDb}
 workspace_base: ${deploymentsDir}/${deployId}
 team_workspace: ~/Documents/ai-usage/agent-teams/${teamName}
 ${cwd ? `cwd: ${cwd}\n` : ""}${repoRoot ? `repo_root: ${repoRoot}\n` : ""}${opts.ticket ? `ticket_id: ${opts.ticket}\n` : ""}agents:

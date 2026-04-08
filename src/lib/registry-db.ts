@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 
 let _db: Database.Database | null = null;
 
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
 
 function ensureDir(path: string): void {
   const dir = dirname(path);
@@ -43,6 +43,9 @@ function runMigrations(db: Database.Database): void {
 function migrateFrom(db: Database.Database, fromVersion: number): void {
   if (fromVersion < 1) {
     migrateToV1(db);
+  }
+  if (fromVersion < 2) {
+    migrateToV2(db);
   }
 }
 
@@ -159,6 +162,57 @@ function migrateToV1(db: Database.Database): void {
       WHERE rating IS NOT NULL
       GROUP BY day, team;
   `);
+}
+
+function migrateToV2(db: Database.Database): void {
+  // V2 adds 'amended' to the event CHECK constraint.
+  // SQLite does not support ALTER TABLE to modify CHECK constraints,
+  // so we use the table rebuild pattern: create new table -> copy data -> drop old -> rename new.
+  db.exec("BEGIN TRANSACTION");
+
+  // Create new registry_events table with updated CHECK constraint
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS registry_events_v2 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deployment_id TEXT NOT NULL,
+      team TEXT NOT NULL,
+      event TEXT NOT NULL CHECK (event IN ('started', 'pid', 'completed', 'crashed', 'amended')),
+      timestamp TEXT NOT NULL,
+      pid INTEGER,
+      status TEXT,
+      summary TEXT,
+      log_file TEXT,
+      primer TEXT,
+      agents TEXT,
+      models TEXT,
+      error TEXT,
+      exit_code INTEGER,
+      ticket_id TEXT,
+      provider TEXT,
+      rating TEXT,
+      objective TEXT,
+      repo TEXT
+    );
+  `);
+
+  // Copy data from old table to new table
+  db.exec(`
+    INSERT INTO registry_events_v2 SELECT * FROM registry_events;
+  `);
+
+  // Drop old table and rename new table
+  db.exec(`
+    DROP TABLE registry_events;
+    ALTER TABLE registry_events_v2 RENAME TO registry_events;
+  `);
+
+  // Recreate indexes (they were dropped when table was dropped)
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_events_deployment_id ON registry_events(deployment_id);
+    CREATE INDEX IF NOT EXISTS idx_events_timestamp ON registry_events(timestamp);
+  `);
+
+  db.exec("COMMIT");
 }
 
 /**
