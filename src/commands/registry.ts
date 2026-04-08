@@ -470,5 +470,53 @@ export function createRegistryCommand(): Command {
       }
     });
 
+  // pa registry amend <deploy-id>
+  cmd
+    .command("amend <deploy-id>")
+    .description("Append an amendment note to a completed deployment")
+    .requiredOption("--summary <text>", "Amendment summary to append")
+    .option("--log-file <path>", "Session log file path (optional)")
+    .action(
+      (
+        deployId: string,
+        opts: {
+          summary: string;
+          logFile?: string;
+        }
+      ) => {
+        // Validate deployment exists and has a completed event
+        const events = getDeploymentEvents(deployId);
+        const started = events.find((e) => e.event === "started");
+        if (!started) {
+          console.error(
+            `Error: Deployment "${deployId}" not found in registry (no started event).`
+          );
+          process.exit(1);
+        }
+
+        const completed = events.find((e) => e.event === "completed");
+        if (!completed) {
+          console.error(
+            `Error: Deployment "${deployId}" has not been completed. Use "pa registry complete" first.`
+          );
+          process.exit(1);
+        }
+
+        const event: RegistryEvent = {
+          deployment_id: deployId,
+          team: started.team,
+          event: "amended",
+          timestamp: localISOTimestamp(),
+          summary: opts.summary,
+          ...(opts.logFile ? { log_file: opts.logFile } : {}),
+        };
+
+        appendRegistryEvent(event);
+        console.log(
+          `Amended: ${deployId} — ${opts.summary}`
+        );
+      }
+    );
+
   return cmd;
 }
