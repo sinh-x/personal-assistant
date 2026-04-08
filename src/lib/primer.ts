@@ -353,7 +353,7 @@ function resolveTemplates(
       docName: 'builder-objective-template',
       summary: 'Before composing builder sub-deployment objectives',
       team: 'builder',
-      mode: 'orchestrate',
+      mode: 'orchestrator',
     },
     {
       filename: 'implementation-artifact.md',
@@ -367,7 +367,7 @@ function resolveTemplates(
       docName: 'uat-review-template',
       summary: 'Before handing off to review-uat',
       team: 'builder',
-      mode: 'orchestrate',
+      mode: 'orchestrator',
     },
     {
       filename: 'uat-review.md',
