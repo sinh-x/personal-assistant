@@ -21,7 +21,7 @@ pnpm bump:major   # 0.1.3 → 1.0.0
 
 Or directly:
 ```bash
-bash scripts/version_bump.sh [patch|minor|major]
+bash scripts/dev/version_bump.sh [patch|minor|major]
 ```
 
 The script: reads current version from `package.json`, computes new version, updates `package.json`, runs `pnpm build`, commits, and pushes to main.
