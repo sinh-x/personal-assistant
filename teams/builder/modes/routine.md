@@ -146,47 +146,25 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
 - Category: CLOSED
 
 **CASE B — PR found, state=OPEN, mergeable=MERGEABLE, checks=PASS:**
-- **Auto-Merge Check (runs first, regardless of existing sub-tickets):**
-  - Get PR created/updated time:
-    ```bash
-    gh pr view <number> --repo {{GH_REPO}} --json createdAt,updatedAt,url
-    ```
-  - Grace period: `${PA_ROUTINE_AUTO_MERGE_GRACE_PERIOD:-24}` hours (default 24h, configurable via env var)
-  - If PR has been in READY-TO-MERGE state for longer than grace period:
-    1. **Auto-Merge Action:**
-       ```bash
-       gh pr merge <number> --repo {{GH_REPO}} --admin --merge
-       ```
-    2. **Close any existing READY-TO-MERGE sub-ticket:**
-       ```bash
-       pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
-       ```
-    3. **Close parent ticket:**
-       ```bash
-       pa ticket update <TICKET-ID> --status done
-       pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged after grace period. Confirmed via gh."
-       ```
-    4. **Decision Log Entry:**
-       ```bash
-       echo "| <TICKET-ID> | READY-TO-MERGE (F3) | Auto-merged after grace period | PR #<number> merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
-       ```
-    5. **Category:** AUTO-MERGED
-  - If within grace period: proceed to sub-ticket handling below
-- **Sub-ticket dedup (only if within grace period):**
-  - Check for existing sub-ticket:
-    ```bash
-    pa ticket subticket list <TICKET-ID>
-    ```
-  - If open sub-ticket titled "READY-TO-MERGE: ..." exists: SKIP (record in SKIPPED)
-  - Otherwise create sub-ticket:
-    ```bash
-    pa ticket subticket create <TICKET-ID> \
-      --title "READY-TO-MERGE: PR #<number> awaiting merge" \
-      --summary "PR #<number> is open, mergeable, CI checks passing. Action: review and merge. PR URL: <url>" \
-      --assignee sinh --priority medium --estimate XS \
-      --actor builder/team-manager
-    ```
-- Category: AUTO-MERGED / READY-TO-MERGE (sub-ticket created or skipped)
+- **Auto-Merge (immediate):**
+  1. **Merge the PR:**
+     ```bash
+     gh pr merge <number> --repo {{GH_REPO}} --admin --merge
+     ```
+  2. **Close any existing READY-TO-MERGE sub-ticket:**
+     ```bash
+     pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
+     ```
+  3. **Close parent ticket:**
+     ```bash
+     pa ticket update <TICKET-ID> --status done
+     pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (MERGEABLE + CI passing). Confirmed via gh."
+     ```
+  4. **Decision Log Entry:**
+     ```bash
+     echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR MERGEABLE + CI passing | PR #<number> merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+     ```
+  5. **Category:** AUTO-MERGED
 
 **CASE C — PR found, state=OPEN, mergeable=CONFLICTING:**
 - Check for existing sub-ticket:
