@@ -282,9 +282,14 @@ case "${EVENT_TYPE}" in
 
     UserPromptSubmit)
         [[ -z "${PA_ACTIVITY_LOG:-}" ]] && exit 0
-        SESSION=$(echo "${INPUT}" | jq -r '.session_id // ""' | cut -c1:8)
+        SESSION=$(echo "${INPUT}" | jq -r '.session_id // ""' | cut -c1-8)
         PROMPT=$(echo "${INPUT}" | jq -r '.prompt // "" | .[0:300]')
         IS_CONTINUE=$(echo "${INPUT}" | jq -r '.is_continue // false')
+        # Save transcript_path for post-session extraction (PA-1107 / F7)
+        TRANSCRIPT_PATH=$(echo "${INPUT}" | jq -r '.transcript_path // ""')
+        if [[ -n "${TRANSCRIPT_PATH}" && -n "${PA_DEPLOYMENT_DIR:-}" ]]; then
+            echo "${TRANSCRIPT_PATH}" > "${PA_DEPLOYMENT_DIR}/session-jsonl-path.txt"
+        fi
         jq -c -n \
             --arg ts "${TS}" \
             --arg deploy_id "${DEPLOY_ID}" \
