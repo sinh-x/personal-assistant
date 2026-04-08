@@ -551,46 +551,67 @@ export function deployCommand(
   // Build claude command
   const claudePrompt = `Read the deployment primer at '${primerFile}' using the Read tool and follow ALL instructions in it exactly. Start immediately. When finished, write the completion marker and exit.`;
 
+  // Post-session content extraction: thinking, text, tool_use_detail → activity.jsonl
+  const extractScript = resolve(paHome, "scripts/extract-session-content.sh");
+  const runExtraction = () => {
+    if (!existsSync(extractScript)) return;
+    try {
+      execSync(`bash "${extractScript}"`, {
+        env: deployEnv,
+        stdio: ["pipe", "pipe", "inherit"],
+        timeout: 30000,
+      });
+    } catch (err) {
+      console.warn(`[extract] Post-session extraction failed: ${(err as Error).message}`);
+    }
+  };
+
   if (mode === "direct") {
     console.log(`Deploying team (direct): ${teamConfig.name} [${deployId}]`);
     appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    let exitCode = 0;
     try {
       execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
         stdio: "inherit",
         env: deployEnv,
       });
     } catch (err) {
-      const exitCode = (err as { status?: number }).status ?? 1;
+      exitCode = (err as { status?: number }).status ?? 1;
       appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
-      process.exit(exitCode);
     }
+    runExtraction();
+    if (exitCode !== 0) process.exit(exitCode);
   } else if (mode === "interactive") {
     console.log(`Deploying team (interactive): ${teamConfig.name} [${deployId}]`);
     console.log("  You will be prompted to approve tool calls.");
     appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    let exitCode = 0;
     try {
       execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
         stdio: "inherit",
         env: deployEnv,
       });
     } catch (err) {
-      const exitCode = (err as { status?: number }).status ?? 1;
+      exitCode = (err as { status?: number }).status ?? 1;
       appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
-      process.exit(exitCode);
     }
+    runExtraction();
+    if (exitCode !== 0) process.exit(exitCode);
   } else if (mode === "foreground") {
     console.log(`Deploying team (foreground): ${teamConfig.name} [${deployId}]`);
     appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    let exitCode = 0;
     try {
       execSync(`claude ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
         stdio: "inherit",
         env: deployEnv,
       });
     } catch (err) {
-      const exitCode = (err as { status?: number }).status ?? 1;
+      exitCode = (err as { status?: number }).status ?? 1;
       appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
-      process.exit(exitCode);
     }
+    runExtraction();
+    if (exitCode !== 0) process.exit(exitCode);
   } else {
     // Background mode
     const logFile = resolve(logsDir, `${teamName}-${deployId}.log`);
@@ -676,6 +697,11 @@ if [[ -s "$PA_LOG_FILE.err" ]]; then
   cat "$PA_LOG_FILE.err" >> "$PA_LOG_FILE"
 fi
 rm -f "$PA_LOG_FILE.err"
+# Post-session content extraction (thinking/text/tool_use_detail → activity.jsonl)
+if [[ -f "$PA_EXTRACT_SCRIPT" ]]; then
+  echo "[$(date -Iseconds)] Running post-session extraction..." >> "$PA_LOG_FILE"
+  bash "$PA_EXTRACT_SCRIPT" 2>> "$PA_LOG_FILE" || echo "[$(date -Iseconds)] Extraction failed (non-fatal)" >> "$PA_LOG_FILE"
+fi
 if [[ $exit_code -eq 124 ]]; then
   echo "[$(date -Iseconds)] TIMED OUT after $PA_MAX_RUNTIME s" >> "$PA_LOG_FILE"
   { flock -w 5 9; cat '${crashTimeoutJson}' >> "$PA_REGISTRY_FILE"; } 9>"$PA_REGISTRY_LOCK"
@@ -696,6 +722,7 @@ fi
       PA_CLAUDE_PROMPT: claudePrompt,
       PA_REGISTRY_FILE: registryFile,
       PA_REGISTRY_LOCK: registryLock,
+      PA_EXTRACT_SCRIPT: extractScript,
     };
 
     // Spawn background process via nohup — runs the script file, not inline string
