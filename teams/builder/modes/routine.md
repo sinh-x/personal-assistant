@@ -401,6 +401,20 @@ See template in Step 4 summary section.
 
 ---
 
+### Step 3.6 — Return to develop and pull
+
+After all ticket processing and clean-merge steps, ensure the local repo is on `develop` with the latest remote state:
+
+```bash
+cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+git checkout develop
+git pull origin develop
+```
+
+This keeps the working tree clean for the next deployment and ensures any PRs merged during this run are reflected locally.
+
+---
+
 ### Step 4 — Produce Structured Summary
 
 After processing all tickets, produce a structured summary as a ticket comment on the last processed ticket (or create an FYI ticket if no tickets were processed):
