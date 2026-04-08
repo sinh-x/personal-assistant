@@ -135,7 +135,7 @@ objective: |
   1. gatherer:
      - Process YouTube queue (~/Documents/ai-usage/queue/youtube-video-queue.txt)
      - Scan RSS feeds defined in team variables
-     - Scan recent agent system logs (sessions/, deployments/registry.jsonl, daily/ summaries)
+     - Scan recent agent system logs (sessions/, deployments/registry.db, daily/ summaries)
      - Output: ingestion report listing what was processed + system anomalies found
 
   2. curator:

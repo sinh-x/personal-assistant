@@ -79,7 +79,7 @@ After writing the daily extract, correlate scanned sessions with provider inform
 
 1. **Extract deployment IDs** from session headers — read each scanned session file and extract the `Deployment:` field from the header (format: `> Deployment: d-XXXXX`)
 
-2. **Correlate with registry** — for each deployment ID, look up the corresponding `started` event in `registry.jsonl` to get the primer path
+2. **Correlate with registry** — for each deployment ID, look up the corresponding `started` event via `pa registry show <deploy-id>` (SQLite) to get the primer path
 
 3. **Determine provider** — read the primer file and extract the model from the `models:` section:
    - If model is `opus`, `sonnet`, or `haiku` → provider = **Anthropic**

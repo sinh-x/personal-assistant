@@ -87,22 +87,39 @@ function __pa_modes
 end
 
 function __pa_deploy_ids
-    # List deployment IDs from registry.jsonl
-    set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
-    if test -f "$registry"
-        string match -r '"deployment_id":"(d-[0-9a-f]+)"' < "$registry" | string match -r 'd-[0-9a-f]+' | sort -u
+    # List deployment IDs from SQLite registry
+    set -l registry_db ~/Documents/ai-usage/deployments/registry.db
+    if test -f "$registry_db"
+        sqlite3 "$registry_db" "SELECT DISTINCT deployment_id FROM registry_events ORDER BY timestamp DESC LIMIT 100;" 2>/dev/null
+    else
+        # Fallback to legacy JSONL if SQLite DB doesn't exist yet
+        set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
+        if test -f "$registry"
+            string match -r '"deployment_id":"(d-[0-9a-f]+)"' < "$registry" | string match -r 'd-[0-9a-f]+' | sort -u
+        end
     end
 end
 
 function __pa_deployments_with_team
     # List deployments as "team/deployment_id" with summary as description.
     # Format: "team/id\tsummary" for fish's -d flag display.
-    # Uses Python for portable JSON parsing; prefer entries with summaries.
-    set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
-    if test -f "$registry"
-        python3 -c "
+    # Queries SQLite registry with fallback to legacy JSONL.
+    set -l registry_db ~/Documents/ai-usage/deployments/registry.db
+    if test -f "$registry_db"
+        sqlite3 "$registry_db" "
+            SELECT e.team || '/' || e.deployment_id, COALESCE(
+                (SELECT summary FROM registry_events WHERE deployment_id = e.deployment_id AND summary IS NOT NULL AND summary != '' LIMIT 1),
+                '(no summary)'
+            )
+            FROM (SELECT DISTINCT deployment_id, team FROM registry_events) e
+            ORDER BY e.deployment_id DESC
+            LIMIT 100;
+        " -separator \t 2>/dev/null
+    else
+        set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
+        if test -f "$registry"
+            python3 -c "
 import sys, json
-# First pass: collect summaries (prefer completed events which have summaries)
 entries = {}
 for line in open('$registry'):
     try:
@@ -115,12 +132,12 @@ for line in open('$registry'):
                 entries[dep_id] = (team, summary[:80] if summary else '')
     except:
         pass
-# Output in deployment_id order for consistency
 for dep_id in sorted(entries.keys()):
     team, summary = entries[dep_id]
     summary_disp = summary if summary else '(no summary)'
     print(f'{team}/{dep_id}\t{summary_disp}')
 " 2>/dev/null
+        end
     end
 end
 

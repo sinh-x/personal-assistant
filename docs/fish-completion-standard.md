@@ -45,7 +45,7 @@ When you add a new `pa` command, complete **all** of these steps before merging:
 |--------|---------|
 | `__pa_teams` | Team names from `PA_HOME/teams/` and `PA_CONFIG/teams/` (reads YAML files) |
 | `__pa_modes` | Deploy mode IDs for the currently selected team (reads team YAML) |
-| `__pa_deploy_ids` | Deployment IDs from `registry.jsonl` |
+| `__pa_deploy_ids` | Deployment IDs from SQLite registry (fallback: `registry.jsonl`) |
 | `__pa_timer_names` | Active `pa-*` systemd timer names |
 | `__pa_projects` | Project names from `pa repos list` (NAME column) |
 | `__pa_ticket_ids` | Active ticket IDs with title description from `pa ticket list` |

@@ -54,7 +54,7 @@ Increment the major version for:
 
 **Examples (hypothetical, PA has not yet reached v1.0.0):**
 - Removing `pa deploy --background` flag → major
-- Changing registry.jsonl schema in a backwards-incompatible way → major
+- Changing registry SQLite schema in a backwards-incompatible way → major
 - Renaming `pa ticket` to `pa task` → major
 
 **Note:** PA is currently pre-1.0.0 (`0.x.y`). Per semver, `0.x.y` signals unstable API. Minor bumps may include breaking changes during this phase. A `1.0.0` release would signal stable API commitment.

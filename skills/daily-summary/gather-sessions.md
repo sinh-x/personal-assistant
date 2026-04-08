@@ -17,8 +17,9 @@ You are a data-gathering agent. Your job is to read all session logs from today 
 
 ### Deployment Registry
 ```bash
-grep "$(date +%Y-%m-%d)" ~/Documents/ai-usage/deployments/registry.jsonl
+pa registry list --since "$(date +%Y-%m-%d)" --limit 100
 ```
+> The registry is stored in SQLite at `~/Documents/ai-usage/deployments/registry.db`. Use `pa registry list` or `pa registry show <deploy-id>` to query it.
 
 ## What to Extract
 

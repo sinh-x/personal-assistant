@@ -17,7 +17,7 @@ Example objective: "Evaluate daily 2026-03-26"
 ## YOUR TASK
 
 1. **Find all deployments from the target date:**
-   - Read `~/Documents/ai-usage/deployments/registry.jsonl` to find deployments by date
+   - Use `pa registry list --since <date> --limit 100` to find deployments by date (reads from SQLite)
    - Filter to only `requirements` team deployments
    - Include all modes (analyze, review, spike)
 2. **For each requirements deployment found:**
