@@ -11,6 +11,7 @@
     "build": "tsup",
     "test": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
     "dev": "tsup --watch",
     "bump:patch": "bash scripts/version_bump.sh patch",
     "bump:minor": "bash scripts/version_bump.sh minor",
@@ -27,14 +28,20 @@
     "marked-terminal": "^7.2.0"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/better-sqlite3": "^7.6.12",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
+    "eslint": "^10.2.0",
+    "eslint-plugin-no-only-tests": "^3.3.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.58.1"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3"]
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   },
   "engines": {
     "node": ">=22"

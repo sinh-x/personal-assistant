@@ -55,7 +55,7 @@ export function ideasRoutes(): Hono {
 
   // POST /api/ideas — create a new idea
   app.post("/api/ideas", async (c: Context) => {
-    let body: Record<string, unknown> = {};
+    let body: Record<string, unknown>;
     try {
       body = await c.req.json();
     } catch {

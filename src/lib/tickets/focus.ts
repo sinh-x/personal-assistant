@@ -235,7 +235,7 @@ export function readLatestFocusReport(): {
   if (!existsSync(artifactsDir)) return null;
 
   // Find all focus-report-*.md files sorted by mtime descending
-  let files: Array<{ name: string; mtime: Date }> = [];
+  let files: Array<{ name: string; mtime: Date }>;
   try {
     files = readdirSync(artifactsDir)
       .filter((f) => f.startsWith("focus-report-") && f.endsWith(".md"))

@@ -13,6 +13,28 @@ mkdir -p ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/team-manager
 
 Team artifacts directory already exists at `~/Documents/ai-usage/agent-teams/builder/artifacts/`.
 
+**Initialize Decision Log:**
+```bash
+echo "| Ticket | Auto-Resolve Rule | Evidence | Outcome | Timestamp |" > ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+echo "|--------|------------------|----------|---------|-----------|" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+```
+
+### Step 1.5 — Dry-Run Mode Detection
+
+Check if `--dry-run` flag is set (via `PA_DRY_RUN` environment variable):
+```bash
+if [ "$PA_DRY_RUN" = "true" ]; then
+  DRY_RUN=true
+  echo "DRY-RUN MODE: Will preview all auto-resolve decisions without executing them"
+fi
+```
+
+**Dry-Run Behavior:**
+- All auto-resolve decisions are logged to decision log WITHOUT executing the actual action
+- Sub-ticket creation is SKIPPED in dry-run (preview only)
+- Summary shows what WOULD have happened
+- Routine mode exits after processing all tickets with dry-run summary
+
 ### Step 2 — Fetch review-uat Tickets
 
 Get all PA project tickets in `review-uat` status:
@@ -33,12 +55,28 @@ pa ticket show <TICKET-ID> --json | jq -r '.tags[], .blockedBy[]'
 ```
 
 **CASE H — Ticket has `blocked` tag or non-empty `blockedBy`:**
-- Do NOT close. Check for existing sub-ticket:
+- Check for existing sub-ticket first:
   ```bash
   pa ticket subticket list <TICKET-ID>
   ```
 - If open sub-ticket titled "BLOCKED: ..." exists: SKIP (record in SKIPPED)
-- Otherwise create sub-ticket:
+- **Auto-Resolve Check (before creating sub-ticket):**
+  - For each `blockedBy` ticket ID, check if it's in `done` status:
+    ```bash
+    pa ticket show <BLOCKING-ID> --json | jq -r '.status'
+    ```
+  - If ALL `blockedBy` tickets are `done`:
+    1. **Auto-Resolve Action:** Update blocked ticket to `done`:
+       ```bash
+       pa ticket update <TICKET-ID> --status done
+       ```
+    2. **Decision Log Entry:**
+       ```bash
+       echo "| <TICKET-ID> | BLOCKED (F1) | All blocking tickets (<blocking-ids>) are done | Closed: auto-resolved | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+    3. **Category:** BLOCKED-AUTO-RESOLVED
+  - If any `blockedBy` ticket is NOT done: proceed to sub-ticket creation
+- Create sub-ticket only if auto-resolve did not apply:
   ```bash
   pa ticket subticket create <TICKET-ID> \
     --title "BLOCKED: Waiting on dependencies" \
@@ -56,6 +94,43 @@ For tickets that pass the blocked check, search for matching PRs:
 gh pr list --repo {{GH_REPO}} --state all --search "<TICKET-ID>" --json number,state,headRefName,mergeable,statusCheckRollup,mergedAt,closedAt,url
 ```
 
+#### Pre-Decision: Stale Sub-Ticket Resolution (F6)
+
+Before entering the decision tree, check if existing sub-tickets are **stale** — i.e., their triggering condition no longer applies. This prevents tickets from being permanently skipped due to outdated sub-tickets.
+
+```bash
+pa ticket subticket list <TICKET-ID>
+```
+
+For each **open** sub-ticket, cross-reference its type against the current PR state:
+
+| Sub-Ticket Pattern | Current PR State | Stale? | Action |
+|--------------------|-----------------|--------|--------|
+| "CONFLICT: ..." | mergeable=MERGEABLE or state=MERGED | Yes | Close sub-ticket |
+| "CI-FAILURE: ..." | checks=PASS or state=MERGED | Yes | Close sub-ticket |
+| "READY-TO-MERGE: ..." | state=MERGED | Yes | Close sub-ticket |
+| "ABANDONED: ..." | state=OPEN (PR reopened) | Yes | Close sub-ticket |
+| "BLOCKED: ..." | All blockers resolved (done status) | Yes | Close sub-ticket |
+
+**For each stale sub-ticket:**
+
+1. **Close it:**
+   ```bash
+   pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
+   ```
+
+2. **Comment on parent ticket:**
+   ```bash
+   pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-resolved stale sub-ticket <SUB-TICKET-ID> (<type>): condition no longer applies. PR #<number> is now <current-state>."
+   ```
+
+3. **Decision Log Entry:**
+   ```bash
+   echo "| <TICKET-ID> | STALE-RESOLVED (F6) | <SUB-TICKET-ID> (<type>) — PR now <state> | Auto-closed | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+   ```
+
+**After resolving stale sub-tickets, continue to the Decision Tree.** The ticket may now be eligible for normal case processing (e.g., a ticket whose CONFLICT sub-ticket was stale now proceeds to Case B for READY-TO-MERGE handling).
+
 #### Decision Tree
 
 **CASE A — PR found, state=MERGED:**
@@ -71,28 +146,57 @@ gh pr list --repo {{GH_REPO}} --state all --search "<TICKET-ID>" --json number,s
 - Category: CLOSED
 
 **CASE B — PR found, state=OPEN, mergeable=MERGEABLE, checks=PASS:**
-- Do NOT close. Check for existing sub-ticket:
-  ```bash
-  pa ticket subticket list <TICKET-ID>
-  ```
-- If open sub-ticket titled "READY-TO-MERGE: ..." exists: SKIP (record in SKIPPED)
-- Otherwise create sub-ticket:
-  ```bash
-  pa ticket subticket create <TICKET-ID> \
-    --title "READY-TO-MERGE: PR #<number> awaiting merge" \
-    --summary "PR #<number> is open, mergeable, CI checks passing. Action: review and merge. PR URL: <url>" \
-    --assignee sinh --priority medium --estimate XS \
-    --actor builder/team-manager
-  ```
-- Category: READY-TO-MERGE (sub-ticket created or skipped)
+- **Auto-Merge (immediate):**
+  1. **Merge the PR:**
+     ```bash
+     gh pr merge <number> --repo {{GH_REPO}} --admin --merge
+     ```
+  2. **Close any existing READY-TO-MERGE sub-ticket:**
+     ```bash
+     pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
+     ```
+  3. **Close parent ticket:**
+     ```bash
+     pa ticket update <TICKET-ID> --status done
+     pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (MERGEABLE + CI passing). Confirmed via gh."
+     ```
+  4. **Decision Log Entry:**
+     ```bash
+     echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR MERGEABLE + CI passing | PR #<number> merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+     ```
+  5. **Category:** AUTO-MERGED
 
 **CASE C — PR found, state=OPEN, mergeable=CONFLICTING:**
-- Do NOT close. Check for existing sub-ticket:
+- Check for existing sub-ticket:
   ```bash
   pa ticket subticket list <TICKET-ID>
   ```
 - If open sub-ticket titled "CONFLICT: ..." exists: SKIP (record in SKIPPED)
-- Otherwise create sub-ticket:
+- **Auto-Resolve Check (before creating sub-ticket):**
+  - Attempt dry-run merge to detect conflict types:
+    ```bash
+    cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+    git fetch origin <branch> <target-branch>
+    git checkout <branch>
+    git merge --no-commit --no-ff origin/<target-branch> 2>&1 | tee /tmp/merge-result.txt
+    git merge --abort
+    ```
+  - If merge output shows conflicts in **non-code files only** (README, docs, config files matching `*.md`, `*.yaml`, `*.yml`, `*.json`, `*.toml`, `*.ini`, `*.cfg`):
+    1. **Auto-Resolve Action:** Attempt auto-merge and push:
+       ```bash
+       git merge --no-commit --no-ff origin/<target-branch>
+       git checkout --ours -- "*.md" "*.yaml" "*.yml" "*.json" "*.toml" "*.ini" "*.cfg"
+       git add -A
+       git commit -m "Merge <target-branch> into <branch> (auto-resolve non-code conflicts)"
+       git push origin <branch>
+       ```
+    2. **Decision Log Entry:**
+       ```bash
+       echo "| <TICKET-ID> | CONFLICT (F2) | Non-code conflicts auto-resolved | Merged: <branch> into <target-branch> | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+    3. **Category:** CONFLICT-AUTO-RESOLVED
+  - If conflicts involve code files, or merge fails: proceed to sub-ticket creation
+- Create sub-ticket only if auto-resolve did not apply:
   ```bash
   pa ticket subticket create <TICKET-ID> \
     --title "CONFLICT: PR #<number> has merge conflicts" \
@@ -103,12 +207,29 @@ gh pr list --repo {{GH_REPO}} --state all --search "<TICKET-ID>" --json number,s
 - Category: CONFLICT (sub-ticket created or skipped)
 
 **CASE D — PR found, state=OPEN, checks=FAILING:**
-- Do NOT close. Check for existing sub-ticket:
+- Check for existing sub-ticket:
   ```bash
   pa ticket subticket list <TICKET-ID>
   ```
 - If open sub-ticket titled "CI-FAILURE: ..." exists: SKIP (record in SKIPPED)
-- Otherwise create sub-ticket:
+- **Auto-Resolve Check (before creating sub-ticket):**
+  - Re-check CI status:
+    ```bash
+    gh pr check <TICKET-ID> --repo {{GH_REPO}} --json statusCheckRollup | jq '.statusCheckRollup[] | select(.conclusion == "FAILURE" or .conclusion == null)'
+    ```
+  - If ALL previously failing checks now show as **PASSED** (re-run succeeded):
+    1. **Auto-Resolve Action:** Re-check PR state:
+       ```bash
+       gh pr view <TICKET-ID> --repo {{GH_REPO}} --json state,mergeable,statusCheckRollup
+       ```
+    2. If still OPEN and mergeable: proceed to READY-TO-MERGE handling
+    3. **Decision Log Entry:**
+       ```bash
+       echo "| <TICKET-ID> | CI-FAILURE (auto-rerun) | Flaky test(s) passed on re-run | Checks: <check-names> now PASSED | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+    4. **Category:** CI-FAILURE-AUTO-RESOLVED
+  - If checks still failing or cannot determine: proceed to sub-ticket creation
+- Create sub-ticket only if auto-resolve did not apply:
   ```bash
   pa ticket subticket create <TICKET-ID> \
     --title "CI-FAILURE: PR #<number> checks failing" \
@@ -148,12 +269,38 @@ gh pr list --repo {{GH_REPO}} --state all --search "<TICKET-ID>" --json number,s
 - **If no commits found:** → Case G
 
 **CASE G — No PR found AND no matching commits:**
-- Do NOT close. Check for existing sub-ticket:
+- Check for existing sub-ticket:
   ```bash
   pa ticket subticket list <TICKET-ID>
   ```
 - If open sub-ticket titled "ORPHAN: ..." exists: SKIP (record in SKIPPED)
-- Otherwise create sub-ticket:
+- **Auto-Resolve Check (alternate branch patterns):**
+  - Search for ticket ID in branch names:
+    ```bash
+    git branch -a --contains <TICKET-ID> 2>/dev/null || echo "No branches found"
+    ```
+  - Search for alternate branch naming patterns:
+    ```bash
+    git branch -a | grep -E "feature/.*<TICKET-ID>|fix/.*<TICKET-ID>|refactor/.*<TICKET-ID>" || echo "No alternate branches"
+    ```
+  - If work found on alternate branch:
+    1. Verify the branch is merged into target:
+       ```bash
+       git log --oneline --grep="<TICKET-ID>" --all | head -5
+       ```
+    2. If commits found on develop or main: work was merged
+    3. **Auto-Resolve Action:**
+       ```bash
+       pa ticket update <TICKET-ID> --status done
+       pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-closed: Found <TICKET-ID> work merged via alternate branch naming. Commits: <list>."
+       ```
+    4. **Decision Log Entry:**
+       ```bash
+       echo "| <TICKET-ID> | ORPHAN (F4) | Work verified via alternate branch pattern | Closed: merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+    5. **Category:** ORPHAN-AUTO-RESOLVED
+  - If no work found: proceed to sub-ticket creation
+- Create sub-ticket only if auto-resolve did not apply:
   ```bash
   pa ticket subticket create <TICKET-ID> \
     --title "ORPHAN: No PR or commits found" \
@@ -201,6 +348,59 @@ Process tickets in batch. If one ticket fails:
 3. Record in ERRORS section of summary
 4. Do NOT abort the entire run
 
+### Step 3.5 — Clean Merge Sub-Action (F5)
+
+After processing all tickets, check if `clean` branch exists and merge it into `develop`:
+
+```bash
+cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+
+# Check if clean branch exists
+if git show-ref --quiet refs/heads/clean; then
+  echo "Clean branch found, attempting merge into develop..."
+
+  # Attempt dry-run merge first
+  git checkout develop
+  DRY_MERGE_OUTPUT=$(git merge --no-commit --no-ff clean 2>&1)
+  MERGE_STATUS=$?
+
+  if [ $MERGE_STATUS -eq 0 ]; then
+    # Clean merge possible
+    if [ "$DRY_RUN" = "true" ]; then
+      echo "[DRY-RUN] Would merge clean into develop (no conflicts)"
+      git merge --abort
+    else
+      git merge --no-ff clean -m "Merge clean into develop (routine mode)"
+      git push origin develop
+      echo "Clean branch merged into develop"
+      # Log decision
+      echo "| CLEAN-MERGE | F5 | Clean merge successful | develop <- clean | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+    fi
+  else
+    # Merge has conflicts
+    git merge --abort
+    if [ "$DRY_RUN" = "true" ]; then
+      echo "[DRY-RUN] Would create CONFLICT sub-ticket for clean branch merge"
+    else
+      # Create sub-ticket for clean branch conflicts
+      pa ticket subticket create PA-0000 \
+        --title "CONFLICT: clean branch has merge conflicts with develop" \
+        --summary "Clean branch cannot be auto-merged into develop due to conflicts. Action: resolve manually. Conflicts detected in: $(echo $DRY_MERGE_OUTPUT | grep -E 'CONFLICT|conflict')" \
+        --assignee sinh --priority medium --estimate XS \
+        --actor builder/team-manager
+      echo "| CLEAN-MERGE | F5 | Conflicts detected | Sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+    fi
+  fi
+else
+  echo "Clean branch not found, skipping clean-merge"
+fi
+```
+
+**Decision Log Entry (for each clean-merge attempt):**
+See template in Step 4 summary section.
+
+---
+
 ### Step 4 — Produce Structured Summary
 
 After processing all tickets, produce a structured summary as a ticket comment on the last processed ticket (or create an FYI ticket if no tickets were processed):
@@ -211,6 +411,20 @@ After processing all tickets, produce a structured summary as a ticket comment o
 ## Routine Mode Summary — d-<deployment-id>
 
 **Mode:** routine | **Runtime:** <elapsed> | **Provider:** MiniMax
+**Dry-Run:** [true/false]
+
+---
+### AUTO-RESOLVED: N tickets
+| Ticket | Rule | Evidence | Outcome | Timestamp |
+|--------|------|----------|---------|-----------|
+| PA-XXXX | F1: BLOCKED resolved | All blocking tickets done | Closed: auto-resolved | YYYY-MM-DD |
+| PA-XXXX | F2: CONFLICT auto-merge | Non-code conflicts only | Merged: branch into target | YYYY-MM-DD |
+| PA-XXXX | F3: READY-TO-MERGE grace | PR older than grace period | Merged via gh | YYYY-MM-DD |
+| PA-XXXX | F4: ORPHAN alternate branch | Work found on feature/* branch | Closed: merged | YYYY-MM-DD |
+| PA-XXXX | CI-FAILURE rerun | Flaky tests now passing | Checks PASS | YYYY-MM-DD |
+| PA-XXXX | F6: Stale CONFLICT resolved | PR now MERGEABLE | Sub-ticket closed | YYYY-MM-DD |
+| PA-XXXX | F6: Stale CI-FAILURE resolved | Checks now PASS | Sub-ticket closed | YYYY-MM-DD |
+| PA-XXXX | F6: Stale READY-TO-MERGE resolved | PR now MERGED | Sub-ticket closed | YYYY-MM-DD |
 
 ---
 ### CLOSED: N tickets
@@ -290,6 +504,10 @@ pa registry complete $PA_DEPLOYMENT_ID \
 - **Graceful handling of empty results.** If no `review-uat` tickets are found, produce an FYI noting "0 tickets processed, none pending".
 - **20-ticket cap.** Process by priority (critical > high > medium > low). Note TRUNCATED if over 20.
 - **Copyable pattern.** Other teams can copy this objective file and adapt for their own use.
+- **Dry-run mode.** When `PA_DRY_RUN=true`, preview all auto-resolve decisions without executing them. Set via `pa deploy builder --mode routine --dry-run`.
+- **NF3 Fail-safe.** If any auto-resolve verification step fails, fall back to sub-ticket creation. Never auto-close a ticket if verification cannot confirm the condition.
+- **Auto-resolve before sub-ticket.** Always attempt auto-resolve before creating sub-tickets for BLOCKED, CONFLICT, CI-FAILURE, ORPHAN, and READY-TO-MERGE cases.
+- **Stale sub-ticket resolution (F6).** Before entering the decision tree, cross-reference existing open sub-tickets against current PR state. Close sub-tickets whose triggering condition no longer applies (e.g., CONFLICT sub-ticket when PR is now MERGEABLE). After cleanup, re-evaluate the ticket through the normal decision tree.
 
 ---
 
