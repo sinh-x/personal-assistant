@@ -1,9 +1,6 @@
 import { createInterface } from "node:readline";
-import { mkdirSync, existsSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { homedir } from "node:os";
-
-const REPORTS_DIR = resolve(homedir(), "Documents/ai-usage/sinh-inputs/reports");
+import { TicketStore } from "../lib/tickets/store.js";
+import { selectProject } from "../lib/interactive.js";
 
 const REPORT_TYPES = ["bug", "feature", "agent", "feedback"] as const;
 type ReportType = (typeof REPORT_TYPES)[number];
@@ -35,6 +32,7 @@ function createLineQueue(rl: ReturnType<typeof createInterface>): () => Promise<
   };
 }
 
+/** Prompt with fallback for empty input */
 function makePrompt(nextLine: () => Promise<string>) {
   return async (question: string, fallback = ""): Promise<string> => {
     process.stdout.write(question);
@@ -43,45 +41,15 @@ function makePrompt(nextLine: () => Promise<string>) {
   };
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-/, "")
-    .replace(/-$/, "")
-    .slice(0, 50);
-}
-
-function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatTimestamp(d: Date): string {
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${formatDate(d)} ${h}:${min}`;
-}
-
-function uniqueFilename(dir: string, base: string): string {
-  let filename = `${base}.md`;
-  if (!existsSync(resolve(dir, filename))) return filename;
-  let counter = 2;
-  while (existsSync(resolve(dir, `${base}-${counter}.md`))) counter++;
-  return `${base}-${counter}.md`;
-}
-
-interface ReportData {
+interface CollectedData {
   title: string;
-  slug: string;
-  extraMeta: string;
-  body: string;
+  summary: string;
+  tags: string[];
+  priority: "low" | "medium" | "high";
+  estimate: "XS" | "S" | "M" | "L" | "XL";
 }
 
-async function collectBug(prompt: ReturnType<typeof makePrompt>): Promise<ReportData> {
+async function collectBug(prompt: ReturnType<typeof makePrompt>): Promise<CollectedData> {
   const title = await prompt("Title: ");
   const component = await prompt("Affected component: ");
   const steps = await prompt("Steps to reproduce: ");
@@ -89,30 +57,64 @@ async function collectBug(prompt: ReturnType<typeof makePrompt>): Promise<Report
   const actual = await prompt("Actual behavior: ");
   console.log("Severity: low | medium | high | critical");
   const severity = await prompt("Severity: ", "medium");
+
+  const summary = [
+    "## Component",
+    component || "_(not specified)_",
+    "",
+    "## Severity",
+    severity,
+    "",
+    "## Steps to Reproduce",
+    steps || "_(not specified)_",
+    "",
+    "## Expected Behavior",
+    expected || "_(not specified)_",
+    "",
+    "## Actual Behavior",
+    actual || "_(not specified)_",
+  ].join("\n");
+
+  const priority = severity === "high" || severity === "critical" ? "high" : "medium";
+
   return {
     title,
-    slug: slugify(title),
-    extraMeta: `> **Component:** ${component}\n> **Severity:** ${severity}`,
-    body: `## Steps to Reproduce\n${steps || "_(not specified)_"}\n\n## Expected\n${expected || "_(not specified)_"}\n\n## Actual\n${actual || "_(not specified)_"}`,
+    summary,
+    tags: [`report-type:bug`, `severity:${severity}`],
+    priority,
+    estimate: "S",
   };
 }
 
-async function collectFeature(prompt: ReturnType<typeof makePrompt>): Promise<ReportData> {
+async function collectFeature(prompt: ReturnType<typeof makePrompt>): Promise<CollectedData> {
   const title = await prompt("Title: ");
   const what = await prompt("What (describe the feature): ");
   const why = await prompt("Why (why this matters): ");
   const who = await prompt("Who benefits: ");
   console.log("Effort: S | M | L | XL");
   const effort = await prompt("Effort: ", "M");
+
+  const summary = [
+    "## What",
+    what || "_(not specified)_",
+    "",
+    "## Why",
+    why || "_(not specified)_",
+    "",
+    "## Who Benefits",
+    who || "_(not specified)_",
+  ].join("\n");
+
   return {
     title,
-    slug: slugify(title),
-    extraMeta: `> **Effort:** ${effort}`,
-    body: `## What\n${what || "_(not specified)_"}\n\n## Why\n${why || "_(not specified)_"}\n\n## Who Benefits\n${who || "_(not specified)_"}`,
+    summary,
+    tags: ["report-type:feature"],
+    priority: "medium",
+    estimate: effort as "XS" | "S" | "M" | "L" | "XL",
   };
 }
 
-async function collectAgent(prompt: ReturnType<typeof makePrompt>): Promise<ReportData> {
+async function collectAgent(prompt: ReturnType<typeof makePrompt>): Promise<CollectedData> {
   const agentName = await prompt("Agent name: ");
   const team = await prompt("Team: ");
   const deployId = await prompt("Deployment ID (Enter to skip): ") || "(not specified)";
@@ -120,41 +122,76 @@ async function collectAgent(prompt: ReturnType<typeof makePrompt>): Promise<Repo
   const reportType = await prompt("Report type: ", "other");
   const what = await prompt("What happened: ");
   const fix = await prompt("Suggested fix: ");
+
+  const summary = [
+    "## Agent",
+    agentName,
+    "",
+    "## Team",
+    team,
+    "",
+    "## Deployment ID",
+    deployId,
+    "",
+    "## Report Type",
+    reportType,
+    "",
+    "## What Happened",
+    what || "_(not specified)_",
+    "",
+    "## Suggested Fix",
+    fix || "_(not specified)_",
+  ].join("\n");
+
   return {
     title: `${agentName} — ${reportType}`,
-    slug: slugify(`${agentName}-${reportType}`),
-    extraMeta: `> **Agent:** ${agentName}\n> **Team:** ${team}\n> **Deployment:** ${deployId}\n> **Report type:** ${reportType}`,
-    body: `## What Happened\n${what || "_(not specified)_"}\n\n## Suggested Fix\n${fix || "_(not specified)_"}`,
+    summary,
+    tags: ["report-type:agent", `report-type:${reportType}`],
+    priority: "medium",
+    estimate: "S",
   };
 }
 
-async function collectFeedback(prompt: ReturnType<typeof makePrompt>): Promise<ReportData> {
+async function collectFeedback(prompt: ReturnType<typeof makePrompt>): Promise<CollectedData> {
   const target = await prompt("Target (deployment ID or team name): ");
   console.log("Rating: good | ok | bad");
   const rating = await prompt("Rating: ", "ok");
   const worked = await prompt("What worked: ");
   const didnt = await prompt("What didn't work: ");
   const suggestions = await prompt("Suggestions: ");
+
+  const summary = [
+    "## Target",
+    target,
+    "",
+    "## Rating",
+    rating,
+    "",
+    "## What Worked",
+    worked || "_(none)_",
+    "",
+    "## What Didn't Work",
+    didnt || "_(none)_",
+    "",
+    "## Suggestions",
+    suggestions || "_(none)_",
+  ].join("\n");
+
   return {
     title: target,
-    slug: slugify(target),
-    extraMeta: `> **Target:** ${target}\n> **Rating:** ${rating}`,
-    body: `## What Worked\n${worked || "_(none)_"}\n\n## What Didn't Work\n${didnt || "_(none)_"}\n\n## Suggestions\n${suggestions || "_(none)_"}`,
+    summary,
+    tags: ["report-type:feedback"],
+    priority: "medium",
+    estimate: "S",
   };
 }
 
-const TYPE_LABEL: Record<ReportType, string> = {
-  bug: "Bug Report",
-  feature: "Feature Request",
-  agent: "Agent Self-Report",
-  feedback: "Feedback",
-};
-
 /**
  * Submit a structured report (bug / feature / agent / feedback).
+ * Creates a ticket instead of writing to a file.
  */
 export async function reportCommand(): Promise<void> {
-  mkdirSync(REPORTS_DIR, { recursive: true });
+  const store = new TicketStore();
 
   const rl = createInterface({
     input: process.stdin,
@@ -163,10 +200,6 @@ export async function reportCommand(): Promise<void> {
 
   const nextLine = createLineQueue(rl);
   const prompt = makePrompt(nextLine);
-
-  const now = new Date();
-  const today = formatDate(now);
-  const timestamp = formatTimestamp(now);
 
   console.log("=== Submit a Report ===");
   console.log("");
@@ -181,7 +214,7 @@ export async function reportCommand(): Promise<void> {
 
   console.log("");
 
-  let data: ReportData;
+  let data: CollectedData;
   if (type === "bug") data = await collectBug(prompt);
   else if (type === "feature") data = await collectFeature(prompt);
   else if (type === "agent") data = await collectAgent(prompt);
@@ -189,21 +222,46 @@ export async function reportCommand(): Promise<void> {
 
   rl.close();
 
-  const content = `# ${TYPE_LABEL[type]}: ${data.title}
+  // Detect or select project
+  let projectKey: string;
+  try {
+    const selected = await selectProject();
+    projectKey = selected.key;
+  } catch {
+    console.error("Error: Could not determine project. Exiting.");
+    process.exit(1);
+  }
 
-> **Date:** ${timestamp}
-> **Type:** ${type}
-> **Status:** new
-${data.extraMeta}
+  // Map report type to ticket type
+  const ticketType: Record<ReportType, string> = {
+    bug: "bug",
+    feature: "feature",
+    agent: "task",
+    feedback: "task",
+  };
 
-${data.body}
-`;
-
-  const base = `${today}-${type}-${data.slug}`;
-  const filename = uniqueFilename(REPORTS_DIR, base);
-  const filePath = resolve(REPORTS_DIR, filename);
-  writeFileSync(filePath, content);
+  // Create the ticket
+  const ticket = store.create(
+    {
+      project: projectKey,
+      title: data.title,
+      summary: data.summary,
+      description: "",
+      status: "idea",
+      priority: data.priority,
+      type: ticketType[type] as "bug" | "feature" | "task",
+      assignee: "sinh",
+      estimate: data.estimate,
+      from: "",
+      to: "",
+      tags: data.tags,
+      blockedBy: [],
+      doc_refs: [],
+      comments: [],
+    },
+    "pa-report"
+  );
 
   console.log("");
-  console.log(`Saved: ${REPORTS_DIR}/${filename}`);
+  console.log(`Created: ${ticket.id}`);
 }
