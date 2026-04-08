@@ -133,7 +133,24 @@
             PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
             cd "$PROJECT_ROOT"
             pnpm build
-            exec node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors "$@"
+
+            DTACH_SOCKET="/tmp/pa-serve.dtach"
+
+            case "''${1:-}" in
+              stop|status)
+                exec node "$PROJECT_ROOT/dist/cli.mjs" serve "$@"
+                ;;
+              restart)
+                node "$PROJECT_ROOT/dist/cli.mjs" serve stop 2>/dev/null || true
+                sleep 1
+                ${pkgs.dtach}/bin/dtach -n "$DTACH_SOCKET" node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors
+                echo "[dev-pa-serve] Restarted in background. Attach: dtach -a $DTACH_SOCKET"
+                ;;
+              *)
+                ${pkgs.dtach}/bin/dtach -n "$DTACH_SOCKET" node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors "$@"
+                echo "[dev-pa-serve] Started in background. Attach: dtach -a $DTACH_SOCKET"
+                ;;
+            esac
           '';
         in {
           default = pkgs.mkShell {
@@ -142,6 +159,7 @@
               coreutils
               util-linux
               systemd
+              dtach
               git
               git-cliff
               # TypeScript
