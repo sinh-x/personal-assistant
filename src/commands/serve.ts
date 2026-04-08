@@ -1,8 +1,9 @@
 import { serve } from "@hono/node-server";
-import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, unlinkSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { homedir } from "node:os";
 import { createServer } from "node:net";
+import { spawn } from "node:child_process";
 import { createApp } from "../lib/agent-api/index.js";
 import { isProcessAlive } from "../utils/process.js";
 
@@ -125,6 +126,27 @@ function killProcess(pid: number, timeoutMs = 5000): Promise<boolean> {
 
 export async function serveCommand(opts: ServeOptions): Promise<void> {
   const { port, host, cors: enableCors } = opts;
+
+  // Background mode: fork a detached child and exit immediately
+  if (opts.background && !process.env["_PA_SERVE_FORKED"]) {
+    const args = ["serve", "--port", String(port), "--host", host];
+    if (enableCors) args.push("--cors");
+    args.push("--background");
+
+    const logDir = resolve(homedir(), ".local/share/personal-assistant");
+    if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
+    const logFile = resolve(logDir, "pa-serve.log");
+    const out = openSync(logFile, "a");
+
+    const child = spawn(process.execPath, [process.argv[1], ...args], {
+      detached: true,
+      stdio: ["ignore", out, out],
+      env: { ...process.env, _PA_SERVE_FORKED: "1" },
+    });
+    child.unref();
+    console.log(`[pa serve] Started in background (PID ${child.pid}). Log: ${logFile}`);
+    process.exit(0);
+  }
 
   // Pre-start check: PID file and port conflict
   const existingPidInfo = readPidFile();

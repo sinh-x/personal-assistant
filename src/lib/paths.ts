@@ -99,3 +99,13 @@ export function getBulletinsDir(): string {
 export function getTrashDir(): string {
   return expandHome("~/Documents/ai-usage/trash");
 }
+
+/**
+ * PA_REGISTRY_DB — SQLite database file for deployment registry.
+ * Defaults to ~/Documents/ai-usage/deployments/registry.db,
+ * overridable via PA_REGISTRY_DB env var.
+ */
+export function getRegistryDbPath(): string {
+  return process.env["PA_REGISTRY_DB"] ??
+    expandHome("~/Documents/ai-usage/deployments/registry.db");
+}

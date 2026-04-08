@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 import { readRegistry } from "../lib/registry.js";
-import { getDataDir } from "../lib/paths.js";
+import { getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { isProcessAlive } from "../utils/process.js";
 import type { RegistryEvent } from "../lib/types.js";
 
@@ -527,11 +527,10 @@ function showArtifacts(did: string): void {
  * Replaces status.sh (200 lines).
  */
 export function statusCommand(args: string[]): void {
-  const deploymentsDir = resolve(homedir(), "Documents/ai-usage/deployments");
-  const registryFile = resolve(deploymentsDir, "registry.jsonl");
+  const dbPath = getRegistryDbPath();
 
-  if (!existsSync(registryFile)) {
-    console.log(`No deployments yet. Registry not found: ${registryFile}`);
+  if (!existsSync(dbPath)) {
+    console.log(`No deployments yet. Registry database not found: ${dbPath}`);
     return;
   }
 

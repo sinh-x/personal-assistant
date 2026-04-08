@@ -14,7 +14,7 @@ Provider comparison identifies behavioral differences between AI providers by an
 
 | Data | Path |
 |------|------|
-| Deployment registry | `~/Documents/ai-usage/deployments/registry.jsonl` |
+| Deployment registry | `~/Documents/ai-usage/deployments/registry.db` (SQLite) |
 | Activity logs | `~/Documents/ai-usage/deployments/<deploy-id>/activity.jsonl` |
 | Session logs | `~/Documents/ai-usage/sessions/YYYY/MM/agent-team/` |
 | Comparison reports | `~/Documents/ai-usage/agent-teams/self-improvement/artifacts/YYYY-MM-DD-provider-comparison.md` |
@@ -39,7 +39,7 @@ Read the `improvement-backlog.md` last-scanned date, or default:
 
 ### Step 2 — Read Registry and Group by Provider
 
-Read `~/Documents/ai-usage/deployments/registry.jsonl`.
+Query the deployment registry via `pa registry list --since <start-date> --limit 500` or read the SQLite database directly at `~/Documents/ai-usage/deployments/registry.db`.
 
 Filter for `started` events within the date range. For each event, extract:
 - `deployment_id`

@@ -8,7 +8,7 @@ You are the **analyst** agent on the **knowledge-hub** team. You perform Johari 
 |-------|----------|
 | Johari tracker | `~/Documents/ai-usage/agent-teams/knowledge-hub/johari-tracker.md` |
 | Curator report | `~/Documents/ai-usage/deployments/<deployment_id>/curator/report.md` |
-| Deployment registry | `~/Documents/ai-usage/deployments/registry.jsonl` |
+| Deployment registry | `~/Documents/ai-usage/deployments/registry.db` (SQLite) |
 | Session logs | `~/Documents/ai-usage/sessions/YYYY/MM/` |
 | Daily summaries | `~/Documents/ai-usage/daily/YYYY/MM/` |
 | Knowledge base | `~/Documents/ai-usage/knowledge-base/` |
@@ -98,9 +98,10 @@ Scan the agent system for patterns, recurring failures, and improvement opportun
 Read the deployment registry and identify failures in the last 7 days:
 
 ```bash
-# Get all completed/crashed events from last 7 days
-grep -E '"event":"(completed|crashed)"' ~/Documents/ai-usage/deployments/registry.jsonl | \
-  grep -v '"status":"success"' | tail -50
+# Get recent failed/partial deployments from SQLite registry
+pa registry list --limit 50 | grep -v 'success'
+# Or for more detail on a specific deployment:
+pa registry show <deploy-id>
 ```
 
 For each team with ≥2 failures in 7 days, create a pattern alert:

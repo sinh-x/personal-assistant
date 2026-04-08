@@ -8,9 +8,9 @@ Scan the **last 3 days** of activity across these sources:
 
 ### 1. Deployment Registry
 
-**File:** `~/Documents/ai-usage/deployments/registry.jsonl`
+**Database:** `~/Documents/ai-usage/deployments/registry.db` (SQLite)
 
-Read the JSONL file and extract recent entries. For each deployment, capture:
+Query the registry using `pa registry list --limit 100` or `pa registry show <deploy-id>`. For each deployment, capture:
 - `deployment_id`, `team`, `event`, `status`, `timestamp`, `summary`
 - Classify: **completed** (success), **failed**, **partial**, **ghost** (started but no completion event)
 
@@ -185,7 +185,7 @@ After writing the evidence report, update **per-project pages** at:
 ### Project inference
 
 For each deployment or session in the evidence:
-1. Check `cwd` field in `registry.jsonl` — extract last path component that looks like a git repo name (e.g., `/home/sinh/git-repos/sinh-x/tools/personal-assistant` → `personal-assistant`)
+1. Check `cwd` field in the deployment registry (via `pa registry show <deploy-id>`) — extract last path component that looks like a git repo name (e.g., `/home/sinh/git-repos/sinh-x/tools/personal-assistant` → `personal-assistant`)
 2. Check session log `## Tags` for a `project:<name>` tag
 3. Fallback: map team name to project using evidence context (e.g., builder inbox item referencing `personal-assistant`)
 

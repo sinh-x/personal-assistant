@@ -9,7 +9,8 @@ import type { Context } from "hono";
 import { basename } from "node:path";
 import { loadRepoEntry } from "../../../lib/repos.js";
 import { isProcessAlive } from "../../../utils/process.js";
-import { parseRegistry, computeDeploymentStatuses, getTodayDateString, isValidDateString } from "./deployments.js";
+import { readRegistry, computeDeploymentStatuses } from "../../registry.js";
+import { getTodayDateString, isValidDateString } from "./deployments.js";
 import type { DeploymentStatus } from "../../../lib/types.js";
 
 const TERMINAL_STATUSES = new Set(["success", "partial", "failed", "crashed", "dead"]);
@@ -35,7 +36,7 @@ export function repoDeploymentsRoutes(): Hono {
     const { name, path, description, prefix } = repoEntry;
 
     // Parse registry and compute statuses
-    const events = parseRegistry();
+    const events = readRegistry();
     const allDeployments = computeDeploymentStatuses(events);
 
     // Filter to deployments that belong to this repo

@@ -103,7 +103,8 @@ src/commands/*.ts    → Subcommand implementations
 src/lib/types.ts     → All shared TypeScript interfaces
 src/lib/config.ts    → Config loading (env vars + config file)
 src/lib/paths.ts     → Path resolution helpers
-src/lib/registry.ts  → JSONL registry read/write
+src/lib/registry.ts  → Registry read/write (SQLite-backed)
+src/lib/registry-db.ts → SQLite schema, FTS5 search, analytics
 src/lib/yaml-parser.ts → Team YAML parsing
 src/lib/primer.ts    → Primer document generation
 src/utils/process.ts → Detached process spawning
@@ -113,5 +114,5 @@ src/utils/process.ts → Detached process spawning
 
 - **Primer issues**: `pa deploy <team> --dry-run` prints the full primer
 - **Deployment issues**: Check `~/.local/share/personal-assistant/logs/<team>-<id>.log`
-- **Registry issues**: `cat ~/Documents/ai-usage/deployments/registry.jsonl | jq .`
+- **Registry issues**: `pa registry list` or `sqlite3 ~/Documents/ai-usage/deployments/registry.db "SELECT * FROM registry_events ORDER BY timestamp DESC LIMIT 10;"`
 - **Timer issues**: `systemctl --user status pa-<name>.timer`

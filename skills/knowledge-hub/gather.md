@@ -265,8 +265,10 @@ Scan the agent system for patterns, anomalies, and intel. This is what keeps the
 ### 4a. Deployment Registry
 
 ```bash
-# Recent deployments (last 7 days)
-tail -50 ~/Documents/ai-usage/deployments/registry.jsonl
+# Recent deployments (last 7 days) — registry is SQLite-backed
+pa registry list --limit 50
+# For detailed event data on a specific deployment:
+pa registry show <deploy-id>
 ```
 
 Look for:

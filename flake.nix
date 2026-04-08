@@ -39,11 +39,19 @@
             pnpm
             pnpmConfigHook
             makeWrapper
+            python3
+            pkg-config
+            sqlite.dev
+            node-gyp
+          ];
+
+          buildInputs = with pkgs; [
+            sqlite.out
           ];
 
           pnpmDeps = pkgs.fetchPnpmDeps {
             inherit (finalAttrs) pname src;
-            hash = "sha256-MqLpogT0ptyQe7wb82I8Q6+74i2yNde5qbxV2e1LH50=";
+            hash = "sha256-m8frSTrDcs9jO81OlUBKWp4cw3QGxm8aHLXqKH3HheA=";
             fetcherVersion = 3;
           };
 
@@ -81,8 +89,16 @@
             mkdir -p $out/share/fish/vendor_completions.d
             cp completions/pa.fish $out/share/fish/vendor_completions.d/pa.fish
 
+            # --- Rebuild better-sqlite3 native addon using local node headers ---
+            cd $out/share/personal-assistant/node_modules/better-sqlite3
+            patchShebangs .
+            export npm_config_nodedir=${pkgs.nodejs_22}
+            ${pkgs.nodejs_22}/bin/node ${pkgs.nodejs_22}/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js rebuild --nodedir=${pkgs.nodejs_22} --openssl-fips=false
+
             runHook postInstall
           '';
+
+          dontStrip = true;
 
           meta = with pkgs.lib; {
             description = "CLI agent team orchestrator for NixOS";
@@ -117,7 +133,24 @@
             PROJECT_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")"
             cd "$PROJECT_ROOT"
             pnpm build
-            exec node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors "$@"
+
+            DTACH_SOCKET="/tmp/pa-serve.dtach"
+
+            case "''${1:-}" in
+              stop|status)
+                exec node "$PROJECT_ROOT/dist/cli.mjs" serve "$@"
+                ;;
+              restart)
+                node "$PROJECT_ROOT/dist/cli.mjs" serve stop 2>/dev/null || true
+                sleep 1
+                ${pkgs.dtach}/bin/dtach -n "$DTACH_SOCKET" node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors
+                echo "[dev-pa-serve] Restarted in background. Attach: dtach -a $DTACH_SOCKET"
+                ;;
+              *)
+                ${pkgs.dtach}/bin/dtach -n "$DTACH_SOCKET" node "$PROJECT_ROOT/dist/cli.mjs" serve --port 9848 --cors "$@"
+                echo "[dev-pa-serve] Started in background. Attach: dtach -a $DTACH_SOCKET"
+                ;;
+            esac
           '';
         in {
           default = pkgs.mkShell {
@@ -126,6 +159,7 @@
               coreutils
               util-linux
               systemd
+              dtach
               git
               git-cliff
               # TypeScript

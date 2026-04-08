@@ -1,41 +1,233 @@
-import { readFileSync, appendFileSync, existsSync } from "node:fs";
-import { execSync } from "node:child_process";
-import { getRegistryPath, getRegistryLockPath } from "./paths.js";
-import type { RegistryEvent } from "./types.js";
+import { getDb } from "./registry-db.js";
+import type { RegistryEvent, DeploymentStatus } from "./types.js";
+import { getRegistryPath, getRegistryDbPath } from "./paths.js";
+import { existsSync, statSync, appendFileSync } from "node:fs";
 
 /**
- * Read all events from the registry JSONL file.
+ * Validate a registry event has required fields.
+ * Throws if required fields are missing.
  */
-export function readRegistry(): RegistryEvent[] {
-  const path = getRegistryPath();
-  if (!existsSync(path)) return [];
-
-  return readFileSync(path, "utf-8")
-    .split("\n")
-    .filter((line) => line.trim())
-    .map((line) => JSON.parse(line) as RegistryEvent);
+export function validateRegistryEvent(event: RegistryEvent): void {
+  if (!event.deployment_id) {
+    throw new Error("Registry event missing required field: deployment_id");
+  }
+  if (!event.team) {
+    throw new Error("Registry event missing required field: team");
+  }
+  if (!event.event) {
+    throw new Error("Registry event missing required field: event");
+  }
+  if (!event.timestamp) {
+    throw new Error("Registry event missing required field: timestamp");
+  }
 }
 
 /**
- * Append an event to the registry JSONL with flock.
- * Uses the same locking mechanism as the bash scripts.
+ * Read all events from the registry SQLite database.
+ * Queries registry_events table ordered by id.
+ */
+export function readRegistry(): RegistryEvent[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM registry_events ORDER BY id")
+    .all() as Record<string, unknown>[];
+
+  return rows.map((row) => {
+    return {
+      deployment_id: row.deployment_id as string,
+      team: row.team as string,
+      event: row.event as RegistryEvent["event"],
+      timestamp: row.timestamp as string,
+      pid: row.pid as number | undefined,
+      status: row.status as RegistryEvent["status"],
+      summary: row.summary as string | undefined,
+      log_file: row.log_file as string | undefined,
+      primer: row.primer as string | undefined,
+      agents: row.agents ? (JSON.parse(row.agents as string) as string[]) : undefined,
+      models: row.models
+        ? (JSON.parse(row.models as string) as Record<string, string>)
+        : undefined,
+      error: row.error as string | undefined,
+      exit_code: row.exit_code as number | undefined,
+      ticket_id: row.ticket_id as string | undefined,
+      provider: row.provider as string | undefined,
+      rating: row.rating ? (JSON.parse(row.rating as string) as RegistryEvent["rating"]) : undefined,
+      objective: row.objective as string | undefined,
+      repo: row.repo as string | undefined,
+    };
+  });
+}
+
+/**
+ * Append an event to the registry SQLite database.
+ * Validates the event before appending.
+ * Handles both registry_events INSERT and deployments UPSERT.
  */
 export function appendRegistryEvent(event: RegistryEvent): void {
-  const registryPath = getRegistryPath();
-  const lockPath = getRegistryLockPath();
-  const json = JSON.stringify(event);
+  validateRegistryEvent(event);
+  const db = getDb();
 
-  // Use flock for atomic append, matching bash behavior
-  execSync(
-    `flock -w 5 "${lockPath}" bash -c 'echo ${JSON.stringify(json)} >> "${registryPath}"'`
-  );
+  // Serialize complex fields to JSON strings for storage
+  const agentsJson = event.agents ? JSON.stringify(event.agents) : null;
+  const modelsJson = event.models ? JSON.stringify(event.models) : null;
+  const ratingJson = event.rating ? JSON.stringify(event.rating) : null;
+
+  // INSERT INTO registry_events
+  db.prepare(`
+    INSERT INTO registry_events (
+      deployment_id, team, event, timestamp, pid, status, summary,
+      log_file, primer, agents, models, error, exit_code,
+      ticket_id, provider, rating, objective, repo
+    ) VALUES (
+      @deployment_id, @team, @event, @timestamp, @pid, @status, @summary,
+      @log_file, @primer, @agents, @models, @error, @exit_code,
+      @ticket_id, @provider, @rating, @objective, @repo
+    )
+  `).run({
+    deployment_id: event.deployment_id,
+    team: event.team,
+    event: event.event,
+    timestamp: event.timestamp,
+    pid: event.pid ?? null,
+    status: event.status ?? null,
+    summary: event.summary ?? null,
+    log_file: event.log_file ?? null,
+    primer: event.primer ?? null,
+    agents: agentsJson,
+    models: modelsJson,
+    error: event.error ?? null,
+    exit_code: event.exit_code ?? null,
+    ticket_id: event.ticket_id ?? null,
+    provider: event.provider ?? null,
+    rating: ratingJson,
+    objective: event.objective ?? null,
+    repo: event.repo ?? null,
+  });
+
+  // UPSERT INTO deployments materialized view
+  upsertDeployment(db, event);
+
+  // Dual-write: also append to JSONL if PA_REGISTRY_DUAL_WRITE=1
+  if (process.env["PA_REGISTRY_DUAL_WRITE"] === "1") {
+    const jsonlPath = getRegistryPath();
+    appendFileSync(jsonlPath, JSON.stringify(event) + "\n");
+  }
+}
+
+/**
+ * Upsert a deployment row based on the event type.
+ * started: INSERT new row
+ * pid: UPDATE pid
+ * completed: UPDATE status, completed_at, summary, log_file, rating, exit_code
+ * crashed: UPDATE status=crashed, completed_at, error, exit_code
+ */
+function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): void {
+  switch (event.event) {
+    case "started":
+      db.prepare(`
+        INSERT INTO deployments (
+          deployment_id, team, status, started_at, pid, primer,
+          agents, models, ticket_id, objective, repo, provider
+        ) VALUES (
+          @deployment_id, @team, 'running', @started_at, @pid, @primer,
+          @agents, @models, @ticket_id, @objective, @repo, @provider
+        )
+      `).run({
+        deployment_id: event.deployment_id,
+        team: event.team,
+        started_at: event.timestamp,
+        pid: event.pid ?? null,
+        primer: event.primer ?? null,
+        agents: event.agents ? JSON.stringify(event.agents) : null,
+        models: event.models ? JSON.stringify(event.models) : null,
+        ticket_id: event.ticket_id ?? null,
+        objective: event.objective ?? null,
+        repo: event.repo ?? null,
+        provider: event.provider ?? null,
+      });
+      break;
+
+    case "pid":
+      db.prepare(`
+        UPDATE deployments SET pid = @pid WHERE deployment_id = @deployment_id
+      `).run({
+        deployment_id: event.deployment_id,
+        pid: event.pid,
+      });
+      break;
+
+    case "completed":
+      db.prepare(`
+        UPDATE deployments SET
+          status = @status,
+          completed_at = @completed_at,
+          summary = @summary,
+          log_file = @log_file,
+          rating = @rating,
+          exit_code = @exit_code
+        WHERE deployment_id = @deployment_id
+      `).run({
+        deployment_id: event.deployment_id,
+        status: event.status ?? "success",
+        completed_at: event.timestamp,
+        summary: event.summary ?? null,
+        log_file: event.log_file ?? null,
+        rating: event.rating ? JSON.stringify(event.rating) : null,
+        exit_code: event.exit_code ?? null,
+      });
+      break;
+
+    case "crashed":
+      db.prepare(`
+        UPDATE deployments SET
+          status = 'crashed',
+          completed_at = @completed_at,
+          error = @error,
+          exit_code = @exit_code
+        WHERE deployment_id = @deployment_id
+      `).run({
+        deployment_id: event.deployment_id,
+        completed_at: event.timestamp,
+        error: event.error ?? null,
+        exit_code: event.exit_code ?? null,
+      });
+      break;
+  }
 }
 
 /**
  * Get events for a specific deployment ID.
  */
 export function getDeploymentEvents(deployId: string): RegistryEvent[] {
-  return readRegistry().filter((e) => e.deployment_id === deployId);
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM registry_events WHERE deployment_id = ? ORDER BY id")
+    .all(deployId) as Record<string, unknown>[];
+
+  return rows.map((row) => {
+    return {
+      deployment_id: row.deployment_id as string,
+      team: row.team as string,
+      event: row.event as RegistryEvent["event"],
+      timestamp: row.timestamp as string,
+      pid: row.pid as number | undefined,
+      status: row.status as RegistryEvent["status"],
+      summary: row.summary as string | undefined,
+      log_file: row.log_file as string | undefined,
+      primer: row.primer as string | undefined,
+      agents: row.agents ? (JSON.parse(row.agents as string) as string[]) : undefined,
+      models: row.models
+        ? (JSON.parse(row.models as string) as Record<string, string>)
+        : undefined,
+      error: row.error as string | undefined,
+      exit_code: row.exit_code as number | undefined,
+      ticket_id: row.ticket_id as string | undefined,
+      provider: row.provider as string | undefined,
+      rating: row.rating ? (JSON.parse(row.rating as string) as RegistryEvent["rating"]) : undefined,
+      objective: row.objective as string | undefined,
+      repo: row.repo as string | undefined,
+    };
+  });
 }
 
 /**
@@ -52,4 +244,147 @@ export function getLatestDeployments(): Map<string, RegistryEvent[]> {
   }
 
   return grouped;
+}
+
+/**
+ * Compute deployment statuses from a list of registry events.
+ * Returns the computed status for each unique deployment.
+ * Note: This function is kept for backwards compatibility when computing from partial events.
+ * For full registry queries, use queryDeploymentStatuses() instead.
+ */
+export function computeDeploymentStatuses(events: RegistryEvent[]): DeploymentStatus[] {
+  const grouped = new Map<string, RegistryEvent[]>();
+  for (const ev of events) {
+    const existing = grouped.get(ev.deployment_id) ?? [];
+    existing.push(ev);
+    grouped.set(ev.deployment_id, existing);
+  }
+
+  const statuses: DeploymentStatus[] = [];
+  for (const [deployId, evs] of grouped) {
+    const started = evs.find((e) => e.event === "started");
+    const completed = evs.find((e) => e.event === "completed");
+    const crashed = evs.find((e) => e.event === "crashed");
+    const pidEv = evs.find((e) => e.event === "pid");
+
+    let status: DeploymentStatus["status"] = "unknown";
+    if (completed) {
+      status = (completed.status as DeploymentStatus["status"]) ?? "success";
+    } else if (crashed) {
+      status = "crashed";
+    } else if (started) {
+      status = "running";
+    }
+
+    statuses.push({
+      deploy_id: deployId,
+      team: started?.team ?? evs[0]?.team ?? "",
+      status,
+      started_at: started?.timestamp ?? evs[0]?.timestamp ?? "",
+      completed_at: completed?.timestamp ?? crashed?.timestamp,
+      pid: pidEv?.pid,
+      agents: started?.agents ?? [],
+      summary: completed?.summary,
+      log_file: started?.log_file,
+      primer: started?.primer,
+      ticket_id: started?.ticket_id,
+      objective: started?.objective,
+      models: started?.models,
+      provider: started?.provider,
+      repo: started?.repo,
+    });
+  }
+
+  // Sort by started_at descending (newest first)
+  statuses.sort((a, b) => b.started_at.localeCompare(a.started_at));
+  return statuses;
+}
+
+/**
+ * Query deployment statuses directly from the deployments table.
+ * Returns all deployments ordered by started_at descending.
+ */
+export function queryDeploymentStatuses(): DeploymentStatus[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM deployments ORDER BY started_at DESC")
+    .all() as Record<string, unknown>[];
+
+  return rows.map((row) => ({
+    deploy_id: row.deployment_id as string,
+    team: row.team as string,
+    status: row.status as DeploymentStatus["status"],
+    started_at: row.started_at as string,
+    completed_at: row.completed_at as string | undefined,
+    pid: row.pid as number | undefined,
+    agents: row.agents ? (JSON.parse(row.agents as string) as string[]) : [],
+    summary: row.summary as string | undefined,
+    log_file: row.log_file as string | undefined,
+    primer: row.primer as string | undefined,
+    ticket_id: row.ticket_id as string | undefined,
+    objective: row.objective as string | undefined,
+    models: row.models
+      ? (JSON.parse(row.models as string) as Record<string, string>)
+      : undefined,
+    provider: row.provider as string | undefined,
+    repo: row.repo as string | undefined,
+  }));
+}
+
+/**
+ * Query a single deployment status from the deployments table.
+ */
+export function queryDeploymentStatus(deployId: string): DeploymentStatus | null {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT * FROM deployments WHERE deployment_id = ?")
+    .get(deployId) as Record<string, unknown> | undefined;
+
+  if (!row) return null;
+
+  return {
+    deploy_id: row.deployment_id as string,
+    team: row.team as string,
+    status: row.status as DeploymentStatus["status"],
+    started_at: row.started_at as string,
+    completed_at: row.completed_at as string | undefined,
+    pid: row.pid as number | undefined,
+    agents: row.agents ? (JSON.parse(row.agents as string) as string[]) : [],
+    summary: row.summary as string | undefined,
+    log_file: row.log_file as string | undefined,
+    primer: row.primer as string | undefined,
+    ticket_id: row.ticket_id as string | undefined,
+    objective: row.objective as string | undefined,
+    models: row.models
+      ? (JSON.parse(row.models as string) as Record<string, string>)
+      : undefined,
+    provider: row.provider as string | undefined,
+    repo: row.repo as string | undefined,
+  };
+}
+
+/**
+ * Check if the legacy JSONL registry file is newer than the SQLite database.
+ * If so, and dual-write is not enabled, emit a deprecation warning to stderr.
+ * This should be called on startup or before any registry write.
+ */
+export function checkJsonlDeprecation(): void {
+  if (process.env["PA_REGISTRY_DUAL_WRITE"] === "1") {
+    return; // dual-write active, JSONL is expected to be updated
+  }
+  const jsonlPath = getRegistryPath();
+  const dbPath = getRegistryDbPath();
+  if (!existsSync(jsonlPath)) {
+    return; // no JSONL file, nothing to warn about
+  }
+  const jsonlStat = statSync(jsonlPath);
+  const dbStat = statSync(dbPath);
+  if (jsonlStat.mtimeMs > dbStat.mtimeMs) {
+    console.error(
+      "[PA REGISTRY WARNING] The legacy JSONL registry file was modified more recently than the SQLite database. " +
+        "JSONL is deprecated — all writes now go to SQLite only. " +
+        "To maintain backwards compatibility during migration, set PA_REGISTRY_DUAL_WRITE=1. " +
+        "Run 'pa registry migrate --force' to sync external JSONL changes to SQLite."
+    );
+  }
 }

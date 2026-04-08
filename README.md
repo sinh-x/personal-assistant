@@ -34,11 +34,11 @@ See [docs/commands.md](docs/commands.md) for full usage and examples.
 pa CLI (Commander.js)
   ├── deploy → parse team YAML → generate primer → spawn claude
   ├── daily  → inject mode objective → deploy daily team
-  ├── status → read registry JSONL → check PID liveness → format table
+  ├── status → read registry SQLite → check PID liveness → format table
   └── schedule → generate systemd .service + .timer → enable
 
 Data flow:
-  teams/*.yaml  →  primer (markdown)  →  claude --print  →  registry.jsonl
+  teams/*.yaml  →  primer (markdown)  →  claude --print  →  registry.db
        ↑                                                         ↓
   skills/*.md                                              pa status
 ```
