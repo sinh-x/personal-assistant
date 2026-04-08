@@ -146,12 +146,7 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
 - Category: CLOSED
 
 **CASE B — PR found, state=OPEN, mergeable=MERGEABLE, checks=PASS:**
-- Check for existing sub-ticket:
-  ```bash
-  pa ticket subticket list <TICKET-ID>
-  ```
-- If open sub-ticket titled "READY-TO-MERGE: ..." exists: SKIP (record in SKIPPED)
-- **Auto-Merge Check (after grace period):**
+- **Auto-Merge Check (runs first, regardless of existing sub-tickets):**
   - Get PR created/updated time:
     ```bash
     gh pr view <number> --repo {{GH_REPO}} --json createdAt,updatedAt,url
@@ -162,21 +157,36 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
        ```bash
        gh pr merge <number> --repo {{GH_REPO}} --admin --merge
        ```
-    2. **Decision Log Entry:**
+    2. **Close any existing READY-TO-MERGE sub-ticket:**
+       ```bash
+       pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
+       ```
+    3. **Close parent ticket:**
+       ```bash
+       pa ticket update <TICKET-ID> --status done
+       pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged after grace period. Confirmed via gh."
+       ```
+    4. **Decision Log Entry:**
        ```bash
        echo "| <TICKET-ID> | READY-TO-MERGE (F3) | Auto-merged after grace period | PR #<number> merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
-    3. **Category:** READY-TO-MERGE-AUTO-MERGED
-  - If within grace period: proceed to sub-ticket creation
-- Create sub-ticket only if auto-merge did not apply:
-  ```bash
-  pa ticket subticket create <TICKET-ID> \
-    --title "READY-TO-MERGE: PR #<number> awaiting merge" \
-    --summary "PR #<number> is open, mergeable, CI checks passing. Action: review and merge. PR URL: <url>" \
-    --assignee sinh --priority medium --estimate XS \
-    --actor builder/team-manager
-  ```
-- Category: READY-TO-MERGE (sub-ticket created or skipped)
+    5. **Category:** AUTO-MERGED
+  - If within grace period: proceed to sub-ticket handling below
+- **Sub-ticket dedup (only if within grace period):**
+  - Check for existing sub-ticket:
+    ```bash
+    pa ticket subticket list <TICKET-ID>
+    ```
+  - If open sub-ticket titled "READY-TO-MERGE: ..." exists: SKIP (record in SKIPPED)
+  - Otherwise create sub-ticket:
+    ```bash
+    pa ticket subticket create <TICKET-ID> \
+      --title "READY-TO-MERGE: PR #<number> awaiting merge" \
+      --summary "PR #<number> is open, mergeable, CI checks passing. Action: review and merge. PR URL: <url>" \
+      --assignee sinh --priority medium --estimate XS \
+      --actor builder/team-manager
+    ```
+- Category: AUTO-MERGED / READY-TO-MERGE (sub-ticket created or skipped)
 
 **CASE C — PR found, state=OPEN, mergeable=CONFLICTING:**
 - Check for existing sub-ticket:
