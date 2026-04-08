@@ -71,9 +71,9 @@ export interface Comment {
 
 /** A typed document reference attached to a ticket */
 export interface DocRef {
-  /** Document type: 'requirements' | 'spike' | 'implementation' | 'review-report' | 'attachment' */
+  /** Document type: 'requirements' | 'spike' | 'implementation' | 'review-report' | 'attachment' | 'url' */
   type: string;
-  /** Relative path to the document (within ~/Documents/ai-usage/) */
+  /** Relative path to the document (within ~/Documents/ai-usage/) or absolute http/https URL */
   path: string;
   /** At most one doc_ref per ticket may be primary */
   primary: boolean;
