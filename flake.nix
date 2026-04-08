@@ -68,6 +68,9 @@
             share=$out/share/personal-assistant
             mkdir -p $share
             cp -r teams skills $share/
+            # Runtime scripts (extract-session-content.sh etc.) — exclude dev/
+            mkdir -p $share/scripts
+            cp scripts/*.sh $share/scripts/
             for f in IDENTITY.md JOURNAL.md README.md; do
               [ -f "$f" ] && cp "$f" $share/
             done
