@@ -94,6 +94,43 @@ For tickets that pass the blocked check, search for matching PRs:
 gh pr list --repo {{GH_REPO}} --state all --search "<TICKET-ID>" --json number,state,headRefName,mergeable,statusCheckRollup,mergedAt,closedAt,url
 ```
 
+#### Pre-Decision: Stale Sub-Ticket Resolution (F6)
+
+Before entering the decision tree, check if existing sub-tickets are **stale** — i.e., their triggering condition no longer applies. This prevents tickets from being permanently skipped due to outdated sub-tickets.
+
+```bash
+pa ticket subticket list <TICKET-ID>
+```
+
+For each **open** sub-ticket, cross-reference its type against the current PR state:
+
+| Sub-Ticket Pattern | Current PR State | Stale? | Action |
+|--------------------|-----------------|--------|--------|
+| "CONFLICT: ..." | mergeable=MERGEABLE or state=MERGED | Yes | Close sub-ticket |
+| "CI-FAILURE: ..." | checks=PASS or state=MERGED | Yes | Close sub-ticket |
+| "READY-TO-MERGE: ..." | state=MERGED | Yes | Close sub-ticket |
+| "ABANDONED: ..." | state=OPEN (PR reopened) | Yes | Close sub-ticket |
+| "BLOCKED: ..." | All blockers resolved (done status) | Yes | Close sub-ticket |
+
+**For each stale sub-ticket:**
+
+1. **Close it:**
+   ```bash
+   pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
+   ```
+
+2. **Comment on parent ticket:**
+   ```bash
+   pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-resolved stale sub-ticket <SUB-TICKET-ID> (<type>): condition no longer applies. PR #<number> is now <current-state>."
+   ```
+
+3. **Decision Log Entry:**
+   ```bash
+   echo "| <TICKET-ID> | STALE-RESOLVED (F6) | <SUB-TICKET-ID> (<type>) — PR now <state> | Auto-closed | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+   ```
+
+**After resolving stale sub-tickets, continue to the Decision Tree.** The ticket may now be eligible for normal case processing (e.g., a ticket whose CONFLICT sub-ticket was stale now proceeds to Case B for READY-TO-MERGE handling).
+
 #### Decision Tree
 
 **CASE A — PR found, state=MERGED:**
@@ -397,6 +434,9 @@ After processing all tickets, produce a structured summary as a ticket comment o
 | PA-XXXX | F3: READY-TO-MERGE grace | PR older than grace period | Merged via gh | YYYY-MM-DD |
 | PA-XXXX | F4: ORPHAN alternate branch | Work found on feature/* branch | Closed: merged | YYYY-MM-DD |
 | PA-XXXX | CI-FAILURE rerun | Flaky tests now passing | Checks PASS | YYYY-MM-DD |
+| PA-XXXX | F6: Stale CONFLICT resolved | PR now MERGEABLE | Sub-ticket closed | YYYY-MM-DD |
+| PA-XXXX | F6: Stale CI-FAILURE resolved | Checks now PASS | Sub-ticket closed | YYYY-MM-DD |
+| PA-XXXX | F6: Stale READY-TO-MERGE resolved | PR now MERGED | Sub-ticket closed | YYYY-MM-DD |
 
 ---
 ### CLOSED: N tickets
@@ -479,6 +519,7 @@ pa registry complete $PA_DEPLOYMENT_ID \
 - **Dry-run mode.** When `PA_DRY_RUN=true`, preview all auto-resolve decisions without executing them. Set via `pa deploy builder --mode routine --dry-run`.
 - **NF3 Fail-safe.** If any auto-resolve verification step fails, fall back to sub-ticket creation. Never auto-close a ticket if verification cannot confirm the condition.
 - **Auto-resolve before sub-ticket.** Always attempt auto-resolve before creating sub-tickets for BLOCKED, CONFLICT, CI-FAILURE, ORPHAN, and READY-TO-MERGE cases.
+- **Stale sub-ticket resolution (F6).** Before entering the decision tree, cross-reference existing open sub-tickets against current PR state. Close sub-tickets whose triggering condition no longer applies (e.g., CONFLICT sub-ticket when PR is now MERGEABLE). After cleanup, re-evaluate the ticket through the normal decision tree.
 
 ---
 
