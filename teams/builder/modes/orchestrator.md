@@ -192,34 +192,8 @@ fi
 
 Use the phase context map from Phase 3 to build a structured, self-contained objective. The builder must be able to execute the phase using ONLY this objective — without re-reading the full plan document.
 
-**Objective template:**
-
-```
-Phase N of <item-filename>: <phase description from checklist>
-
-## Scope
-<List the §4 In Scope items this phase addresses, as checkboxes>
-
-## Requirements
-### Functional
-<Table of §6 Functional Requirements relevant to this phase: ID | Requirement | Priority>
-
-### Non-Functional
-<Table of §6 Non-Functional Requirements relevant to this phase: ID | Requirement | Priority>
-
-## Acceptance Criteria
-<List the §10 AC items that become verifiable after this phase, as checkboxes>
-
-## Verification
-<Ordered list of verification steps for this phase: build commands, test commands, manual checks>
-
-## Context
-- Repo: <repo_path>
-- Branch: <feature_branch> (already checked out by orchestrator — implement must verify, not create)
-- Plan: <path to plan document>
-- Prior phases completed: <list of completed phase numbers, or "none">
-- Dependencies: <any §7 items or prior-phase outputs this phase needs>
-```
+> **Template:** Read `skills/templates/builder-objective.md` for the standard builder objective format.
+> Every builder objective MUST follow this template.
 
 **Rules for objective composition:**
 - Include ONLY the requirements, NFRs, and ACs relevant to THIS phase — do not dump the entire plan
