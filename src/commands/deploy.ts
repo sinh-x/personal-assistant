@@ -454,13 +454,11 @@ export function deployCommand(
 
   // Resolve effective models — always call resolveEffectiveModels to populate tmModel/agentModels
   // regardless of provider. modelFlag is only set for non-minimax (minimax uses ANTHROPIC_MODEL env var)
-  let tmModel: string | undefined;
-  let agentModels: Record<string, string | undefined> = {};
-  ({ tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
+  const { tmModel, agentModels } = resolveEffectiveModels(teamConfig, {
     teamModel: opts.teamModel,
     agentModel: opts.agentModel,
     modeModel: teamConfig.deploy_modes?.find((m) => m.id === (opts.mode ?? teamConfig.default_mode))?.model,
-  }));
+  });
   const modelFlag = provider === "minimax" ? "" : (tmModel ? `--model ${tmModel}` : "");
 
   // Deployment env vars passed to claude so hooks can locate the activity log.

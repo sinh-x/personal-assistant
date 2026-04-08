@@ -67,7 +67,7 @@ function formatTimestamp(d: Date): string {
 }
 
 function uniqueFilename(dir: string, base: string): string {
-  let filename = `${base}.md`;
+  const filename = `${base}.md`;
   if (!existsSync(resolve(dir, filename))) return filename;
   let counter = 2;
   while (existsSync(resolve(dir, `${base}-${counter}.md`))) counter++;

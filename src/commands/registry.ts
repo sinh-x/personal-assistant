@@ -3,7 +3,6 @@ import {
   appendRegistryEvent,
   getDeploymentEvents,
   readRegistry,
-  computeDeploymentStatuses,
   queryDeploymentStatuses,
   queryDeploymentStatus,
   checkJsonlDeprecation,

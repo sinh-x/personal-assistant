@@ -31,7 +31,7 @@ export function deployRoutes(): Hono {
 
   // POST /api/deploy — fire-and-forget deployment
   app.post("/api/deploy", async (c: Context) => {
-    let body: Record<string, unknown> = {};
+    let body: Record<string, unknown>;
     try {
       body = await c.req.json();
     } catch {

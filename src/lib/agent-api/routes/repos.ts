@@ -280,7 +280,7 @@ export function reposRoutes(): Hono {
     const developBranch = skipDevelopChecks ? "none" : configuredDevelop;
 
     // F2: Validate branch name params - only allow alphanumeric, dots, underscores, hyphens, and forward slashes
-    const branchNameRegex = /^[a-zA-Z0-9._\-\/]+$/;
+    const branchNameRegex = /^[a-zA-Z0-9._\-/]+$/;
     if (!branchNameRegex.test(mainBranch)) {
       return c.json({ error: `Invalid main branch name: ${mainBranch}`, code: "BAD_REQUEST" }, 400);
     }

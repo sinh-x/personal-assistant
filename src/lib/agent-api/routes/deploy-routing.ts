@@ -75,7 +75,7 @@ export function deployRoutingRoutes(): Hono {
 
     teams.sort((a, b) => (a["name"] as string).localeCompare(b["name"] as string));
 
-    let repos: Record<string, unknown>[] = [];
+    let repos: Record<string, unknown>[];
     try {
       repos = listRepos().map((r) => ({
         name: r.name,

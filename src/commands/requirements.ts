@@ -30,25 +30,6 @@ ${flagLines.length > 0 ? flagLines.join("\n") : "No special flags set. Triage on
 }
 
 /**
- * Build the focus objective for MiniMax agent processing (Phase 2).
- * Currently unused — Phase 1 uses direct focus list printing.
- */
-function focusObjective(): string {
-  return `MODE: REQUIREMENTS — FOCUS PROCESSING (automated)
-
-You are running as a solo requirements analyst — do NOT spawn sub-agents.
-
-Read the latest focus list via: pa requirements focus --enrich
-Or directly via the API: curl http://localhost:3000/api/focus?enrich=true
-
-Follow the focus-objective.md skill to:
-1. Review the focus list with staleness and bottleneck analysis
-2. Generate per-item AI suggestions
-3. Save a focus report to agent-teams/requirements/artifacts/YYYY-MM-DD-focus-report.md
-`;
-}
-
-/**
  * Handle focus mode directly — print the GTD focus list to stdout.
  * Parses --project, --assignee, --all, --mine, --enrich flags.
  */
