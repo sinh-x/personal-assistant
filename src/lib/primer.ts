@@ -252,8 +252,18 @@ function selectModules(_modeType: string): string[] {
  * Returns the list of on-demand reference documents (Tier 3) for a given mode type.
  * These are listed in the Reference Documents section rather than injected inline.
  * If repoRoot is set, repo context is added as the first entry.
+ *
+ * @param _modeType - The mode type (e.g., 'work', 'review')
+ * @param repoRoot - Optional repo root path for repo context
+ * @param teamName - Optional team name for template filtering
+ * @param deployMode - Optional deploy mode (e.g., 'implement', 'orchestrate') for template filtering
  */
-function selectReferenceModules(_modeType: string, repoRoot?: string): ReferenceDoc[] {
+function selectReferenceModules(
+  _modeType: string,
+  repoRoot?: string,
+  teamName?: string,
+  deployMode?: string,
+): ReferenceDoc[] {
   const refs: ReferenceDoc[] = [];
 
   if (repoRoot) {
@@ -288,7 +298,120 @@ function selectReferenceModules(_modeType: string, repoRoot?: string): Reference
     },
   );
 
+  // Add templates filtered by team/mode relevance
+  const templates = resolveTemplates(repoRoot, teamName, deployMode);
+  refs.push(...templates);
+
   return refs;
+}
+
+/**
+ * Resolve and filter lifecycle templates based on team and deploy mode.
+ * Templates are listed in the Reference Documents table as on-demand Read references.
+ */
+function resolveTemplates(
+  repoRoot?: string,
+  teamName?: string,
+  deployMode?: string,
+): ReferenceDoc[] {
+  if (!repoRoot) return [];
+
+  const templatesDir = resolve(repoRoot, 'skills/templates');
+  if (!existsSync(templatesDir)) {
+    return [];
+  }
+
+  // Template filtering rules per team/mode:
+  // - requirements team: requirements.md, idea-intake.md
+  // - builder orchestrator: builder-objective.md, uat-review.md
+  // - builder implement: implementation-artifact.md, uat-review.md
+  // - maintenance: uat-review.md
+  // - all teams: done-summary.md (lightweight, broadly useful)
+  interface TemplateSpec {
+    filename: string;
+    docName: string;
+    summary: string;
+    team?: string;
+    mode?: string;
+  }
+
+  const templateSpecs: TemplateSpec[] = [
+    {
+      filename: 'requirements.md',
+      docName: 'requirements-template',
+      summary: 'Before producing a requirements document',
+      team: 'requirements',
+    },
+    {
+      filename: 'idea-intake.md',
+      docName: 'idea-intake-template',
+      summary: 'Before capturing a new idea or feature',
+      team: 'requirements',
+    },
+    {
+      filename: 'builder-objective.md',
+      docName: 'builder-objective-template',
+      summary: 'Before composing builder sub-deployment objectives',
+      team: 'builder',
+      mode: 'orchestrate',
+    },
+    {
+      filename: 'implementation-artifact.md',
+      docName: 'implementation-artifact-template',
+      summary: 'Before composing implementation artifact for UAT handoff',
+      team: 'builder',
+      mode: 'implement',
+    },
+    {
+      filename: 'uat-review.md',
+      docName: 'uat-review-template',
+      summary: 'Before handing off to review-uat',
+      team: 'builder',
+      mode: 'orchestrate',
+    },
+    {
+      filename: 'uat-review.md',
+      docName: 'uat-review-template',
+      summary: 'Before handing off to review-uat',
+      team: 'builder',
+      mode: 'implement',
+    },
+    {
+      filename: 'uat-review.md',
+      docName: 'uat-review-template',
+      summary: 'Before handing off to review-uat',
+      team: 'maintenance',
+    },
+    {
+      filename: 'done-summary.md',
+      docName: 'done-summary-template',
+      summary: 'Lightweight summary for ticket closure — useful for all teams',
+    },
+  ];
+
+  const seen = new Set<string>();
+  const result: ReferenceDoc[] = [];
+
+  for (const spec of templateSpecs) {
+    // Filter: skip if team/mode doesn't match
+    if (spec.team && spec.team !== teamName) continue;
+    if (spec.team && spec.mode && spec.mode !== deployMode) continue;
+
+    // Skip duplicates (e.g., uat-review.md appears for multiple team/mode combos)
+    if (seen.has(spec.docName)) continue;
+    seen.add(spec.docName);
+
+    const fullPath = resolve(templatesDir, spec.filename);
+    if (!existsSync(fullPath)) continue;
+
+    result.push({
+      name: spec.docName,
+      path: `skills/templates/${spec.filename}`,
+      summary: spec.summary,
+    });
+  }
+
+  return result;
 }
 
 /**
@@ -561,7 +684,7 @@ When spawning unplanned sub-agents, use this policy:
 
   const modeType = modeConfig?.mode_type ?? 'work';
   const selectedModules = selectModules(modeType);
-  const referenceModules = selectReferenceModules(modeType, repoRoot);
+  const referenceModules = selectReferenceModules(modeType, repoRoot, teamName, effectiveMode);
   const seenModules = new Set<string>();
   const referenceNames = new Set(referenceModules.map(r => r.name.replace(/ /g, '-')));
 
