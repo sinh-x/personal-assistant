@@ -28,8 +28,8 @@ No team may skip to `done` except Sinh (via UAT sign-off). The correct advanceme
 
 ### Rule 2 — Status change = handoff
 
-When advancing a ticket's status, the actor **MUST** also set `team` and/or `assignee` to the next owner.
-If status is advanced without setting team/assignee, the CLI warns: `"Status advanced without setting team/assignee — ticket may be orphaned."`
+When advancing a ticket's status, the actor **MUST** also set `assignee` to the next owner.
+If status is advanced without setting assignee, the CLI warns: `"Status advanced without setting assignee — ticket may be orphaned."`
 
 **Additionally:** When advancing to `pending-approval` or `review-uat`, the actor **MUST** add a `--doc-ref` pointing to the requirements doc or implementation artifact. If `doc_refs` is empty at these gates, the CLI warns to stderr and adds the `needs-doc-ref` tag automatically. The transition still succeeds (soft enforcement) — but the tag signals the gap to sprint-master.
 
@@ -39,7 +39,7 @@ Every active ticket must have an owner. Sprint-master flags unowned active ticke
 
 When Sinh (or any gate owner) rejects or requests changes, the actor **MUST**:
 1. Set status back to the appropriate earlier stage
-2. Set `team` and/or `assignee` to the team responsible for rework
+2. Set `assignee` to the team responsible for rework
 3. Add a comment explaining exactly what needs to change
 
 **Example — Sinh sends back for rework:**

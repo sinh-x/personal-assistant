@@ -377,7 +377,7 @@ export class TicketStore {
       const newPos = PIPELINE_ORDER[input.status] ?? -1;
       if (newPos > oldPos) {
         process.stderr.write(
-          "Warning: Status advanced without setting team/assignee — ticket may be orphaned\n"
+          "Warning: Status advanced without setting assignee — ticket may be orphaned\n"
         );
       }
     }

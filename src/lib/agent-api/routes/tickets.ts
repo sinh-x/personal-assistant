@@ -95,10 +95,15 @@ export function ticketRoutes(): Hono {
       input.assignee = team;
     }
 
+    // Deprecation warning when team field is used
+    if (team) {
+      process.stderr.write("Deprecation: 'team' field in POST /api/tickets is deprecated. Use 'assignee' instead.\n");
+    }
+
     // F4: Require assignee (or team fallback already applied above)
     if (!input.assignee) {
       return c.json(
-        { error: "assignee is required (or provide team field)", code: "BAD_REQUEST" },
+        { error: "assignee is required, team field is deprecated", code: "BAD_REQUEST" },
         400
       );
     }

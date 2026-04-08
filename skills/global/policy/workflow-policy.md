@@ -48,9 +48,9 @@ Standard flow: `idea → requirement-review → pending-approval → pending-imp
 **Decision:** Sinh sets the executor at `pending-approval`. Sprint-master may recommend but not decide.
 
 **Rules:**
-1. Sinh sets `team: builder` or `team: orchestrator` when advancing from `pending-approval` to `pending-implementation`.
+1. Sinh sets `assignee: builder` or `assignee: orchestrator` when advancing from `pending-approval` to `pending-implementation`.
 2. Sprint-master may add a recommendation comment during triage (e.g., `"Recommend: orchestrator — 3 parallel sub-tasks identified"`), but the final decision is Sinh's.
-3. If Sinh advances without setting a team, the CLI warns: "Status advanced without setting team/assignee — ticket may be orphaned."
+3. If Sinh advances without setting an assignee, the CLI warns: "Status advanced without setting assignee — ticket may be orphaned."
 
 **Guidance table (advisory, not policy):**
 
