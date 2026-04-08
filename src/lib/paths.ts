@@ -49,16 +49,6 @@ export function getUserConfigPath(): string {
   return resolve(homedir(), ".config/sinh-x/personal-assistant/config.yaml");
 }
 
-/** Deployment registry JSONL file */
-export function getRegistryPath(): string {
-  return expandHome("~/Documents/ai-usage/deployments/registry.jsonl");
-}
-
-/** Registry lock file */
-export function getRegistryLockPath(): string {
-  return expandHome("~/Documents/ai-usage/deployments/.registry.lock");
-}
-
 /** Teams directory — config override or PA_HOME fallback */
 export function getTeamsDir(): string {
   const configDir = getConfigDir();

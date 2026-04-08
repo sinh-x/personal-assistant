@@ -3,7 +3,7 @@ import { resolve, basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
 import { loadConfig } from "../lib/config.js";
-import { getHomeDir, getDataDir, getRegistryPath, getRegistryLockPath } from "../lib/paths.js";
+import { getHomeDir, getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent } from "../lib/registry.js";
 import { generatePrimer, resolveGhRepo } from "../lib/primer.js";
@@ -134,8 +134,7 @@ export function deployCommand(
   const primersDir = resolve(dataDir, "primers");
   const logsDir = resolve(dataDir, "logs");
   const deploymentsDir = resolve(homedir(), "Documents/ai-usage/deployments");
-  const registryFile = getRegistryPath();
-  const registryLock = getRegistryLockPath();
+  const registryDb = getRegistryDbPath();
 
   const resolveFile = makeResolver(config.configDir, paHome);
 
@@ -269,8 +268,7 @@ export function deployCommand(
       teamConfig,
       teamFile,
       deployTs: new Date().toISOString(),
-      registryFile,
-      registryLock,
+      registryDb,
       deploymentsDir,
       deployMode: opts.mode,
       cwd: process.cwd(),
@@ -496,8 +494,7 @@ export function deployCommand(
     teamConfig,
     teamFile,
     deployTs,
-    registryFile,
-    registryLock,
+    registryDb,
     deploymentsDir,
     extraObjective: opts.objective,
     deployMode: opts.mode ?? (opts.direct ? "direct" : undefined),
@@ -720,8 +717,6 @@ fi
       PA_LOG_FILE: logFile,
       PA_MAX_RUNTIME: maxRuntime,
       PA_CLAUDE_PROMPT: claudePrompt,
-      PA_REGISTRY_FILE: registryFile,
-      PA_REGISTRY_LOCK: registryLock,
       PA_EXTRACT_SCRIPT: extractScript,
     };
 
