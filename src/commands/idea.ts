@@ -1,15 +1,41 @@
 import { createInterface } from "node:readline";
-import { mkdirSync, existsSync, writeFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { homedir } from "node:os";
+import { TicketStore } from "../lib/tickets/store.js";
+import { selectProject } from "../lib/interactive.js";
 
-const IDEAS_DIR = resolve(homedir(), "Documents/ai-usage/sinh-inputs/ideas");
+/**
+ * Create a line queue from a readline interface.
+ * Works correctly in both TTY (interactive) and piped (non-interactive) modes.
+ * rl.question() with promises fails in piped mode because 'line' events fire
+ * before the next question's listener is set up. This queue captures all lines
+ * eagerly so they're available when nextLine() is called.
+ */
+function createLineQueue(rl: ReturnType<typeof createInterface>): () => Promise<string> {
+  const buffer: string[] = [];
+  const waiting: Array<(line: string) => void> = [];
 
-/** Prompt user for a line of input */
-function prompt(rl: ReturnType<typeof createInterface>, question: string): Promise<string> {
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => resolve(answer));
+  rl.on("line", (line) => {
+    if (waiting.length > 0) {
+      waiting.shift()!(line);
+    } else {
+      buffer.push(line);
+    }
   });
+
+  return (): Promise<string> => {
+    if (buffer.length > 0) {
+      return Promise.resolve(buffer.shift()!);
+    }
+    return new Promise((resolve) => waiting.push(resolve));
+  };
+}
+
+/** Prompt with fallback for empty input */
+function makePrompt(nextLine: () => Promise<string>) {
+  return async (question: string, fallback = ""): Promise<string> => {
+    process.stdout.write(question);
+    const answer = await nextLine();
+    return answer.trim() || fallback;
+  };
 }
 
 /** Read multi-line input until Ctrl-D or empty first line */
@@ -39,53 +65,37 @@ function readMultiLine(rl: ReturnType<typeof createInterface>): Promise<string> 
   });
 }
 
-/** Generate a URL-safe slug from a title */
-function slugify(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-/, "")
-    .replace(/-$/, "")
-    .slice(0, 50);
-}
-
-/** Format date as YYYY-MM-DD */
-function formatDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Format date+time as YYYY-MM-DD HH:MM */
-function formatTimestamp(d: Date): string {
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${formatDate(d)} ${h}:${min}`;
-}
-
 /**
  * Log an idea interactively.
- * Replaces idea.sh (131 lines).
+ * Replaces file-writing idea.sh (131 lines).
  */
 export async function ideaCommand(): Promise<void> {
-  mkdirSync(IDEAS_DIR, { recursive: true });
+  const store = new TicketStore();
 
   const rl = createInterface({
     input: process.stdin,
     output: process.stdout,
   });
 
-  const now = new Date();
-  const timestamp = formatTimestamp(now);
-  const today = formatDate(now);
+  const nextLine = createLineQueue(rl);
+  const prompt = makePrompt(nextLine);
 
   console.log("=== Log an Idea ===");
   console.log("");
 
+  // Detect or select project
+  let projectKey: string;
+  try {
+    const selected = await selectProject();
+    projectKey = selected.key;
+  } catch {
+    console.error("Error: Could not determine project. Exiting.");
+    rl.close();
+    process.exit(1);
+  }
+
   // Title (required)
-  const title = await prompt(rl, "Title: ");
+  const title = await prompt("Title: ");
   if (!title) {
     console.error("Error: Title is required.");
     rl.close();
@@ -95,28 +105,24 @@ export async function ideaCommand(): Promise<void> {
   // Category
   console.log("");
   console.log("Categories: personal | work | volunteer | learning | infra");
-  const categoryInput = await prompt(rl, "Category [personal]: ");
-  const category = categoryInput || "personal";
+  const category = await prompt("Category [personal]: ", "personal");
 
   // Effort
   console.log("");
   console.log("Effort: S | M | L | XL");
-  const effortInput = await prompt(rl, "Effort [M]: ");
-  const effort = effortInput || "M";
+  const effort = await prompt("Effort [M]: ", "M");
 
   // What
   console.log("");
-  const whatInput = await prompt(rl, "What (one-line description): ");
-  const what = whatInput || title;
+  const what = await prompt("What (one-line description): ") || title;
 
   // Why
   console.log("");
-  const why = await prompt(rl, "Why (why this matters): ");
+  const why = await prompt("Why (why this matters): ");
 
   // Who
   console.log("");
-  const whoInput = await prompt(rl, "Who benefits [Sinh]: ");
-  const who = whoInput || "Sinh";
+  const who = await prompt("Who benefits [Sinh]: ", "Sinh");
 
   // Notes (multi-line)
   console.log("");
@@ -132,62 +138,56 @@ export async function ideaCommand(): Promise<void> {
   console.log("");
   let tagsInput = "";
   if (!rlClosed) {
-    tagsInput = await prompt(rl, "Tags (space-separated, or Enter to skip): ");
+    tagsInput = await prompt("Tags (space-separated, or Enter to skip): ");
     rl.close();
   }
 
-  // Generate filename
-  const slug = slugify(title);
-  let filename = `${today}-${slug}.md`;
+  // Build summary as markdown
+  const summary = [
+    "## What",
+    what,
+    "",
+    "## Why",
+    why || "_(not specified)_",
+    "",
+    "## Who",
+    who,
+    "",
+    "## Notes",
+    notes || "_(none)_",
+  ].join("\n");
 
-  // Avoid overwriting
-  if (existsSync(resolve(IDEAS_DIR, filename))) {
-    let counter = 2;
-    while (existsSync(resolve(IDEAS_DIR, `${today}-${slug}-${counter}.md`))) {
-      counter++;
-    }
-    filename = `${today}-${slug}-${counter}.md`;
-  }
-
-  // Format tags
-  let tagsFormatted: string;
+  // Build tags array
+  const tags: string[] = [`category:${category}`];
   if (tagsInput.trim()) {
-    tagsFormatted = tagsInput
+    tagsInput
       .trim()
       .split(/\s+/)
-      .map((t) => `\`${t}\``)
-      .join(" ");
-  } else {
-    tagsFormatted = "(none yet)";
+      .forEach((t) => tags.push(t));
   }
 
-  // Write file
-  const content = `# Idea: ${title}
-
-> **Date:** ${timestamp}
-> **Category:** ${category}
-> **Status:** new
-> **Effort:** ${effort}
-
-## What
-${what}
-
-## Why
-${why || "_(not specified)_"}
-
-## Who
-${who}
-
-## Notes
-${notes || "_(none)_"}
-
-## Tags
-${tagsFormatted}
-`;
-
-  const filePath = resolve(IDEAS_DIR, filename);
-  writeFileSync(filePath, content);
+  // Create the ticket
+  const ticket = store.create(
+    {
+      project: projectKey,
+      title,
+      summary,
+      description: "",
+      status: "idea",
+      priority: "low",
+      type: "idea",
+      assignee: "sinh",
+      estimate: effort as "XS" | "S" | "M" | "L" | "XL",
+      from: "",
+      to: "",
+      tags,
+      blockedBy: [],
+      doc_refs: [],
+      comments: [],
+    },
+    "pa-idea"
+  );
 
   console.log("");
-  console.log(`Saved: ${IDEAS_DIR}/${filename}`);
+  console.log(`Created: ${ticket.id}`);
 }
