@@ -91,19 +91,13 @@ function __pa_deploy_ids
     set -l registry_db ~/Documents/ai-usage/deployments/registry.db
     if test -f "$registry_db"
         sqlite3 "$registry_db" "SELECT DISTINCT deployment_id FROM registry_events ORDER BY timestamp DESC LIMIT 100;" 2>/dev/null
-    else
-        # Fallback to legacy JSONL if SQLite DB doesn't exist yet
-        set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
-        if test -f "$registry"
-            string match -r '"deployment_id":"(d-[0-9a-f]+)"' < "$registry" | string match -r 'd-[0-9a-f]+' | sort -u
-        end
     end
 end
 
 function __pa_deployments_with_team
     # List deployments as "team/deployment_id" with summary as description.
     # Format: "team/id\tsummary" for fish's -d flag display.
-    # Queries SQLite registry with fallback to legacy JSONL.
+    # Queries SQLite registry.
     set -l registry_db ~/Documents/ai-usage/deployments/registry.db
     if test -f "$registry_db"
         sqlite3 "$registry_db" "
@@ -115,29 +109,6 @@ function __pa_deployments_with_team
             ORDER BY e.deployment_id DESC
             LIMIT 100;
         " -separator \t 2>/dev/null
-    else
-        set -l registry ~/Documents/ai-usage/deployments/registry.jsonl
-        if test -f "$registry"
-            python3 -c "
-import sys, json
-entries = {}
-for line in open('$registry'):
-    try:
-        entry = json.loads(line.strip())
-        if 'deployment_id' in entry and 'team' in entry:
-            dep_id = entry.get('deployment_id', '')
-            team = entry.get('team', '')
-            summary = entry.get('summary', '')
-            if dep_id not in entries or (summary and not entries[dep_id][1]):
-                entries[dep_id] = (team, summary[:80] if summary else '')
-    except:
-        pass
-for dep_id in sorted(entries.keys()):
-    team, summary = entries[dep_id]
-    summary_disp = summary if summary else '(no summary)'
-    print(f'{team}/{dep_id}\t{summary_disp}')
-" 2>/dev/null
-        end
     end
 end
 
