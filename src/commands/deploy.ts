@@ -20,7 +20,7 @@ const MAX_TIMEOUT = 7200;
 const DEFAULT_TIMEOUT = 2700;
 
 /** Validate timeout is within bounds (60-7200s). Returns error message or undefined if valid. */
-function validateTimeout(timeout: number | undefined, source: string): string | undefined {
+function validateTimeout(timeout: number | undefined, _source: string): string | undefined {
   if (timeout === undefined) return undefined;
   if (timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
     return `timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} seconds`;
