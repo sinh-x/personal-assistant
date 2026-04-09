@@ -25,6 +25,12 @@ export interface DeployMode {
   /** Per-mode API provider — takes precedence over default 'anthropic', but yields to explicit --provider CLI flag */
   provider?: 'anthropic' | 'minimax';
   /**
+   * Per-mode timeout override in seconds.
+   * Takes precedence over team-level timeout, but yields to --timeout CLI flag and PA_MAX_RUNTIME env var.
+   * Must be between 60 and 7200 seconds.
+   */
+  timeout?: number;
+  /**
    * Additional global skill/policy docs to inject for this mode.
    * Paths relative to PA_CONFIG or PA_HOME.
    * Merged with TeamConfig.global_docs and injected after standards modules as <global-skill> blocks.
@@ -62,6 +68,12 @@ export interface TeamConfig {
   default_mode?: string;
   /** Team hierarchy definition */
   hierarchy?: Hierarchy;
+  /**
+   * Per-team timeout in seconds.
+   * Takes precedence over the hardcoded default (2700s), but yields to --timeout CLI flag and PA_MAX_RUNTIME env var.
+   * Must be between 60 and 7200 seconds.
+   */
+  timeout?: number;
   /**
    * Global docs injected for all modes of this team (team-level default).
    * Merged with per-mode global_docs. Useful for kanban-aware teams that need

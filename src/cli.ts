@@ -97,7 +97,8 @@ program
   .option("--ticket <id>", "Link deployment to a ticket")
   .option("--validate", "Validate team config, skill files, mode files, and template variables without deploying")
   .option("--provider <name>", "API provider: anthropic (default) or minimax")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean; provider?: string }) => {
+  .option("--timeout <seconds>", "Override deployment timeout in seconds (default: 2700, min: 60, max: 7200)")
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean; provider?: string; timeout?: number }) => {
     deployCommand(team, opts);
   });
 

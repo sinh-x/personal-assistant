@@ -89,12 +89,15 @@ Generates a markdown primer from the team's YAML config (plus global skills), th
 | `--list-modes` | boolean | false | List available modes for the team and exit |
 | `--repo <name>` | string | — | Target repo name from repos.yaml (overrides CWD detection) |
 | `--ticket <id>` | string | — | Link deployment to a ticket ID (e.g. `PA-042`) |
+| `--timeout <seconds>` | number | 2700 | Override deployment timeout (min: 60, max: 7200) |
 
 **Environment:**
 
 | Variable | Effect |
 |----------|--------|
-| `PA_MAX_RUNTIME` | Override timeout (default: 1800s). Example: `PA_MAX_RUNTIME=3600 pa deploy builder` |
+| `PA_MAX_RUNTIME` | Override timeout (default: 2700s). Takes precedence over --timeout CLI flag. Example: `PA_MAX_RUNTIME=3600 pa deploy builder` |
+
+**Timeout Precedence:** `PA_MAX_RUNTIME` env var > `--timeout` CLI flag > mode timeout (YAML) > team timeout (YAML) > 2700s default.
 
 **Examples:**
 
@@ -104,6 +107,8 @@ pa deploy maintenance --dry-run                    # Print primer, don't execute
 pa deploy builder --objective "Fix PA-042"         # Append extra instructions
 pa deploy builder --team-model opus --ticket PA-042
 pa deploy builder --list-modes                     # List available modes
+pa deploy builder --timeout 3600                   # 1-hour timeout
+pa deploy builder --timeout 120                    # 2-minute timeout (min: 60)
 ```
 
 ---

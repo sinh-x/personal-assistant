@@ -43,6 +43,7 @@ export function parseTeamYaml(filePath: string): TeamConfig {
         solo: m["solo"] as boolean | undefined,
         model: m["model"] as DeployMode["model"] | undefined,
         provider: m["provider"] as DeployMode["provider"] | undefined,
+        timeout: m["timeout"] as number | undefined,
         global_docs: m["global_docs"] as string[] | undefined,
       };
     });
@@ -84,6 +85,7 @@ export function parseTeamYaml(filePath: string): TeamConfig {
     ...(raw["default_mode"] ? { default_mode: raw["default_mode"] as string } : {}),
     ...(deployModes ? { deploy_modes: deployModes } : {}),
     ...(hierarchy ? { hierarchy } : {}),
+    ...(raw["timeout"] ? { timeout: raw["timeout"] as number } : {}),
     ...(raw["global_docs"] ? { global_docs: raw["global_docs"] as string[] } : {}),
   };
 }
