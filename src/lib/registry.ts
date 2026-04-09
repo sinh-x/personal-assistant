@@ -52,6 +52,7 @@ export function readRegistry(): RegistryEvent[] {
       rating: row.rating ? (JSON.parse(row.rating as string) as RegistryEvent["rating"]) : undefined,
       objective: row.objective as string | undefined,
       repo: row.repo as string | undefined,
+      fallback: !!row.fallback,
     };
   });
 }
@@ -75,11 +76,11 @@ export function appendRegistryEvent(event: RegistryEvent): void {
     INSERT INTO registry_events (
       deployment_id, team, event, timestamp, pid, status, summary,
       log_file, primer, agents, models, error, exit_code,
-      ticket_id, provider, rating, objective, repo
+      ticket_id, provider, rating, objective, repo, fallback
     ) VALUES (
       @deployment_id, @team, @event, @timestamp, @pid, @status, @summary,
       @log_file, @primer, @agents, @models, @error, @exit_code,
-      @ticket_id, @provider, @rating, @objective, @repo
+      @ticket_id, @provider, @rating, @objective, @repo, @fallback
     )
   `).run({
     deployment_id: event.deployment_id,
@@ -100,6 +101,7 @@ export function appendRegistryEvent(event: RegistryEvent): void {
     rating: ratingJson,
     objective: event.objective ?? null,
     repo: event.repo ?? null,
+    fallback: event.fallback ? 1 : 0,
   });
 
   // UPSERT INTO deployments materialized view
@@ -156,7 +158,8 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
           summary = @summary,
           log_file = @log_file,
           rating = @rating,
-          exit_code = @exit_code
+          exit_code = @exit_code,
+          fallback = @fallback
         WHERE deployment_id = @deployment_id
       `).run({
         deployment_id: event.deployment_id,
@@ -166,6 +169,7 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
         log_file: event.log_file ?? null,
         rating: event.rating ? JSON.stringify(event.rating) : null,
         exit_code: event.exit_code ?? null,
+        fallback: event.fallback ? 1 : 0,
       });
       break;
 
@@ -229,6 +233,7 @@ export function getDeploymentEvents(deployId: string): RegistryEvent[] {
       rating: row.rating ? (JSON.parse(row.rating as string) as RegistryEvent["rating"]) : undefined,
       objective: row.objective as string | undefined,
       repo: row.repo as string | undefined,
+      fallback: !!row.fallback,
     };
   });
 }
@@ -331,6 +336,7 @@ export function queryDeploymentStatuses(): DeploymentStatus[] {
       : undefined,
     provider: row.provider as string | undefined,
     repo: row.repo as string | undefined,
+    fallback: !!row.fallback,
   }));
 }
 
@@ -363,5 +369,6 @@ export function queryDeploymentStatus(deployId: string): DeploymentStatus | null
       : undefined,
     provider: row.provider as string | undefined,
     repo: row.repo as string | undefined,
+    fallback: !!row.fallback,
   };
 }

@@ -8,6 +8,7 @@ import {
 import { localISOTimestamp } from "../lib/time.js";
 import type { Rating, RegistryEvent } from "../lib/types.js";
 import { getDb } from "../lib/registry-db.js";
+import { isProcessAlive } from "../utils/process.js";
 
 const VALID_STATUSES = ["success", "partial", "failed"] as const;
 type CompletionStatus = (typeof VALID_STATUSES)[number];
@@ -33,6 +34,7 @@ export function createRegistryCommand(): Command {
     .option("--rating-quality <number>", "Quality rating (0-5)", parseFloat)
     .option("--rating-efficiency <number>", "Efficiency rating (0-5)", parseFloat)
     .option("--rating-insight <number>", "Insight rating (0-5)", parseFloat)
+    .option("--fallback", "Mark this as a system-generated fallback completion marker")
     .action(
       (
         deployId: string,
@@ -46,6 +48,7 @@ export function createRegistryCommand(): Command {
           ratingQuality?: number;
           ratingEfficiency?: number;
           ratingInsight?: number;
+          fallback?: boolean;
         }
       ) => {
         // Validate status
@@ -94,6 +97,19 @@ export function createRegistryCommand(): Command {
           process.exit(1);
         }
 
+        // If --fallback flag is set, check for existing terminal event
+        if (opts.fallback) {
+          const hasTerminal = events.some(
+            (e) => e.event === "completed" || e.event === "crashed"
+          );
+          if (hasTerminal) {
+            console.log(
+              `Skipping: deployment already has terminal event`
+            );
+            process.exit(0);
+          }
+        }
+
         // Warn if no rating flags provided
         if (!opts.ratingSource && opts.ratingOverall === undefined) {
           console.error(
@@ -131,6 +147,7 @@ export function createRegistryCommand(): Command {
           summary: opts.summary,
           ...(opts.logFile ? { log_file: opts.logFile } : {}),
           ...(rating && { rating }),
+          ...(opts.fallback && { fallback: true }),
         };
 
         appendRegistryEvent(event);
@@ -299,6 +316,65 @@ export function createRegistryCommand(): Command {
         }
       }
     );
+
+  // pa registry sweep
+  cmd
+    .command("sweep")
+    .description("Resolve orphaned deployments (running but PID dead) with fallback completion markers")
+    .option("--dry-run", "List orphaned deployments without modifying registry (default)")
+    .option("--fix", "Actually write fallback completion markers for orphaned deployments")
+    .action((opts: { dryRun?: boolean; fix?: boolean }) => {
+      // Query deployments table for status=running
+      const statuses = queryDeploymentStatuses();
+      const running = statuses.filter(d => d.status === "running");
+
+      if (running.length === 0) {
+        console.log("No running deployments found.");
+        return;
+      }
+
+      // Check PID liveness for each running deployment
+      const orphans = running.filter(d => {
+        if (d.pid === undefined) return true; // No PID = orphaned
+        return !isProcessAlive(d.pid);
+      });
+
+      if (orphans.length === 0) {
+        console.log("No orphaned deployments found. All running deployments have live PIDs.");
+        return;
+      }
+
+      // Display orphans
+      console.log(`Found ${orphans.length} orphaned deployment(s):\n`);
+      console.log(`${"DEPLOY_ID".padEnd(12)} ${"TEAM".padEnd(15)} ${"STARTED_AT".padEnd(25)} PID`);
+      console.log("-".repeat(60));
+      for (const d of orphans) {
+        console.log(`${d.deploy_id.padEnd(12)} ${d.team.padEnd(15)} ${d.started_at.padEnd(25)} ${d.pid ?? "none"}`);
+      }
+
+      if (!opts.fix) {
+        console.log(`\n(Dry-run: no changes made. Use --fix to write fallback markers.)`);
+        return;
+      }
+
+      // Write fallback completion markers
+      console.log("\nWriting fallback markers...");
+      let fixed = 0;
+      for (const d of orphans) {
+        appendRegistryEvent({
+          deployment_id: d.deploy_id,
+          team: d.team,
+          event: "completed",
+          timestamp: localISOTimestamp(),
+          status: "partial",
+          summary: "Resolved by pa registry sweep (fallback)",
+          fallback: true,
+        });
+        console.log(`  Fixed: ${d.deploy_id}`);
+        fixed++;
+      }
+      console.log(`\nSwept ${fixed} orphaned deployment(s).`);
+    });
 
   // pa registry search <query>
   cmd
