@@ -33,6 +33,7 @@ import { buildBoardView } from "../../tickets/board.js";
 import type { CreateTicketInput, UpdateTicketInput, Comment } from "../../tickets/types.js";
 import { listRepos } from "../../repos.js";
 import { validateSandboxPath } from "../utils/sandbox.js";
+import { getDeploymentsByTicketId } from "../../registry.js";
 
 export function ticketRoutes(): Hono {
   const app = new Hono();
@@ -150,6 +151,8 @@ export function ticketRoutes(): Hono {
     if (!ticket) {
       return c.json({ error: "Ticket not found", code: "NOT_FOUND" }, 404);
     }
+    // F5: Include deployments array for this ticket
+    const deployments = getDeploymentsByTicketId(id);
     if (renderHtml) {
       // Render content fields to HTML using marked
       const renderToHtml = (content: string): string => {
@@ -169,9 +172,9 @@ export function ticketRoutes(): Hono {
           content: renderToHtml(comment.content),
         })),
       };
-      return c.json({ ticket: htmlTicket });
+      return c.json({ ticket: htmlTicket, deployments });
     }
-    return c.json({ ticket });
+    return c.json({ ticket, deployments });
   });
 
   // PATCH /api/tickets/:id — update ticket fields

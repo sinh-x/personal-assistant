@@ -37,6 +37,8 @@ export interface TeamStatusSummary {
   total: number;
 }
 
+import { getDb } from "../registry-db.js";
+
 /**
  * Build a Kanban board view grouped by status.
  *
@@ -54,6 +56,19 @@ export function buildBoardView(
 ): BoardView {
   const store = new TicketStore();
   const tickets = store.list({ project, ...filters });
+
+  // Efficient query: fetch all running deployments once and build a Set of ticket_ids
+  const db = getDb();
+  const runningRows = db
+    .prepare(
+      "SELECT ticket_id FROM deployments WHERE started_at IS NOT NULL AND completed_at IS NULL AND status NOT IN ('completed', 'crashed')"
+    )
+    .all() as { ticket_id: string | null }[];
+  const runningTicketIds = new Set(
+    runningRows
+      .map((r) => r.ticket_id)
+      .filter((id): id is string => id !== null)
+  );
 
   const grouped = new Map<TicketStatus, Ticket[]>();
   for (const status of BOARD_COLUMNS) {
@@ -82,6 +97,11 @@ export function buildBoardView(
       (a, b) =>
         (priorityOrder[a.priority] ?? 99) - (priorityOrder[b.priority] ?? 99)
     );
+    // Annotate each ticket with hasRunningDeployment
+    for (const t of col) {
+      (t as Ticket & { hasRunningDeployment: boolean }).hasRunningDeployment =
+        runningTicketIds.has(t.id);
+    }
     return { status, tickets: col, count: col.length };
   });
 
