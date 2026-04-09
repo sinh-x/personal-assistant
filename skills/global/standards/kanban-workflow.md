@@ -68,6 +68,33 @@ Deprioritize: add `backlog` tag (ticket stays in current status)
 
 ---
 
+## Handoff Patterns
+
+### Orchestrator → Sinh → Routine → Done
+
+This pattern applies when the orchestrator (builder team in orchestrator mode) completes multi-phase implementation work.
+
+**Step 1 — Orchestrator completes all phases:**
+1. Orchestrator creates PR (GitHub) or pushes feature branch (non-GitHub)
+2. Orchestrator produces UAT review artifact using `uat-review.md` template
+3. Orchestrator advances ticket to `review-uat` with `--assignee sinh` and UAT doc attached
+
+**Step 2 — Sinh reviews UAT:**
+- Sinh reviews the UAT report and PR
+- Sinh signs off → ticket stays in `review-uat`
+- Sinh finds issues → ticket returns to `implementing` for rework
+
+**Step 3 — Routine mode auto-merges (next run after Sinh approval):**
+- GitHub repos: Routine auto-merges PR if OPEN + MERGEABLE + CI passing (Case B)
+- Non-GitHub repos: Routine performs local `git merge --no-ff <branch>` into develop (Case J)
+
+**Step 4 — Routine closes ticket:**
+- Routine updates ticket to `done` with completion comment
+
+**Key rule:** The orchestrator never merges. Sinh's UAT gate is always enforced. Merge is always done by routine mode after Sinh's sign-off.
+
+---
+
 ## Status Definitions
 
 ### `idea`
