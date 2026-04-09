@@ -262,10 +262,11 @@ export function createCodeCtxCommand(): Command {
       "Override data directory for graph storage"
     )
     .option("-v, --verbose", "Verbose output")
+    .option("--markdown", "Also generate markdown summary file")
     .action(
       async (
         repo: string | undefined,
-        opts: { dataDir?: string; verbose?: boolean }
+        opts: { dataDir?: string; verbose?: boolean; markdown?: boolean }
       ) => {
         const repoPath = repo || resolve(".");
         const dataDir = opts.dataDir || getCodeContextDir();
@@ -281,6 +282,18 @@ export function createCodeCtxCommand(): Command {
           });
 
           const graphPath = saveGraph(graph, dataDir);
+
+          // Optionally generate markdown summary
+          if (opts.markdown) {
+            const markdown = generateMarkdown(graph, {
+              title: `Codebase Overview: ${graph.repo.split("/").pop()}`,
+            });
+            const markdownPath = graphPath.replace("/graph.json", "/CODEBASE.md");
+            const dir = dirname(markdownPath);
+            mkdirSync(dir, { recursive: true });
+            writeFileSync(markdownPath, markdown, "utf-8");
+            console.log(`Markdown saved to: ${markdownPath}`);
+          }
 
           console.log(`CodeContext refresh complete`);
           console.log(formatStats(stats, duration));
