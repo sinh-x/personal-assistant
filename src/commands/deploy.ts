@@ -350,7 +350,7 @@ export function deployCommand(
   // Resolve effective provider: explicit --provider > mode-level provider > "anthropic"
   const effectiveModeId = opts.mode ?? teamConfig.default_mode;
   const modeProvider = teamConfig.deploy_modes?.find((m) => m.id === effectiveModeId)?.provider;
-  const provider = opts.provider ?? modeProvider ?? "anthropic";
+  const provider = opts.provider ?? modeProvider ?? "minimax";
   if (!VALID_PROVIDERS.has(provider)) {
     console.error(`Error: Invalid provider "${provider}" from mode "${effectiveModeId}". Valid values: anthropic, minimax`);
     process.exit(1);
