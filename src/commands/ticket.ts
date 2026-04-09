@@ -93,34 +93,37 @@ function parseDocRef(raw: string, primary: boolean): AddDocRefInput {
 }
 
 /**
- * Parse --linked-branch value: "repo:branch[:sha]"
- * Format: repo:branch or repo:branch:sha
- * Branch names can contain "/" (e.g., "feature/PA-1120-topic"), so we split on ":"
- * and reconstruct: parts[0] = repo, everything between first and last ":" = branch,
+ * Parse --linked-branch value: "repo|branch[:sha]"
+ * Format: repo|branch or repo|branch:sha
+ * Branch names can contain "/" (e.g., "feature/PA-1120-topic"), so we split on "|"
+ * and reconstruct: parts[0] = repo, everything between first and last "|" = branch,
  * last part = sha (only if 3+ parts).
+ * Delimiter is "|" to avoid conflicts with branch names containing ":" (uncommon but possible).
  */
 function parseLinkedBranch(raw: string): AddLinkedBranchInput {
-  const parts = raw.split(":");
+  const parts = raw.split("|");
   if (parts.length < 2) {
-    throw new Error(`Invalid --linked-branch format "${raw}". Expected: repo:branch[:sha]`);
+    throw new Error(`Invalid --linked-branch format "${raw}". Expected: repo|branch[:sha]`);
   }
   const repo = parts[0];
   const hasSha = parts.length >= 3;
-  const branch = hasSha ? parts.slice(1, -1).join(":") : parts.slice(1).join(":");
+  const branch = hasSha ? parts.slice(1, -1).join("|") : parts.slice(1).join("|");
   const sha = hasSha ? parts[parts.length - 1] : undefined;
   return { repo, branch, sha };
 }
 
 /**
- * Parse --linked-commit value: "repo:sha[:message:author:timestamp]"
- * Format: repo:sha or repo:sha:message:author:timestamp
+ * Parse --linked-commit value: "repo|sha[:message|author|timestamp]"
+ * Format: repo|sha or repo|sha:message|author|timestamp
  * parts[0] = repo, parts[1] = sha, parts[2] = message (optional),
  * parts[3] = author (optional), parts[4] = timestamp (optional).
+ * Delimiter is "|" to avoid conflicts with commit messages containing ":"
+ * (e.g., conventional commits like "feat(tickets): ...").
  */
 function parseLinkedCommit(raw: string): AddLinkedCommitInput {
-  const parts = raw.split(":");
+  const parts = raw.split("|");
   if (parts.length < 2) {
-    throw new Error(`Invalid --linked-commit format "${raw}". Expected: repo:sha[:message:author:timestamp]`);
+    throw new Error(`Invalid --linked-commit format "${raw}". Expected: repo|sha[:message|author|timestamp]`);
   }
   const repo = parts[0];
   const sha = parts[1];
@@ -277,9 +280,9 @@ export function createTicketCommand(): Command {
     .option("--doc-ref <value>", "Add document reference: [type:]path (ADDS to array, does not replace). Type defaults to 'attachment'.")
     .option("--doc-ref-primary", "Mark the added doc-ref as primary (demotes any existing primary)")
     .option("--remove-doc-ref <path>", "Remove a doc-ref by exact path match")
-    .option("--linked-branch <value>", "Link a branch: repo:branch[:sha] (ADDS to array)")
-    .option("--linked-commit <value>", "Link a commit: repo:sha[:message:author:timestamp] (ADDS to array)")
-    .option("--remove-linked-branch <value>", "Remove a linked branch by repo:branch")
+    .option("--linked-branch <value>", "Link a branch: repo|branch[:sha] (ADDS to array)")
+    .option("--linked-commit <value>", "Link a commit: repo|sha[:message|author|timestamp] (ADDS to array)")
+    .option("--remove-linked-branch <value>", "Remove a linked branch by repo|branch")
     .option("--remove-linked-commit <sha>", "Remove a linked commit by SHA")
     .option("--force", "Suppress doc-ref file existence warnings")
     .option("--actor <name>", "Actor for audit log", "cli-user")
