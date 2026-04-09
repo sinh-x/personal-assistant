@@ -306,6 +306,8 @@ export class TicketStore {
       updatedAt: now,
       resolvedAt: input.resolvedAt ?? null,
       doc_refs: dedupedDocRefs,
+      linkedBranches: input.linkedBranches ?? [],
+      linkedCommits: input.linkedCommits ?? [],
     };
 
     writeFileSync(this.ticketPath(id), JSON.stringify(ticket, null, 2));
