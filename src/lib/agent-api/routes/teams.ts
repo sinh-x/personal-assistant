@@ -117,6 +117,8 @@ export function teamsRoutes(): Hono {
               label: m.label,
               phone_visible: m.phone_visible,
               mode_type: m.mode_type,
+              provider: m.provider ?? null,
+              model: m.model ?? null,
             }));
 
           teams.push({
