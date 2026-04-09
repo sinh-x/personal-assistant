@@ -206,7 +206,7 @@ export function documentsRoutes(): Hono {
     }
 
     interface SectionBody {
-      title: string;
+      title: string | null;
       content: string;
       location: number;
     }
@@ -223,12 +223,19 @@ export function documentsRoutes(): Hono {
 
     const { title, content, location } = body;
 
-    if (typeof title !== "string" || typeof content !== "string" || typeof location !== "number") {
+    if (typeof content !== "string" || typeof location !== "number") {
       return c.json(
-        { error: "title and content must be strings, location must be a number", code: "BAD_REQUEST" },
+        { error: "content must be a string, location must be a number", code: "BAD_REQUEST" },
         400
       );
     }
+
+    // Check if title should suppress the header line
+    const isNoHeaderTitle =
+      title === null ||
+      title === "" ||
+      title === "NA" ||
+      title === "NULL";
 
     // Read current file content
     const fileContent = await readFile(resolvedPath, "utf8");
@@ -242,8 +249,10 @@ export function documentsRoutes(): Hono {
     // e.g. location=3 → insert at index 2 (before third line)
     const insertPos = location <= 0 ? 0 : Math.min(location - 1, lines.length);
 
-    // Build new section: ### <title>\n\n<content>\n
-    const newSection = `### ${title}\n\n${content}\n`;
+    // Build new section: ### <title>\n\n<content>\n (or blockquote-only if isNoHeaderTitle)
+    const newSection = isNoHeaderTitle
+      ? `${content}\n`
+      : `### ${title}\n\n${content}\n`;
 
     // Insert at computed position
     lines.splice(insertPos, 0, newSection);
