@@ -16,6 +16,7 @@ import { createTicketCommand } from "./commands/ticket.js";
 import { createBulletinCommand } from "./commands/bulletin.js";
 import { createRegistryCommand } from "./commands/registry.js";
 import { createTrashCommand } from "./commands/trash.js";
+import { createCodeCtxCommand } from "./commands/codectx.js";
 
 declare const __PA_VERSION__: string;
 
@@ -275,5 +276,6 @@ program.addCommand(createTicketCommand());
 program.addCommand(createBulletinCommand());
 program.addCommand(createRegistryCommand());
 program.addCommand(createTrashCommand());
+program.addCommand(createCodeCtxCommand());
 
 program.parse();

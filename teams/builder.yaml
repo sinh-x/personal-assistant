@@ -30,6 +30,8 @@ deploy_modes:
     provider: minimax
     agents: []  # solo, no sub-agents
     objective: teams/builder/modes/implement.md
+    global_docs:
+      - knowledge-base/codebase/personal-assistant.md
     skills:
       - name: pa-cli
         inject-as: shared-skill

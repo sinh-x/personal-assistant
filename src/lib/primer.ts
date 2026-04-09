@@ -5,6 +5,8 @@ import { execSync } from "node:child_process";
 import type { TeamConfig, DeployMode } from "./types.js";
 import { BulletinStore } from "./bulletins/index.js";
 import { listRepos } from "./repos.js";
+import { graphExists, loadGraph, getCodeContextDir } from "./codectx/json-store.js";
+import { computeStats, getTopExports } from "./codectx/graph-builder.js";
 
 interface ImprovementFocusItem {
   id: string;
@@ -89,6 +91,76 @@ function injectImprovementFocus(
   }
 
   return lines_out.slice(0, 10).join("\n") + "\n\n";
+}
+
+/**
+ * Inject a Codebase Context section into the primer if a graph exists for the repo.
+ * Returns empty string if no graph is available.
+ */
+function injectCodeContext(
+  repoRoot: string | undefined,
+): string {
+  if (!repoRoot) return "";
+
+  const repoName = basename(repoRoot);
+  const dataDir = getCodeContextDir();
+
+  if (!graphExists(repoName, dataDir)) {
+    return "";
+  }
+
+  const graph = loadGraph(repoName, dataDir);
+  if (!graph) return "";
+
+  const stats = computeStats(graph);
+  const topExports = getTopExports(graph);
+
+  // Find key modules — files with the most declaration nodes
+  // Filter to src/ files and sort by declaration count
+  const fileDeclarationCounts: { file: string; count: number }[] = [];
+  for (const [file, nodeIds] of Object.entries(graph.fileIndex)) {
+    // Count non-file nodes (actual declarations)
+    const declCount = nodeIds.filter((id) => {
+      const node = graph.nodes[id];
+      return node && node.type !== "file";
+    }).length;
+    if (declCount > 0 && file.includes("/src/")) {
+      fileDeclarationCounts.push({ file, count: declCount });
+    }
+  }
+
+  // Sort by declaration count descending and take top 5
+  fileDeclarationCounts.sort((a, b) => b.count - a.count);
+  const keyModules = fileDeclarationCounts.slice(0, 5);
+
+  // Build the section
+  const lines: string[] = ["## Codebase Context\n"];
+
+  // Stats line
+  lines.push(
+    `**Files:** ${stats.files} | **Functions:** ${stats.functions} | **Classes:** ${stats.classes}`
+  );
+  lines.push("");
+
+  // Top-level exports (max 10)
+  if (topExports.length > 0) {
+    const exportSlice = topExports.slice(0, 10);
+    lines.push(`**Top-level exports:** ${exportSlice.join(", ")}`);
+    lines.push("");
+  }
+
+  // Key modules
+  if (keyModules.length > 0) {
+    lines.push("**Key modules:**");
+    for (const mod of keyModules) {
+      // Get a brief description from the file node's exports or just show the file
+      const relPath = mod.file.replace(repoRoot + "/", "");
+      lines.push(`- \`${relPath}\` — ${mod.count} declarations`);
+    }
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 interface PrimerOptions {
@@ -732,6 +804,12 @@ When spawning unplanned sub-agents, use this policy:
     primer += docContent;
     if (!docContent.endsWith("\n")) primer += "\n";
     primer += "\n</global-skill>\n\n";
+  }
+
+  // Inject Codebase Context section if graph exists for the repo
+  const codeContextSection = injectCodeContext(repoRoot);
+  if (codeContextSection) {
+    primer += codeContextSection;
   }
 
   // Reference Documents (Tier 3 — on-demand; includes repo context when repoRoot is set)
