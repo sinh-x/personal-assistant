@@ -149,7 +149,7 @@ After verification passes:
   msg=$(git log -1 --format=%s)
   author=$(git log -1 --format=%an)
   ts=$(git log -1 --format=%aI)
-  pa ticket update <ticket-id> --linked-commit "<repo-key>:${sha}:${msg}:${author}:${ts}"
+  pa ticket update <ticket-id> --linked-commit "<repo-key>|${sha}|${msg}|${author}|${ts}"
   ```
   The repo key comes from `repos.yaml` (e.g., `pa`, `avodah`). This maintains a running history of commits against the ticket.
 - **Update the item file checklist** — change `- [ ] Phase N` to `- [x] Phase N` for the phase just completed
