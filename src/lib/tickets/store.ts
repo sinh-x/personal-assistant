@@ -28,6 +28,10 @@ import type {
   TicketType,
   TicketPriority,
   Estimate,
+  LinkedBranch,
+  LinkedCommit,
+  AddLinkedBranchInput,
+  AddLinkedCommitInput,
 } from "./types.js";
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
 import { resolveProject } from "../repos.js";
@@ -107,6 +111,8 @@ export class TicketStore {
       blockedBy: raw.blockedBy ?? [],
       comments: raw.comments ?? [],
       doc_refs: raw.doc_refs ?? [],
+      linkedBranches: (raw.linkedBranches as Ticket["linkedBranches"]) ?? [],
+      linkedCommits: (raw.linkedCommits as Ticket["linkedCommits"]) ?? [],
       assignee: (raw.assignee as string) ?? "",
       subTickets: raw.subTickets ?? [],
       nextSubTicketCounter: (raw.nextSubTicketCounter as number) ?? 0,
@@ -300,6 +306,8 @@ export class TicketStore {
       updatedAt: now,
       resolvedAt: input.resolvedAt ?? null,
       doc_refs: dedupedDocRefs,
+      linkedBranches: input.linkedBranches ?? [],
+      linkedCommits: input.linkedCommits ?? [],
     };
 
     writeFileSync(this.ticketPath(id), JSON.stringify(ticket, null, 2));
@@ -385,7 +393,7 @@ export class TicketStore {
     // Extract special doc_ref operation fields (not spread into ticket data)
     const addDocRefInput: AddDocRefInput | undefined = (input as Record<string, unknown>).add_doc_ref as AddDocRefInput | undefined;
     const removeDocRefPath: string | undefined = (input as Record<string, unknown>).remove_doc_ref as string | undefined;
-    const { add_doc_ref: _addDocRef, remove_doc_ref: _removeDocRef, ...restInput } = input as Record<string, unknown>;
+    const { add_doc_ref: _addDocRef, remove_doc_ref: _removeDocRef, add_linked_branch: _addLinkedBranch, remove_linked_branch: _removeLinkedBranch, add_linked_commit: _addLinkedCommit, remove_linked_commit: _removeLinkedCommit, ...restInput } = input as Record<string, unknown>;
 
     const hasDocRefs = (ticket.doc_refs?.length ?? 0) > 0 || !!addDocRefInput;
 
@@ -532,7 +540,121 @@ export class TicketStore {
       }
     }
 
-    const updated: Ticket = { ...ticket, ...(restInput as Partial<Ticket>), doc_refs: docRefs, updatedAt: now };
+    // Process linked branch mutations
+    const addLinkedBranchInput: AddLinkedBranchInput | undefined = (input as Record<string, unknown>).add_linked_branch as AddLinkedBranchInput | undefined;
+    const removeLinkedBranchKey: string | undefined = (input as Record<string, unknown>).remove_linked_branch as string | undefined;
+
+    let linkedBranches: LinkedBranch[] = ticket.linkedBranches ?? [];
+
+    if (removeLinkedBranchKey) {
+      const before = linkedBranches;
+      linkedBranches = linkedBranches.filter((b) => `${b.repo}:${b.branch}` !== removeLinkedBranchKey);
+      if (linkedBranches.length !== before.length) {
+        changes["linkedBranches"] = [before, linkedBranches];
+        this.appendAudit({
+          ticket_id: id,
+          action: "branch_link_removed",
+          actor,
+          timestamp: now,
+          changes: { branch: [removeLinkedBranchKey, null] },
+        });
+      }
+    }
+
+    if (addLinkedBranchInput) {
+      const existingIdx = linkedBranches.findIndex((b) => b.repo === addLinkedBranchInput.repo && b.branch === addLinkedBranchInput.branch);
+      const newBranch: LinkedBranch = {
+        repo: addLinkedBranchInput.repo,
+        branch: addLinkedBranchInput.branch,
+        sha: addLinkedBranchInput.sha ?? "",
+        linkedAt: now,
+        linkedBy: addLinkedBranchInput.linkedBy ?? actor,
+      };
+
+      if (existingIdx >= 0) {
+        const before = ticket.linkedBranches ?? [];
+        linkedBranches = linkedBranches.map((b, i) => (i === existingIdx ? { ...b, ...newBranch } : b));
+        changes["linkedBranches"] = [before, linkedBranches];
+        this.appendAudit({
+          ticket_id: id,
+          action: "branch_link_added",
+          actor,
+          timestamp: now,
+          changes: { branch: [linkedBranches[existingIdx], newBranch] },
+        });
+      } else {
+        const before = ticket.linkedBranches ?? [];
+        linkedBranches = [...linkedBranches, newBranch];
+        changes["linkedBranches"] = [before, linkedBranches];
+        this.appendAudit({
+          ticket_id: id,
+          action: "branch_link_added",
+          actor,
+          timestamp: now,
+          changes: { branch: [null, newBranch] },
+        });
+      }
+    }
+
+    // Process linked commit mutations
+    const addLinkedCommitInput: AddLinkedCommitInput | undefined = (input as Record<string, unknown>).add_linked_commit as AddLinkedCommitInput | undefined;
+    const removeLinkedCommitSha: string | undefined = (input as Record<string, unknown>).remove_linked_commit as string | undefined;
+
+    let linkedCommits: LinkedCommit[] = ticket.linkedCommits ?? [];
+
+    if (removeLinkedCommitSha) {
+      const before = linkedCommits;
+      linkedCommits = linkedCommits.filter((c) => c.sha !== removeLinkedCommitSha);
+      if (linkedCommits.length !== before.length) {
+        changes["linkedCommits"] = [before, linkedCommits];
+        this.appendAudit({
+          ticket_id: id,
+          action: "commit_link_removed",
+          actor,
+          timestamp: now,
+          changes: { sha: [removeLinkedCommitSha, null] },
+        });
+      }
+    }
+
+    if (addLinkedCommitInput) {
+      const existingIdx = linkedCommits.findIndex((c) => c.sha === addLinkedCommitInput.sha);
+      const newCommit: LinkedCommit = {
+        repo: addLinkedCommitInput.repo,
+        sha: addLinkedCommitInput.sha,
+        message: addLinkedCommitInput.message ?? "",
+        author: addLinkedCommitInput.author ?? "",
+        timestamp: addLinkedCommitInput.timestamp ?? now,
+        linkedAt: now,
+        linkedBy: addLinkedCommitInput.linkedBy ?? actor,
+      };
+
+      if (existingIdx >= 0) {
+        const before = ticket.linkedCommits ?? [];
+        linkedCommits = linkedCommits.map((c, i) => (i === existingIdx ? { ...c, ...newCommit } : c));
+        changes["linkedCommits"] = [before, linkedCommits];
+        this.appendAudit({
+          ticket_id: id,
+          action: "commit_link_added",
+          actor,
+          timestamp: now,
+          changes: { commit: [linkedCommits[existingIdx], newCommit] },
+        });
+      } else {
+        const before = ticket.linkedCommits ?? [];
+        linkedCommits = [...linkedCommits, newCommit];
+        changes["linkedCommits"] = [before, linkedCommits];
+        this.appendAudit({
+          ticket_id: id,
+          action: "commit_link_added",
+          actor,
+          timestamp: now,
+          changes: { commit: [null, newCommit] },
+        });
+      }
+    }
+
+    const updated: Ticket = { ...ticket, ...(restInput as Partial<Ticket>), doc_refs: docRefs, linkedBranches, linkedCommits, updatedAt: now };
     writeFileSync(this.ticketPath(id), JSON.stringify(updated, null, 2));
 
     if (Object.keys(changes).length > 0) {

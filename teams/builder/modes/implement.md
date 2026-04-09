@@ -142,6 +142,16 @@ Every phase has verification steps listed in the plan. Run ALL of them. Common c
 After verification passes:
 - Stage changed files
 - Commit with: `feat(<scope>): phase N - description`
+- **Link commit to ticket** — after committing, link the commit to the ticket for traceability:
+  ```bash
+  # Get the commit SHA and link it
+  sha=$(git rev-parse HEAD)
+  msg=$(git log -1 --format=%s)
+  author=$(git log -1 --format=%an)
+  ts=$(git log -1 --format=%aI)
+  pa ticket update <ticket-id> --linked-commit "<repo-key>:${sha}:${msg}:${author}:${ts}"
+  ```
+  The repo key comes from `repos.yaml` (e.g., `pa`, `avodah`). This maintains a running history of commits against the ticket.
 - **Update the item file checklist** — change `- [ ] Phase N` to `- [x] Phase N` for the phase just completed
 - **Check done condition** — see §Multi-Phase Completion Logic below
 - Add a brief completion comment on the ticket: `pa ticket comment <id> --author team-manager --content "Completed phase N: <summary>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"`

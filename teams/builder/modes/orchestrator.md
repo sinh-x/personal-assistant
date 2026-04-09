@@ -188,6 +188,16 @@ if [ "$current" != "<feature_branch>" ]; then
 fi
 ```
 
+**Post-branch-setup — Link branch to ticket:**
+
+After creating or confirming the feature branch, link it to the ticket for traceability:
+
+```bash
+pa ticket update <ticket_id> --linked-branch <repo-key>:<feature_branch>
+```
+
+This records which branch is associated with the ticket. The repo key comes from `repos.yaml` (e.g., `pa`, `avodah`). Do this once per ticket, immediately after branch creation.
+
 **For each unchecked phase in the checklist:**
 
 **a. Compose the builder objective:**

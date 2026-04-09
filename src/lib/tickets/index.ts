@@ -13,6 +13,10 @@ export type {
   CreateTicketInput,
   UpdateTicketInput,
   CounterStore,
+  LinkedBranch,
+  LinkedCommit,
+  AddLinkedBranchInput,
+  AddLinkedCommitInput,
 } from "./types.js";
 
 export { TERMINAL_STATUSES, ACTIVE_STATUSES } from "./types.js";

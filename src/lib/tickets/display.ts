@@ -1,6 +1,6 @@
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
-import type { Ticket, Comment, DocRef, SubTicket } from "./types.js";
+import type { Ticket, Comment, DocRef, SubTicket, LinkedBranch, LinkedCommit } from "./types.js";
 
 // Configure marked with terminal renderer
 const terminalRenderer = markedTerminal({
@@ -128,6 +128,69 @@ function formatSubTicketsSection(subTickets: SubTicket[]): string {
 }
 
 /**
+ * Format linked branches section for display in ticket card.
+ * Returns empty string if no linked branches exist.
+ */
+function formatLinkedBranchesSection(branches: LinkedBranch[]): string {
+  if (!branches || branches.length === 0) return "";
+  const header = "  REPO".padEnd(20) + "BRANCH".padEnd(35) + "SHA".padEnd(12) + "LINKED AT";
+  const sep = "  " + "-".repeat(80);
+  const rows = branches.map((b) => {
+    const sha = b.sha ? b.sha.slice(0, 7) : "—";
+    const date = b.linkedAt ? b.linkedAt.split("T")[0] : "—";
+    return (
+      "  " +
+      b.repo.padEnd(18) +
+      (b.branch.length > 33 ? b.branch.slice(0, 30) + "..." : b.branch).padEnd(35) +
+      sha.padEnd(12) +
+      date
+    );
+  });
+  return [
+    `  ── Linked Branches (${branches.length}) ─────────────────────────────────────`,
+    "",
+    header,
+    sep,
+    ...rows,
+  ].join("\n");
+}
+
+/**
+ * Format linked commits section for display in ticket card.
+ * Returns empty string if no linked commits exist.
+ */
+function formatLinkedCommitsSection(commits: LinkedCommit[]): string {
+  if (!commits || commits.length === 0) return "";
+  const header = "  REPO".padEnd(20) + "SHA".padEnd(12) + "AUTHOR".padEnd(18) + "DATE".padEnd(12) + "MESSAGE";
+  const sep = "  " + "-".repeat(80);
+  const rows = commits.map((c) => {
+    const sha = c.sha ? c.sha.slice(0, 7) : "—";
+    const date = c.timestamp ? c.timestamp.split("T")[0] : "—";
+    const author = c.author || "—";
+    const msg = c.message
+      ? c.message.length > 30
+        ? c.message.slice(0, 27) + "..."
+        : c.message
+      : "—";
+    return (
+      "  " +
+      c.repo.padEnd(18) +
+      sha.padEnd(12) +
+      (author.length > 16 ? author.slice(0, 13) + "..." : author).padEnd(18) +
+      date.padEnd(12) +
+      msg
+    );
+  });
+  return [
+    `  ── Linked Commits (${commits.length}) ──────────────────────────────────────`,
+    "",
+    header,
+    sep,
+    ...rows,
+  ].join("\n");
+}
+
+/**
  * Format a Ticket object as a human-readable terminal card view.
  *
  * Renders: header bar, title, summary, description, doc_refs, sub-tickets, comments, metadata.
@@ -181,6 +244,12 @@ export function formatTicketCard(ticket: Ticket): string {
     "",
     formatDocRefsTable(ticket.doc_refs),
     "",
+    ...((ticket.linkedBranches ?? []).length > 0
+      ? [formatLinkedBranchesSection(ticket.linkedBranches ?? []), ""]
+      : []),
+    ...((ticket.linkedCommits ?? []).length > 0
+      ? [formatLinkedCommitsSection(ticket.linkedCommits ?? []), ""]
+      : []),
     ...((ticket.subTickets ?? []).length > 0
       ? [formatSubTicketsSection(ticket.subTickets ?? []), ""]
       : []),
