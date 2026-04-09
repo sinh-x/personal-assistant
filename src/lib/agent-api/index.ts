@@ -11,6 +11,7 @@ import { configRoutes } from "./routes/config.js";
 import { deploymentsRoutes } from "./routes/deployments.js";
 import { repoDeploymentsRoutes } from "./routes/repo-deployments.js";
 import { reposRoutes } from "./routes/repos.js";
+import { repoCommitsRoutes } from "./routes/repo-commits.js";
 import { teamsRoutes } from "./routes/teams.js";
 import { deployRoutes } from "./routes/deploy.js";
 import { deployRoutingRoutes } from "./routes/deploy-routing.js";
@@ -103,6 +104,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", configRoutes());
   app.route("/", deploymentsRoutes());
   app.route("/", reposRoutes());
+  app.route("/", repoCommitsRoutes());
   app.route("/", repoDeploymentsRoutes());
   app.route("/", teamsRoutes());
   app.route("/", deployRoutes());
