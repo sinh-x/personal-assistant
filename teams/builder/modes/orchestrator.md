@@ -12,6 +12,7 @@ Common repos:
 
 ## Critical Rules
 
+- **Phase tracking requirement (STRICT).** Before entering Phase 3 (Plan Analysis), the orchestrator MUST create a TodoWrite task list tracking all phases from the plan checklist. Each phase becomes a task with status. Update tasks as phases complete. This is mandatory for all multi-phase implementations. Single-phase work does not require a task list but should still use TodoWrite to track completion.
 - **Solo operator.** You do ALL coordination yourself. Do NOT spawn sub-agents. Launch other teams via `pa deploy` CLI only.
 - **CLAUDECODE guard.** Always `unset CLAUDECODE` before any nested `pa deploy` command. This prevents session conflicts.
 - **Never guess.** If the objective is ambiguous, no matching item is found, or any decision point is unclear — create a review request to Sinh and wait for a response. Do not proceed on assumptions.
@@ -23,7 +24,42 @@ Common repos:
 
 ## Workflow
 
-### Phase 0: Repo Resolution (mandatory pre-flight)
+### Tool Preferences (mandatory)
+
+**Use dedicated tools over Bash equivalents wherever possible:**
+
+| Task | Preferred tools | Bash equivalents to avoid |
+|------|-----------------|---------------------------|
+| Read file contents | `Read` | `cat`, `head`, `tail` |
+| Find files by pattern | `Glob` | `find`, `ls` |
+| Search file contents | `Grep` | `grep`, `rg` |
+| Edit files | `Edit` | `sed`, `awk` |
+| Write files | `Write` | `echo`, `printf` with redirects |
+| Git operations | `gh` CLI via Bash | direct git commands for GitHub ops |
+
+**Rationale:** Dedicated tools have better permission handling, integrated context, and produce machine-parseable output. Bash commands are harder to parse and may behave differently across environments.
+
+---
+
+## Time-Boxing Rules
+
+Each phase has a maximum time allocation. If a phase approaches its limit, write a partial work report and exit gracefully rather than running indefinitely.
+
+| Phase | Name | Time Limit | Action on Timeout |
+|-------|------|------------|-------------------|
+| 0 | Repo Resolution | 2 minutes | Fail immediately — repo must be resolvable |
+| 1 | Understand Objective | 5 minutes | If ticket not found or ambiguous, create review-request and exit |
+| 2 | Requirements Gathering | 30 minutes | Exit partial, notify Sinh via FYI ticket |
+| 3 | Plan Analysis | 10 minutes | If plan too thin, create review-request and exit |
+| 4 | Build Loop (per phase) | 60 minutes | Exit partial, report failure via FYI ticket |
+| 5 | Merge | 10 minutes | If strategy unclear, create review-request and exit |
+| 6 | Report and Shutdown | 5 minutes | Log and exit regardless |
+
+**Total budget:** PA_MAX_RUNTIME (default 3 hours) minus overhead for coordination.
+
+---
+
+## Phase 0: Repo Resolution (mandatory pre-flight)
 
 Determine the target repository **before any other work**. This is mandatory — fail immediately if the repo cannot be resolved.
 
@@ -160,6 +196,8 @@ Build a **phase context map** — a structured lookup of phase number → {requi
   - On timeout: exit partial
 
 ### Phase 4: Build Loop
+
+**Delegation guardrail (STRICT):** The orchestrator must NEVER run build, test, or typecheck commands directly. All verification must be delegated to the builder team via `pa deploy`. Running verification directly bypasses the builder agent's execution context and breaks traceability. If verification is needed, include it in the builder objective for the appropriate phase.
 
 Execute each unchecked phase by launching the builder team in implement mode.
 

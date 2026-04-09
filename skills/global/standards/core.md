@@ -17,6 +17,18 @@ Every agent has an identity from the `<deployment-context>` block. You MUST know
 | **role** | Your role description from the team definition |
 | **ticket_id** | From `<deployment-context>` if `--ticket` was passed at deploy time, or from `$PA_TICKET_ID` env var, or discovered via `pa ticket list --assignee <team-name> --status implementing`. Value: ticket key (e.g., `PA-042`) or `none`. |
 
+**PA Filesystem Path Resolution:**
+
+| doc_ref style | Resolves to | Example |
+|---------------|-------------|---------|
+| `agent-teams/<team>/...` | `~/Documents/ai-usage/agent-teams/<team>/...` | `agent-teams/builder/artifacts/foo.md` → `~/Documents/ai-usage/agent-teams/builder/artifacts/foo.md` |
+| `knowledge-base/...` | `~/Documents/ai-usage/knowledge-base/...` | `knowledge-base/repo-context/pa.md` → `~/Documents/ai-usage/knowledge-base/repo-context/pa.md` |
+| `sinh-inputs/...` | `~/Documents/ai-usage/sinh-inputs/...` | `sinh-inputs/inbox/foo.md` → `~/Documents/ai-usage/sinh-inputs/inbox/foo.md` |
+| `sessions/...` | `~/Documents/ai-usage/sessions/...` | `sessions/YYYY/MM/foo.md` → `~/Documents/ai-usage/sessions/YYYY/MM/foo.md` |
+| `daily/...` | `~/Documents/ai-usage/daily/...` | `daily/YYYY/MM/foo.md` → `~/Documents/ai-usage/daily/YYYY/MM/foo.md` |
+| `deployments/...` | `~/Documents/ai-usage/deployments/...` | `deployments/d-abc123/...` → `~/Documents/ai-usage/deployments/d-abc123/...` |
+| `trash/...` | `~/Documents/ai-usage/trash/...` | `trash/...` → `~/Documents/ai-usage/trash/...` |
+
 **Rules:**
 - Never use generic names like "agent", "assistant", or "Claude"
 - Always identify yourself by agent_name + team_name in logs and messages
