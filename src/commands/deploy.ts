@@ -15,6 +15,18 @@ import { localISOTimestamp } from "../lib/time.js";
 import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
 
 const VALID_MODELS = new Set(["haiku", "sonnet", "opus"]);
+const MIN_TIMEOUT = 60;
+const MAX_TIMEOUT = 7200;
+const DEFAULT_TIMEOUT = 2700;
+
+/** Validate timeout is within bounds (60-7200s). Returns error message or undefined if valid. */
+function validateTimeout(timeout: number | undefined, source: string): string | undefined {
+  if (timeout === undefined) return undefined;
+  if (timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
+    return `timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} seconds`;
+  }
+  return undefined;
+}
 
 /** Resolve effective model for team-manager and each agent, applying Sonnet floor and validation */
 function resolveEffectiveModels(
@@ -138,6 +150,8 @@ export function deployCommand(
     ticket?: string;
     validate?: boolean;
     provider?: string;
+    /** Override deployment timeout in seconds (default: 2700) */
+    timeout?: number;
     /** Template variables to substitute in mode objective files */
     templateVars?: Record<string, string>;
   }
@@ -640,7 +654,40 @@ export function deployCommand(
     console.log(`  Log: ${logFile}`);
     console.log("  Status: pa status");
 
-    const maxRuntime = process.env["PA_MAX_RUNTIME"] ?? "1800";
+    // Resolve timeout with precedence: PA_MAX_RUNTIME env var > --timeout CLI > mode.timeout > teamConfig.timeout > 2700
+    const modeTimeout = teamConfig.deploy_modes?.find((m) => m.id === effectiveModeId)?.timeout;
+    const teamTimeout = teamConfig.timeout;
+
+    // Check bounds on YAML values early so we fail before spawning
+    const yamlTimeoutErr = validateTimeout(teamTimeout, "team config");
+    if (yamlTimeoutErr) {
+      console.error(`Error: team config timeout ${yamlTimeoutErr}`);
+      process.exit(1);
+    }
+    const yamlModeTimeoutErr = validateTimeout(modeTimeout, "mode config");
+    if (yamlModeTimeoutErr) {
+      console.error(`Error: mode config timeout ${yamlModeTimeoutErr}`);
+      process.exit(1);
+    }
+    const cliTimeoutErr = validateTimeout(opts.timeout, "CLI flag");
+    if (cliTimeoutErr) {
+      console.error(`Error: ${cliTimeoutErr}`);
+      process.exit(1);
+    }
+
+    // Apply precedence
+    let maxRuntime: number;
+    if (process.env["PA_MAX_RUNTIME"]) {
+      maxRuntime = parseInt(process.env["PA_MAX_RUNTIME"]!, 10);
+    } else if (opts.timeout !== undefined) {
+      maxRuntime = opts.timeout;
+    } else if (modeTimeout !== undefined) {
+      maxRuntime = modeTimeout;
+    } else if (teamTimeout !== undefined) {
+      maxRuntime = teamTimeout;
+    } else {
+      maxRuntime = DEFAULT_TIMEOUT;
+    }
 
     // Write log header
     const logHeader = `=== Deployment Log ===
@@ -726,7 +773,7 @@ fi
     const bgScriptEnv = {
       ...deployEnv,
       PA_LOG_FILE: logFile,
-      PA_MAX_RUNTIME: maxRuntime,
+      PA_MAX_RUNTIME: String(maxRuntime),
       PA_CLAUDE_PROMPT: claudePrompt,
       PA_EXTRACT_SCRIPT: extractScript,
     };

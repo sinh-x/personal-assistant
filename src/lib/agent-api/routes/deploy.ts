@@ -2,7 +2,7 @@
  * Deploy route — trigger a PA team deployment.
  *
  * POST /api/deploy — fire-and-forget deployment trigger.
- *   Body: {team: string, mode?: string, objective?: string, repo?: string, ticket?: string}
+ *   Body: {team: string, mode?: string, objective?: string, repo?: string, ticket?: string, timeout?: number}
  *   Returns 202: {status: "pending", team, mode} — spawned successfully; real status arrives via WS deployment-status-change
  *   Returns 202: {status: "failed", reason: string} — spawn failed (binary not found, permission error, etc.)
  */
@@ -13,6 +13,9 @@ import { spawn } from "node:child_process";
 import { getBinDir } from "../../paths.js";
 import { join } from "node:path";
 import { existsSync } from "node:fs";
+
+const MIN_TIMEOUT = 60;
+const MAX_TIMEOUT = 7200;
 
 /** Validate that a string only contains safe characters for CLI args */
 function isSafeIdentifier(value: string): boolean {
@@ -43,6 +46,7 @@ export function deployRoutes(): Hono {
     const objective = body["objective"] as string | undefined;
     const repo = body["repo"] as string | undefined;
     const ticket = body["ticket"] as string | undefined;
+    const timeout = body["timeout"] as number | undefined;
 
     if (!team || !team.trim()) {
       return c.json({ error: "team is required", code: "BAD_REQUEST" }, 400);
@@ -55,6 +59,11 @@ export function deployRoutes(): Hono {
     }
     if (ticket && !/^[A-Z][A-Z0-9]+-[0-9]+$/.test(ticket)) {
       return c.json({ error: "Invalid ticket ID", code: "BAD_REQUEST" }, 400);
+    }
+    if (timeout !== undefined) {
+      if (!Number.isInteger(timeout) || timeout < MIN_TIMEOUT || timeout > MAX_TIMEOUT) {
+        return c.json({ error: `timeout must be between ${MIN_TIMEOUT} and ${MAX_TIMEOUT} seconds`, code: "BAD_REQUEST" }, 400);
+      }
     }
 
     // Validate objective: max 500 chars, safe ASCII only
@@ -87,6 +96,9 @@ export function deployRoutes(): Hono {
     }
     if (ticket && ticket.trim()) {
       args.push("--ticket", ticket.trim());
+    }
+    if (timeout !== undefined) {
+      args.push("--timeout", String(timeout));
     }
 
     // Spawn detached and return 202 immediately — phone gets real status via WS deployment-status-change

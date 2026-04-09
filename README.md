@@ -86,7 +86,7 @@ PA resolves paths in layers:
 | `PA_DATA` | `~/.local/share/personal-assistant` | Mutable data (primers/, logs/) |
 | `PA_CONFIG` | — | User override dir (teams/, skills/ that shadow PA_HOME) |
 | `PA_BIN` | `$PA_HOME/../bin` | Wrapped binaries directory |
-| `PA_MAX_RUNTIME` | `1800` | Max deployment runtime in seconds |
+| `PA_MAX_RUNTIME` | `2700` | Max deployment runtime in seconds |
 
 User config file: `~/.config/sinh-x/personal-assistant/config.yaml`
 
