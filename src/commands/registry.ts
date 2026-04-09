@@ -33,6 +33,7 @@ export function createRegistryCommand(): Command {
     .option("--rating-quality <number>", "Quality rating (0-5)", parseFloat)
     .option("--rating-efficiency <number>", "Efficiency rating (0-5)", parseFloat)
     .option("--rating-insight <number>", "Insight rating (0-5)", parseFloat)
+    .option("--fallback", "Mark this as a system-generated fallback completion marker")
     .action(
       (
         deployId: string,
@@ -46,6 +47,7 @@ export function createRegistryCommand(): Command {
           ratingQuality?: number;
           ratingEfficiency?: number;
           ratingInsight?: number;
+          fallback?: boolean;
         }
       ) => {
         // Validate status
@@ -94,6 +96,19 @@ export function createRegistryCommand(): Command {
           process.exit(1);
         }
 
+        // If --fallback flag is set, check for existing terminal event
+        if (opts.fallback) {
+          const hasTerminal = events.some(
+            (e) => e.event === "completed" || e.event === "crashed"
+          );
+          if (hasTerminal) {
+            console.log(
+              `Skipping: deployment already has terminal event`
+            );
+            process.exit(0);
+          }
+        }
+
         // Warn if no rating flags provided
         if (!opts.ratingSource && opts.ratingOverall === undefined) {
           console.error(
@@ -131,6 +146,7 @@ export function createRegistryCommand(): Command {
           summary: opts.summary,
           ...(opts.logFile ? { log_file: opts.logFile } : {}),
           ...(rating && { rating }),
+          ...(opts.fallback && { fallback: true }),
         };
 
         appendRegistryEvent(event);

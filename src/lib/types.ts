@@ -113,6 +113,7 @@ export interface RegistryEvent {
   rating?: Rating;
   objective?: string;
   repo?: string;
+  fallback?: boolean;
 }
 
 /** Computed deployment status from registry events */
@@ -139,6 +140,7 @@ export interface DeploymentStatus {
   models?: Record<string, string>;
   provider?: string;
   repo?: string;
+  fallback?: boolean;
 }
 
 /** PA configuration paths */

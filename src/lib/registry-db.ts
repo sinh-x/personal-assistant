@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 
 let _db: Database.Database | null = null;
 
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 function ensureDir(path: string): void {
   const dir = dirname(path);
@@ -46,6 +46,9 @@ function migrateFrom(db: Database.Database, fromVersion: number): void {
   }
   if (fromVersion < 2) {
     migrateToV2(db);
+  }
+  if (fromVersion < 3) {
+    migrateToV3(db);
   }
 }
 
@@ -213,6 +216,17 @@ function migrateToV2(db: Database.Database): void {
   `);
 
   db.exec("COMMIT");
+}
+
+function migrateToV3(db: Database.Database): void {
+  // V3 adds fallback column to both tables.
+  // SQLite supports ALTER TABLE ADD COLUMN without table rebuild.
+  db.exec(`
+    ALTER TABLE registry_events ADD COLUMN fallback INTEGER DEFAULT 0;
+  `);
+  db.exec(`
+    ALTER TABLE deployments ADD COLUMN fallback INTEGER DEFAULT 0;
+  `);
 }
 
 /**
