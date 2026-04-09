@@ -238,7 +238,9 @@ export function documentsRoutes(): Hono {
     // location <= 0 → prepend (position 0)
     // location > lines.length → append (position lines.length)
     // 1 <= location <= lines.length → insert BEFORE line at that index (1-based)
-    const insertPos = location <= 0 ? 0 : Math.min(location, lines.length);
+    // e.g. location=1 → insert at index 0 (before first line)
+    // e.g. location=3 → insert at index 2 (before third line)
+    const insertPos = location <= 0 ? 0 : Math.min(location - 1, lines.length);
 
     // Build new section: ### <title>\n\n<content>\n
     const newSection = `### ${title}\n\n${content}\n`;
