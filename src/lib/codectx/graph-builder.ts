@@ -67,8 +67,8 @@ export function buildRelationships(graph: CodeGraph): void {
   }
 
   // For each file, create implicit relationships between exported items
-  for (const [file, nodes] of Object.entries(fileNodes)) {
-    const exportedNodes = nodes.filter(
+  for (const [_file, nodes] of Object.entries(fileNodes)) {
+    const _exportedNodes = nodes.filter(
       (n) => n.type !== "function" || n.exports?.length
     );
 

@@ -2,8 +2,8 @@
  * Query engine - executes queries against the code graph.
  */
 
-import type { CodeGraph, GraphNode, GraphStats } from "./types.js";
-import { computeStats, getTopExports, findCallers } from "./graph-builder.js";
+import type { CodeGraph, GraphNode } from "./types.js";
+import { getTopExports, findCallers } from "./graph-builder.js";
 
 /** Query result types */
 export interface FileQueryResult {

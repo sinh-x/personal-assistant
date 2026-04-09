@@ -5,7 +5,6 @@ import { execSync } from "node:child_process";
 import type { TeamConfig, DeployMode } from "./types.js";
 import { BulletinStore } from "./bulletins/index.js";
 import { listRepos } from "./repos.js";
-import type { CodeGraph } from "./codectx/types.js";
 import { graphExists, loadGraph, getCodeContextDir } from "./codectx/json-store.js";
 import { computeStats, getTopExports } from "./codectx/graph-builder.js";
 
