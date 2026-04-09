@@ -22,7 +22,7 @@
 
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, writeFile } from "node:fs/promises";
 import { existsSync, statSync } from "node:fs";
 import { join, basename, extname } from "node:path";
 import { validateSandboxPath, normalizeSandboxPath } from "../utils/sandbox.js";
@@ -184,6 +184,88 @@ export function documentsRoutes(): Hono {
     c.header("Content-Type", contentType);
     c.header("Content-Length", String(statImg.size));
     return c.body(fileBuffer);
+  });
+
+  app.post("/api/folders/:folderId/files/:fileId/sections", async (c: Context) => {
+    const folderId = c.req.param("folderId");
+    const fileId = c.req.param("fileId");
+    const normalized = normalizeSandboxPath(`${folderId}/${fileId}`);
+
+    let resolvedPath: string;
+    try {
+      resolvedPath = validateSandboxPath(normalized);
+    } catch {
+      return c.json(
+        { error: "Path traversal denied", code: "SANDBOX_VIOLATION" },
+        403
+      );
+    }
+
+    if (!existsSync(resolvedPath)) {
+      return c.json({ error: "Not found", code: "NOT_FOUND" }, 404);
+    }
+
+    interface SectionBody {
+      title: string;
+      content: string;
+      location: number;
+    }
+
+    let body: SectionBody;
+    try {
+      body = await c.req.json<SectionBody>();
+    } catch {
+      return c.json(
+        { error: "Invalid JSON body", code: "BAD_REQUEST" },
+        400
+      );
+    }
+
+    const { title, content, location } = body;
+
+    if (typeof title !== "string" || typeof content !== "string" || typeof location !== "number") {
+      return c.json(
+        { error: "title and content must be strings, location must be a number", code: "BAD_REQUEST" },
+        400
+      );
+    }
+
+    // Read current file content
+    const fileContent = await readFile(resolvedPath, "utf8");
+    const lines = fileContent.split("\n");
+
+    // Compute insert position
+    // location <= 0 → prepend (position 0)
+    // location > lines.length → append (position lines.length)
+    // 1 <= location <= lines.length → insert BEFORE line at that index (1-based)
+    const insertPos = location <= 0 ? 0 : Math.min(location, lines.length);
+
+    // Build new section: ### <title>\n\n<content>\n
+    const newSection = `### ${title}\n\n${content}\n`;
+
+    // Insert at computed position
+    lines.splice(insertPos, 0, newSection);
+
+    // Join and write back
+    const updatedContent = lines.join("\n");
+    await writeFile(resolvedPath, updatedContent, "utf8");
+
+    // Return updated file state
+    const filename = basename(resolvedPath);
+    const metadata = parseMarkdownMetadata(updatedContent, filename);
+    const docType = detectDocumentType(updatedContent, filename);
+    const stat = statSync(resolvedPath);
+
+    return c.json({
+      path: `${folderId}/${fileId}`,
+      content: updatedContent,
+      metadata: {
+        ...metadata,
+        type: docType,
+        size: stat.size,
+        modified: stat.mtime.toISOString(),
+      },
+    });
   });
 
   return app;
