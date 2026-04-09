@@ -57,6 +57,8 @@ export function deployRoutingRoutes(): Hono {
               id: m.id,
               label: m.label,
               modeType: m.mode_type ?? null,
+              provider: m.provider ?? null,
+              model: m.model ?? null,
             }));
 
           // Skip teams with no non-interactive modes
