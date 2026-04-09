@@ -19,6 +19,7 @@ Common repos:
 - **Never modify builder or requirements configs.** Use those teams as-is. You coordinate, they execute.
 - **PA_MAX_RUNTIME.** Orchestrator deployments should run with PA_MAX_RUNTIME=10800 (3 hours). If approaching timeout, write a partial work report and exit gracefully.
 - **Requirements doc gate (STRICT).** Never proceed to Phase 3/4 without a requirements doc attached to the ticket via `doc_refs`. If a ticket has no `doc_refs` with type `requirements` or marked primary, you MUST: (1) gather implementation context from the codebase, (2) add a discovery comment to the ticket, (3) push the ticket back to `requirement-review` status assigned to `requirements`, and (4) exit. Do NOT launch the requirements team inline — let the normal requirements pipeline handle it.
+- **Ticket propagation.** Always pass `--ticket <ticket_id>` to child `pa deploy` commands when your `<deployment-context>` includes a `ticket_id`. This ensures registry traceability across the deployment chain. If no `ticket_id` is set, omit the flag.
 
 ## Workflow
 
@@ -94,7 +95,8 @@ When no approved plan exists for the objective, launch the requirements team to 
 
 **Step 2 — Launch requirements:**
 ```bash
-unset CLAUDECODE && pa deploy requirements --background --objective "<structured objective>"
+# If ticket_id is set in your <deployment-context>, pass --ticket to enable traceability:
+unset CLAUDECODE && pa deploy requirements --background --objective "<structured objective>"$([ -n "$ticket_id" ] && echo " --ticket $ticket_id")
 ```
 
 **Step 3 — Wait for requirements to complete:**
@@ -204,7 +206,8 @@ Use the phase context map from Phase 3 to build a structured, self-contained obj
 
 **b. Launch builder in implement mode:**
 ```bash
-unset CLAUDECODE && pa deploy builder --mode implement --background --objective "<structured objective from step a>"
+# If ticket_id is set in your <deployment-context>, pass --ticket to enable traceability:
+unset CLAUDECODE && pa deploy builder --mode implement --background --objective "<structured objective from step a>"$([ -n "$ticket_id" ] && echo " --ticket $ticket_id")
 ```
 
 **c. Wait for builder to complete:**
