@@ -43,6 +43,8 @@ export function deployRoutes(): Hono {
     const objective = body["objective"] as string | undefined;
     const repo = body["repo"] as string | undefined;
     const ticket = body["ticket"] as string | undefined;
+    const provider = body["provider"] as string | undefined;
+    const teamModel = body["team_model"] as string | undefined;
 
     if (!team || !team.trim()) {
       return c.json({ error: "team is required", code: "BAD_REQUEST" }, 400);
@@ -55,6 +57,12 @@ export function deployRoutes(): Hono {
     }
     if (ticket && !/^[A-Z][A-Z0-9]+-[0-9]+$/.test(ticket)) {
       return c.json({ error: "Invalid ticket ID", code: "BAD_REQUEST" }, 400);
+    }
+    if (provider && !isSafeIdentifier(provider)) {
+      return c.json({ error: "Invalid provider", code: "BAD_REQUEST" }, 400);
+    }
+    if (teamModel && !isSafeIdentifier(teamModel)) {
+      return c.json({ error: "Invalid model", code: "BAD_REQUEST" }, 400);
     }
 
     // Validate objective: max 500 chars, safe ASCII only
@@ -87,6 +95,12 @@ export function deployRoutes(): Hono {
     }
     if (ticket && ticket.trim()) {
       args.push("--ticket", ticket.trim());
+    }
+    if (provider && provider.trim()) {
+      args.push("--provider", provider.trim());
+    }
+    if (teamModel && teamModel.trim()) {
+      args.push("--model", teamModel.trim());
     }
 
     // Spawn detached and return 202 immediately — phone gets real status via WS deployment-status-change
