@@ -5,7 +5,7 @@ import { execSync } from "node:child_process";
 import { loadConfig } from "../lib/config.js";
 import { getHomeDir, getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
-import { appendRegistryEvent } from "../lib/registry.js";
+import { appendRegistryEvent, getDeploymentEvents } from "../lib/registry.js";
 import { generatePrimer, resolveGhRepo } from "../lib/primer.js";
 import { resolveRepo, listRepos } from "../lib/repos.js";
 import { isTeamBlocked } from "../lib/bulletins/index.js";
@@ -53,6 +53,27 @@ function generateDeployId(): string {
   return "d-" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+
+/**
+ * Write a fallback completion marker if no terminal event exists.
+ * Called after execSync blocks in foreground-like modes (direct, interactive, foreground).
+ */
+function writeFallbackIfNeeded(deployId: string, teamName: string): void {
+  const events = getDeploymentEvents(deployId);
+  const hasTerminal = events.some(e => e.event === "completed" || e.event === "crashed");
+  if (!hasTerminal) {
+    appendRegistryEvent({
+      deployment_id: deployId,
+      team: teamName,
+      event: "completed",
+      timestamp: localISOTimestamp(),
+      status: "partial",
+      summary: "Session ended without completion marker (fallback)",
+      fallback: true,
+    });
+    console.log(`[fallback] Wrote fallback completion marker for ${deployId}`);
+  }
+}
 
 /** Resolve a relative path from PA_CONFIG first, then PA_HOME */
 function makeResolver(configDir: string, homeDir: string) {
@@ -577,6 +598,7 @@ export function deployCommand(
       appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
     }
     runExtraction();
+    writeFallbackIfNeeded(deployId, teamName);
     if (exitCode !== 0) process.exit(exitCode);
   } else if (mode === "interactive") {
     console.log(`Deploying team (interactive): ${teamConfig.name} [${deployId}]`);
@@ -593,6 +615,7 @@ export function deployCommand(
       appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
     }
     runExtraction();
+    writeFallbackIfNeeded(deployId, teamName);
     if (exitCode !== 0) process.exit(exitCode);
   } else if (mode === "foreground") {
     console.log(`Deploying team (foreground): ${teamConfig.name} [${deployId}]`);
@@ -608,6 +631,7 @@ export function deployCommand(
       appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
     }
     runExtraction();
+    writeFallbackIfNeeded(deployId, teamName);
     if (exitCode !== 0) process.exit(exitCode);
   } else {
     // Background mode
