@@ -166,8 +166,8 @@ function getCommitHistory(
       if (!numLine) continue;
       const parts = numLine.split("\t");
       if (parts.length >= 3) {
-        const added = parseInt(parts[1], 10) || 0;
-        const removed = parseInt(parts[2], 10) || 0;
+        const added = parseInt(parts[0], 10) || 0;
+        const removed = parseInt(parts[1], 10) || 0;
         if (added > 0 || removed > 0) {
           filesChanged++;
           insertions += added;
