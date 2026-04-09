@@ -680,24 +680,6 @@ export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
       writeFileSync(envFile, envContent, { mode: 0o600 });
     }
 
-    // Pre-write crash JSON files before bgScriptContent evaluation (avoids inline JSON construction in shell)
-    const crashTimeoutJson = resolve(deployDir, "crash-timeout.json");
-    const crashErrorJson = resolve(deployDir, "crash-error.json");
-    writeFileSync(crashTimeoutJson, JSON.stringify({
-      deployment_id: deployId,
-      team: teamName,
-      event: "crashed",
-      timestamp: new Date().toISOString(),
-      exit_code: 124,
-      summary: `Timed out after ${maxRuntime}s`,
-    }));
-    writeFileSync(crashErrorJson, JSON.stringify({
-      deployment_id: deployId,
-      team: teamName,
-      event: "crashed",
-      timestamp: new Date().toISOString(),
-      exit_code: 0,
-    }));
 
     // Build background script — uses env vars exclusively (no inline interpolation)
     // so that objectives with quotes/metacharacters cannot break the shell command.
@@ -725,9 +707,14 @@ if [[ -f "$PA_EXTRACT_SCRIPT" ]]; then
 fi
 if [[ $exit_code -eq 124 ]]; then
   echo "[$(date -Iseconds)] TIMED OUT after $PA_MAX_RUNTIME s" >> "$PA_LOG_FILE"
-  { flock -w 5 9; cat '${crashTimeoutJson}' >> "$PA_REGISTRY_FILE"; } 9>"$PA_REGISTRY_LOCK"
+  pa registry complete "$PA_DEPLOYMENT_ID" --status failed --summary "Timed out after $PA_MAX_RUNTIME s" 2>> "$PA_LOG_FILE" || true
 elif [[ $exit_code -ne 0 ]]; then
-  { flock -w 5 9; cat '${crashErrorJson}' >> "$PA_REGISTRY_FILE"; } 9>"$PA_REGISTRY_LOCK"
+  echo "[$(date -Iseconds)] claude exited with error code $exit_code" >> "$PA_LOG_FILE"
+  pa registry complete "$PA_DEPLOYMENT_ID" --status failed --summary "Crashed with exit code $exit_code" 2>> "$PA_LOG_FILE" || true
+fi
+# Fallback: clean exit but no completion marker
+if [[ $exit_code -eq 0 ]]; then
+  pa registry complete "$PA_DEPLOYMENT_ID" --status partial --summary "Session ended without completion marker (fallback)" --fallback 2>> "$PA_LOG_FILE" || true
 fi
 `.trimStart();
 
