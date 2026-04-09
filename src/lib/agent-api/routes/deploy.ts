@@ -2,7 +2,7 @@
  * Deploy route — trigger a PA team deployment.
  *
  * POST /api/deploy — fire-and-forget deployment trigger.
- *   Body: {team: string, mode?: string, objective?: string, repo?: string, ticket?: string}
+ *   Body: {team: string, mode?: string, objective?: string, repo?: string, ticket?: string, provider?: string, team_model?: string}
  *   Returns 202: {status: "pending", team, mode} — spawned successfully; real status arrives via WS deployment-status-change
  *   Returns 202: {status: "failed", reason: string} — spawn failed (binary not found, permission error, etc.)
  */
@@ -43,6 +43,8 @@ export function deployRoutes(): Hono {
     const objective = body["objective"] as string | undefined;
     const repo = body["repo"] as string | undefined;
     const ticket = body["ticket"] as string | undefined;
+    const provider = body["provider"] as string | undefined;
+    const team_model = body["team_model"] as string | undefined;
 
     if (!team || !team.trim()) {
       return c.json({ error: "team is required", code: "BAD_REQUEST" }, 400);
@@ -55,6 +57,12 @@ export function deployRoutes(): Hono {
     }
     if (ticket && !/^[A-Z][A-Z0-9]+-[0-9]+$/.test(ticket)) {
       return c.json({ error: "Invalid ticket ID", code: "BAD_REQUEST" }, 400);
+    }
+    if (provider && !isSafeIdentifier(provider)) {
+      return c.json({ error: "Invalid provider", code: "BAD_REQUEST" }, 400);
+    }
+    if (team_model && !isSafeIdentifier(team_model)) {
+      return c.json({ error: "Invalid team_model", code: "BAD_REQUEST" }, 400);
     }
 
     // Validate objective: max 500 chars, safe ASCII only
@@ -80,6 +88,12 @@ export function deployRoutes(): Hono {
       }
       if (repo) {
         args.push("--repo", repo);
+      }
+      if (provider) {
+        args.push("--provider", provider);
+      }
+      if (team_model) {
+        args.push("--team-model", team_model);
       }
     }
     if (objective && objective.trim()) {
