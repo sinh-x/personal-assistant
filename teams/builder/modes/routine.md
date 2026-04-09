@@ -327,6 +327,36 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
     ```
 - Category: CLOSED if any merged, MULTI-PR (sub-ticket created or skipped) if none merged
 
+**CASE J — No PR found, no commits on develop, but linked branch exists (non-GitHub repo):**
+- The orchestrator advanced the ticket to `review-uat` but skipped PR creation (non-GitHub repo). Routine handles local merge.
+- Check for existing sub-ticket:
+  ```bash
+  pa ticket subticket list <TICKET-ID>
+  ```
+- If open sub-ticket titled "LOCAL-MERGE: ..." exists: SKIP (record in SKIPPED)
+- **Auto-Resolve Check:** If linked branch is already merged into develop (git log shows the branch commits), close ticket:
+  ```bash
+  git log develop --oneline | grep "<TICKET-ID>"
+  ```
+- Otherwise perform local merge:
+  ```bash
+  cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+  git checkout develop
+  git merge --no-ff <linked-branch> -m "Merge <linked-branch> into develop (routine mode, after UAT)"
+  git push origin develop
+  ```
+- Close ticket:
+  ```bash
+  pa ticket update <TICKET-ID> --status done
+  pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-closed: Local merge of <branch> into develop (non-GitHub repo, UAT approved)."
+  ```
+- Decision Log Entry:
+  ```bash
+  echo "| <TICKET-ID> | LOCAL-MERGE (J) | Non-GitHub repo, linked branch merged locally | Closed: done | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+  ```
+- Category: LOCAL-MERGE
+- If dry-run: preview the merge without executing it
+
 #### Error Handling
 
 During ticket processing, handle errors gracefully so one failure does not block others:
@@ -522,6 +552,8 @@ pa registry complete $PA_DEPLOYMENT_ID \
 - **NF3 Fail-safe.** If any auto-resolve verification step fails, fall back to sub-ticket creation. Never auto-close a ticket if verification cannot confirm the condition.
 - **Auto-resolve before sub-ticket.** Always attempt auto-resolve before creating sub-tickets for BLOCKED, CONFLICT, CI-FAILURE, ORPHAN, and READY-TO-MERGE cases.
 - **Stale sub-ticket resolution (F6).** Before entering the decision tree, cross-reference existing open sub-tickets against current PR state. Close sub-tickets whose triggering condition no longer applies (e.g., CONFLICT sub-ticket when PR is now MERGEABLE). After cleanup, re-evaluate the ticket through the normal decision tree.
+- **Orchestrator-created PRs.** When the orchestrator creates a PR and advances the ticket to `review-uat`, routine mode processes these PRs in the normal Case A/B flow. After Sinh reviews the UAT, the next routine run auto-merges qualifying PRs (Case B) or closes tickets with already-merged PRs (Case A). No special handling is needed for orchestrator-created PRs.
+- **Non-GitHub repos.** Repos without GitHub remotes are handled by Case J (local merge). The orchestrator advances the ticket to `review-uat` with a linked branch but no PR. Routine detects this and performs a local `git merge --no-ff`.
 
 ---
 

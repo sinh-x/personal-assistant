@@ -52,7 +52,7 @@ Each phase has a maximum time allocation. If a phase approaches its limit, write
 | 2 | Requirements Gathering | 30 minutes | Exit partial, notify Sinh via FYI ticket |
 | 3 | Plan Analysis | 10 minutes | If plan too thin, create review-request and exit |
 | 4 | Build Loop (per phase) | 60 minutes | Exit partial, report failure via FYI ticket |
-| 5 | Merge | 10 minutes | If strategy unclear, create review-request and exit |
+| 5 | PR Creation & UAT Handoff | 10 minutes | If strategy unclear, create review-request and exit |
 | 6 | Report and Shutdown | 5 minutes | Log and exit regardless |
 
 **Total budget:** PA_MAX_RUNTIME (default 3 hours) minus overhead for coordination.
@@ -293,11 +293,17 @@ pa ticket create \
 
 After creating the failure ticket, **stop**. Do not continue to the next phase or attempt the merge.
 
-### Phase 5: Merge
+### Phase 5: PR Creation & UAT Handoff
 
-After all phases complete successfully, merge the feature branch. The orchestrator owns this step — implement agents never merge.
+After all phases complete successfully, the orchestrator creates a PR (if GitHub), produces a UAT review artifact, and advances the ticket to `review-uat`. **The orchestrator never merges — routine mode handles merge after Sinh's UAT sign-off.**
 
-**Step 1 — Determine merge strategy:**
+**Step 1 — Push feature branch:**
+
+```bash
+git push -u origin <feature-branch>
+```
+
+**Step 2 — Determine merge target:**
 
 Check these sources in order:
 1. `<repo>/CLAUDE.md` — look for explicit branch/merge instructions
@@ -305,30 +311,32 @@ Check these sources in order:
 3. `<repo>/.claude/branch-strategy.yaml` — machine-readable branch config
 4. **Default: merge target is `develop`** — feature branches are always created from `develop` and merge back into `develop`
 
-**Step 2 — If strategy is clear:**
-- For repos with GitHub remotes: `gh pr create --base develop --head <feature-branch> --title "<title>" --body "<summary>"`
-- For local-only repos: `git checkout develop && git merge --no-ff <feature-branch>`
-
-**Step 3 — If strategy is unclear:**
-
-Create a review-request ticket asking for merge strategy confirmation:
+**Step 3 — Create PR (GitHub repos only):**
 
 ```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "Review: Merge strategy needed for <feature-branch>" \
-  --type review-request \
-  --assignee sinh \
-  --priority high \
-  --estimate XS \
-  --summary "All phases for '<objective>' completed. Repo: <repo_path>. Branch: <feature-branch> (<N> commits). Branches found: <list>. Confirm: merge into main? develop? Create PR first? Other?"
+gh pr create --base develop --head <feature-branch> --title "<ticket-id>: <title>" --body "<summary with AC checklist>"
 ```
 
-Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a note that merge is pending.
+**Step 4 — Produce UAT review artifact:**
 
-**Step 4 — Post-merge cleanup:**
-- Verify the plan document has all phases checked off
-- Update ticket status if not already done by the builder
+1. Read the requirements UAT doc from the ticket's `doc_refs` (type `uat`)
+2. Read the UAT review template (`skills/templates/uat-review.md`)
+3. Populate the template: fill test scenarios from requirements UAT, add regression checks based on changed files, note the PR URL
+4. Save to deployment workspace and team artifacts:
+   ```bash
+   cp <artifact> ~/Documents/ai-usage/agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-uat-review.md
+   ```
+
+**Step 5 — Advance ticket to `review-uat`:**
+
+```bash
+pa ticket update <ticket-id> --status review-uat --assignee sinh \
+  --doc-ref "uat-review:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-uat-review.md"
+```
+
+**Step 6 — Non-GitHub repos:**
+
+Skip PR creation (Step 3), but still produce UAT review artifact (Step 4) and advance ticket to `review-uat` (Step 5). Merge is handled by routine mode via local `git merge --no-ff`.
 
 ### Phase 6: Report and Shutdown
 
@@ -336,7 +344,7 @@ Wait for Sinh's response (30-minute timeout). On timeout, exit partial with a no
 
 If the orchestrator was working on an assigned ticket, add a completion comment:
 ```bash
-pa ticket comment <ticket-id> --author team-manager --content "Orchestration complete for '<objective>'. All N phases done, merged to <branch>. Deploys: <phase→deploy-id list>. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
+pa ticket comment <ticket-id> --author team-manager --content "Orchestration complete for '<objective>'. All N phases done, PR #<N> created, awaiting UAT sign-off. Routine mode will merge after approval. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
 ```
 
 If no working ticket (standalone orchestration), create an FYI ticket:
