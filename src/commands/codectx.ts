@@ -4,7 +4,8 @@
  */
 
 import { Command } from "commander";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
+import { writeFileSync, mkdirSync } from "node:fs";
 import {
   createEmptyGraph,
   mergeParseResult,
@@ -16,7 +17,23 @@ import {
   findSourceFiles,
   parseFile,
 } from "../lib/codectx/parser.js";
-import { saveGraph, loadGraph, graphExists, getCodeContextDir } from "../lib/codectx/json-store.js";
+import {
+  saveGraph,
+  loadGraph,
+  graphExists,
+  getCodeContextDir,
+} from "../lib/codectx/json-store.js";
+import { generateMarkdown } from "../lib/codectx/markdown-generator.js";
+import {
+  queryFile,
+  queryFunction,
+  queryClass,
+  queryExports,
+  formatFileResult,
+  formatFunctionResult,
+  formatClassResult,
+  formatExportsResult,
+} from "../lib/codectx/query-engine.js";
 import type { CodeGraph, GraphStats } from "../lib/codectx/types.js";
 
 /**
@@ -121,7 +138,8 @@ export function createCodeCtxCommand(): Command {
       "Override data directory for graph storage"
     )
     .option("-v, --verbose", "Verbose output")
-    .action(async (repo: string | undefined, opts: { dataDir?: string; verbose?: boolean }) => {
+    .option("--markdown", "Also generate markdown summary file")
+    .action(async (repo: string | undefined, opts: { dataDir?: string; verbose?: boolean; markdown?: boolean }) => {
       const repoPath = repo || resolve(".");
       const dataDir = opts.dataDir || getCodeContextDir();
 
@@ -133,6 +151,18 @@ export function createCodeCtxCommand(): Command {
 
         // Save the graph
         const graphPath = saveGraph(graph, dataDir);
+
+        // Optionally generate markdown summary
+        if (opts.markdown) {
+          const markdown = generateMarkdown(graph, {
+            title: `Codebase Overview: ${graph.repo.split("/").pop()}`,
+          });
+          const markdownPath = graphPath.replace("/graph.json", "/CODEBASE.md");
+          const dir = dirname(markdownPath);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(markdownPath, markdown, "utf-8");
+          console.log(`Markdown saved to: ${markdownPath}`);
+        }
 
         // Output summary
         console.log(`CodeContext analysis complete`);
@@ -162,8 +192,7 @@ export function createCodeCtxCommand(): Command {
       async (
         type: string,
         value: string,
-        repo: string | undefined,
-        opts: { verbose?: boolean }
+        repo: string | undefined
       ) => {
         const repoPath = repo || resolve(".");
         const repoName = repoPath.split("/").pop() || repoPath;
@@ -177,52 +206,36 @@ export function createCodeCtxCommand(): Command {
 
           switch (type) {
             case "file": {
-              const nodes = Object.values(graph.nodes).filter(
-                (n) => n.file.includes(value) || n.name.includes(value)
-              );
-              if (nodes.length === 0) {
+              const result = queryFile(graph, value);
+              if (!result) {
                 console.log(`No declarations found matching: ${value}`);
               } else {
-                console.log(`Declarations in ${value}:`);
-                for (const node of nodes) {
-                  console.log(`  ${node.type}: ${node.name} (line ${node.startLine})`);
-                }
+                console.log(formatFileResult(result));
               }
               break;
             }
             case "fn":
             case "function": {
-              const node = Object.values(graph.nodes).find(
-                (n) => n.type === "function" && n.name === value
-              );
-              if (node) {
-                console.log(`Function: ${node.name}`);
-                console.log(`  File: ${node.file}`);
-                console.log(`  Line: ${node.startLine}`);
-              } else {
+              const result = queryFunction(graph, value);
+              if (!result) {
                 console.log(`Function not found: ${value}`);
+              } else {
+                console.log(formatFunctionResult(result));
               }
               break;
             }
             case "class": {
-              const node = Object.values(graph.nodes).find(
-                (n) => n.type === "class" && n.name === value
-              );
-              if (node) {
-                console.log(`Class: ${node.name}`);
-                console.log(`  File: ${node.file}`);
-                console.log(`  Line: ${node.startLine}`);
-              } else {
+              const result = queryClass(graph, value);
+              if (!result) {
                 console.log(`Class not found: ${value}`);
+              } else {
+                console.log(formatClassResult(result));
               }
               break;
             }
             case "exports": {
-              const exports = getTopExports(graph);
-              console.log(`Top exports (${exports.length} total):`);
-              for (const exp of exports) {
-                console.log(`  ${exp}`);
-              }
+              const result = queryExports(graph);
+              console.log(formatExportsResult(result));
               break;
             }
             default:
