@@ -35,8 +35,19 @@ function computeInsertPosition(location: number, lineCount: number): number {
 /**
  * Build a section string from title and content.
  * Mirrors the logic in documents.ts POST handler.
+ * title can be null to suppress the header line.
  */
-function buildSection(title: string, content: string): string {
+function buildSection(title: string | null, content: string): string {
+  // isNoHeaderTitle: null, "", "NA", "NULL" suppress the header
+  const isNoHeaderTitle =
+    title === null ||
+    title === "" ||
+    title === "NA" ||
+    title === "NULL";
+
+  if (isNoHeaderTitle) {
+    return `${content}\n`;
+  }
   return `### ${title}\n\n${content}\n`;
 }
 
@@ -82,6 +93,42 @@ class Assertion {
       return;
     }
     throw new Error("Expected function to throw");
+  }
+
+  get not(): NegatedAssertion {
+    return new NegatedAssertion(this.actual);
+  }
+}
+
+class NegatedAssertion {
+  constructor(private actual: unknown) {}
+  toBe(expected: unknown): void {
+    if (this.actual === expected)
+      throw new Error(`Expected NOT ${JSON.stringify(expected)}, but it was equal`);
+  }
+  toContain(expected: string): void {
+    if (typeof this.actual === "string" && this.actual.includes(expected))
+      throw new Error(`Expected string to NOT contain "${expected}", but it did`);
+  }
+  toBeDefined(): void {
+    if (this.actual === undefined) throw new Error(`Expected NOT undefined`);
+  }
+  toBeGreaterThan(expected: number): void {
+    if (typeof this.actual === "number" && this.actual <= expected)
+      throw new Error(`Expected number to NOT be <= ${expected}`);
+  }
+  toBeLessThan(expected: number): void {
+    if (typeof this.actual === "number" && this.actual >= expected)
+      throw new Error(`Expected number to NOT be >= ${expected}`);
+  }
+  toThrow(): void {
+    if (typeof this.actual !== "function") throw new Error(`Expected function, got ${typeof this.actual}`);
+    try {
+      (this.actual as () => void)();
+      throw new Error("Expected function to throw, but it did not");
+    } catch {
+      return;
+    }
   }
 }
 
@@ -161,7 +208,7 @@ describe("buildSection", () => {
 
 async function doInsert(opts: {
   fileContent: string;
-  title: string;
+  title: string | null;
   content: string;
   location: number;
   fileId?: string;
@@ -286,6 +333,123 @@ describe("insert logic integration", () => {
     expect(result.content.indexOf("Line 1")).toBeLessThan(result.content.indexOf("### Inserted"));
     expect(result.content.indexOf("### Inserted")).toBeLessThan(result.content.indexOf("Line 2"));
     expect(result.content.indexOf("Line 2")).toBeLessThan(result.content.indexOf("Line 3"));
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+});
+
+// ─── Header-suppressed (no-title) section tests ─────────────────────────────────
+
+describe("header-suppressed section insert (PA-1131)", () => {
+  it("AC1: null title inserts blockquote-only, no ### header", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const initial = "# Header\n\nExisting content";
+    const result = await doInsert({
+      fileContent: initial,
+      title: null,
+      content: "> This is a blockquote comment",
+      location: 1,
+      tmpDir: td,
+    });
+    // Should NOT contain ### header
+    expect(result.content).not.toContain("### null");
+    expect(result.content).not.toContain("###");
+    // Should contain the blockquote content
+    expect(result.content).toContain("> This is a blockquote comment");
+    // Blockquote should be at position 0 (inserted first)
+    expect(result.content.indexOf("> This is a blockquote comment")).toBe(0);
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+
+  it("AC1: empty string title inserts blockquote-only, no ### header", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const initial = "# Header\n\nExisting content";
+    const result = await doInsert({
+      fileContent: initial,
+      title: "",
+      content: "> Another blockquote",
+      location: 1,
+      tmpDir: td,
+    });
+    expect(result.content).not.toContain("###");
+    expect(result.content).toContain("> Another blockquote");
+    expect(result.content.indexOf("> Another blockquote")).toBe(0);
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+
+  it("AC2: NA title inserts blockquote-only, no ### header", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const initial = "# Header\n\nExisting content";
+    const result = await doInsert({
+      fileContent: initial,
+      title: "NA",
+      content: "> NA blockquote content",
+      location: 1,
+      tmpDir: td,
+    });
+    expect(result.content).not.toContain("### NA");
+    expect(result.content).not.toContain("###");
+    expect(result.content).toContain("> NA blockquote content");
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+
+  it("AC2: NULL title inserts blockquote-only, no ### header", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const initial = "# Header\n\nExisting content";
+    const result = await doInsert({
+      fileContent: initial,
+      title: "NULL",
+      content: "> NULL blockquote content",
+      location: 1,
+      tmpDir: td,
+    });
+    expect(result.content).not.toContain("### NULL");
+    expect(result.content).not.toContain("###");
+    expect(result.content).toContain("> NULL blockquote content");
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+
+  it("AC3: normal title uses existing ### header format", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const initial = "# Header\n\nExisting content";
+    const result = await doInsert({
+      fileContent: initial,
+      title: "Comment",
+      content: "This is a regular comment",
+      location: 1,
+      tmpDir: td,
+    });
+    expect(result.content).toContain("### Comment");
+    expect(result.content).toContain("This is a regular comment");
+    expect(result.content.indexOf("### Comment")).toBe(0);
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+
+  it("AC4: null title on empty file inserts just blockquote content", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const result = await doInsert({
+      fileContent: "",
+      title: null,
+      content: "> Standalone blockquote",
+      location: 1,
+      tmpDir: td,
+    });
+    expect(result.content).toBe("> Standalone blockquote\n");
+    await unlink(join(td, "test.md")).catch(() => {});
+  });
+
+  it("AC5: response shape unchanged - path, content, metadata present", async () => {
+    const td = mkdtempSync(join(tmpdir(), "pa-section-test-"));
+    const result = await doInsert({
+      fileContent: "# Header",
+      title: null,
+      content: "> Blockquote",
+      location: 1,
+      tmpDir: td,
+    });
+    expect(result.path).toBeDefined();
+    expect(result.content).toBeDefined();
+    expect(result.metadata).toBeDefined();
+    expect(result.metadata.size).toBeGreaterThan(0);
     await unlink(join(td, "test.md")).catch(() => {});
   });
 });
