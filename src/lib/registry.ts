@@ -372,3 +372,35 @@ export function queryDeploymentStatus(deployId: string): DeploymentStatus | null
     fallback: !!row.fallback,
   };
 }
+
+/**
+ * Query deployment statuses filtered by ticket_id from the deployments table.
+ * Returns all deployments linked to the given ticket, ordered by started_at descending.
+ */
+export function getDeploymentsByTicketId(ticketId: string): DeploymentStatus[] {
+  const db = getDb();
+  const rows = db
+    .prepare("SELECT * FROM deployments WHERE ticket_id = ? ORDER BY started_at DESC")
+    .all(ticketId) as Record<string, unknown>[];
+
+  return rows.map((row) => ({
+    deploy_id: row.deployment_id as string,
+    team: row.team as string,
+    status: row.status as DeploymentStatus["status"],
+    started_at: row.started_at as string,
+    completed_at: row.completed_at as string | undefined,
+    pid: row.pid as number | undefined,
+    agents: row.agents ? (JSON.parse(row.agents as string) as string[]) : [],
+    summary: row.summary as string | undefined,
+    log_file: row.log_file as string | undefined,
+    primer: row.primer as string | undefined,
+    ticket_id: row.ticket_id as string | undefined,
+    objective: row.objective as string | undefined,
+    models: row.models
+      ? (JSON.parse(row.models as string) as Record<string, string>)
+      : undefined,
+    provider: row.provider as string | undefined,
+    repo: row.repo as string | undefined,
+    fallback: !!row.fallback,
+  }));
+}

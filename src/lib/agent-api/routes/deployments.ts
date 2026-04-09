@@ -10,7 +10,7 @@ import type { Context } from "hono";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { readRegistry, computeDeploymentStatuses } from "../../registry.js";
+import { readRegistry, computeDeploymentStatuses, getDeploymentsByTicketId } from "../../registry.js";
 import type { DeploymentStatus } from "../../types.js";
 
 const AI_USAGE = join(homedir(), "Documents", "ai-usage");
@@ -32,6 +32,16 @@ export function getTodayDateString(): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Get the ISO timestamp for 48 hours ago in UTC.
+ * Used for the rolling window default date filter.
+ */
+export function get48HoursAgoISO(): string {
+  const now = new Date();
+  now.setUTCHours(now.getUTCHours() - 48);
+  return now.toISOString();
+}
+
 export function deploymentsRoutes(): Hono {
   const app = new Hono();
 
@@ -40,31 +50,43 @@ export function deploymentsRoutes(): Hono {
     const sinceParam = c.req.query("since");
     const limitParam = c.req.query("limit");
     const allParam = c.req.query("all");
+    const ticketIdParam = c.req.query("ticket_id");
 
     // Validate since param if provided
     if (sinceParam && !isValidDateString(sinceParam)) {
       return c.json({ error: "Invalid 'since' parameter. Expected YYYY-MM-DD format.", code: "BAD_REQUEST" }, 400);
     }
 
-    // Determine date filter
+    // Determine date filter — default is rolling 48 hours UTC (not today)
     let since: string | undefined;
     if (allParam === "true") {
       since = undefined; // bypass date filtering
     } else if (sinceParam) {
       since = sinceParam;
     } else {
-      since = getTodayDateString();
+      // Default: rolling 48 hours ago (UTC-based)
+      since = get48HoursAgoISO();
     }
 
     // Parse limit (default 50, max 200)
     const limit = limitParam ? Math.min(parseInt(limitParam, 10) || 50, 200) : 50;
 
-    const events = readRegistry();
-    let deployments = computeDeploymentStatuses(events);
+    let deployments: DeploymentStatus[];
 
-    // Apply date filter if since is set
-    if (since) {
-      deployments = deployments.filter((d) => d.started_at >= since);
+    if (ticketIdParam) {
+      // Filter by ticket_id using the dedicated query function
+      deployments = getDeploymentsByTicketId(ticketIdParam);
+      // Apply date filter to ticket_id results (ticket_id and since are orthogonal)
+      if (since) {
+        deployments = deployments.filter((d) => d.started_at >= since);
+      }
+    } else {
+      const events = readRegistry();
+      deployments = computeDeploymentStatuses(events);
+      // Apply date filter if since is set
+      if (since) {
+        deployments = deployments.filter((d) => d.started_at >= since);
+      }
     }
 
     const total = deployments.length;
@@ -77,6 +99,7 @@ export function deploymentsRoutes(): Hono {
         since,
         limit,
         status: "all",
+        ticket_id: ticketIdParam ?? null,
       },
     });
   });
