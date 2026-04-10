@@ -35,6 +35,7 @@ import type {
 } from "./types.js";
 import { ACTIVE_STATUSES, TERMINAL_STATUSES } from "./types.js";
 import { resolveProject } from "../repos.js";
+import { resolveLinkedBranch, resolveLinkedCommit } from "./git-validation.js";
 
 /** Pipeline stage order for handoff warning — higher index = later stage */
 const PIPELINE_ORDER: Record<string, number> = {
@@ -563,13 +564,7 @@ export class TicketStore {
 
     if (addLinkedBranchInput) {
       const existingIdx = linkedBranches.findIndex((b) => b.repo === addLinkedBranchInput.repo && b.branch === addLinkedBranchInput.branch);
-      const newBranch: LinkedBranch = {
-        repo: addLinkedBranchInput.repo,
-        branch: addLinkedBranchInput.branch,
-        sha: addLinkedBranchInput.sha ?? "",
-        linkedAt: now,
-        linkedBy: addLinkedBranchInput.linkedBy ?? actor,
-      };
+      const newBranch: LinkedBranch = resolveLinkedBranch(addLinkedBranchInput, actor);
 
       if (existingIdx >= 0) {
         const before = ticket.linkedBranches ?? [];
@@ -619,15 +614,7 @@ export class TicketStore {
 
     if (addLinkedCommitInput) {
       const existingIdx = linkedCommits.findIndex((c) => c.sha === addLinkedCommitInput.sha);
-      const newCommit: LinkedCommit = {
-        repo: addLinkedCommitInput.repo,
-        sha: addLinkedCommitInput.sha,
-        message: addLinkedCommitInput.message ?? "",
-        author: addLinkedCommitInput.author ?? "",
-        timestamp: addLinkedCommitInput.timestamp ?? now,
-        linkedAt: now,
-        linkedBy: addLinkedCommitInput.linkedBy ?? actor,
-      };
+      const newCommit: LinkedCommit = resolveLinkedCommit(addLinkedCommitInput, actor);
 
       if (existingIdx >= 0) {
         const before = ticket.linkedCommits ?? [];
