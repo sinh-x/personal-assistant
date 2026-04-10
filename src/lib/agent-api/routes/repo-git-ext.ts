@@ -215,7 +215,7 @@ function getCommitDiff(repoPath: string, sha: string): {
   insertions: number;
   deletions: number;
 } | null {
-  const output = gitRun(["show", sha, "--format=", "--numstat", "-p"], repoPath);
+  const output = gitRun(["show", sha, "-p", "--format=", "--numstat"], repoPath);
   if (!output) return null;
   return parseUnifiedDiff(output);
 }
