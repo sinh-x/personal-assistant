@@ -114,10 +114,11 @@ export function resolveLinkedCommit(
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("not a commit")) {
       throw new Error(
-        `Commit "${input.sha}" not found in repo "${input.repo}". ` + `Hint: make sure the commit exists locally.`
+        `Commit "${input.sha}" not found in repo "${input.repo}". ` + `Hint: make sure the commit exists locally.`,
+        { cause: err }
       );
     }
-    throw new Error(`Commit "${input.sha}" not found in repo "${input.repo}"`);
+    throw new Error(`Commit "${input.sha}" not found in repo "${input.repo}"`, { cause: err });
   }
 
   // Step 4: Auto-resolve metadata
