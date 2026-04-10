@@ -31,15 +31,18 @@ function validateTimeout(timeout: number | undefined, _source: string): string |
 /** Resolve effective model for team-manager and each agent, applying Sonnet floor and validation */
 function resolveEffectiveModels(
   teamConfig: TeamConfig,
-  opts: { teamModel?: string; agentModel?: string; modeModel?: string }
+  opts: { teamModel?: string; agentModel?: string; modeModel?: string },
+  warnings: string[]
 ): { tmModel: string | undefined; agentModels: Record<string, string | undefined> } {
   // Precedence: explicit --team-model CLI flag > per-mode YAML model > team-level YAML model
   let tmModel: string | undefined = opts.teamModel ?? opts.modeModel ?? teamConfig.model ?? undefined;
   if (tmModel === "haiku") {
+    warnings.push('team-manager model "haiku" upgraded to "sonnet" (minimum floor)');
     console.log('Warning: team-manager model "haiku" upgraded to "sonnet" (minimum floor)');
     tmModel = "sonnet";
   }
   if (tmModel !== undefined && !VALID_MODELS.has(tmModel)) {
+    warnings.push(`unknown model "${tmModel}" for team-manager`);
     console.warn(`Warning: unknown model "${tmModel}" for team-manager — ignored`);
     tmModel = undefined;
   }
@@ -48,6 +51,7 @@ function resolveEffectiveModels(
   for (const agent of teamConfig.agents) {
     const m = opts.agentModel ?? agent.model ?? teamConfig.model ?? undefined;
     if (m !== undefined && !VALID_MODELS.has(m)) {
+      warnings.push(`unknown model "${m}" for agent "${agent.name}"`);
       console.warn(`Warning: unknown model "${m}" for agent "${agent.name}" — ignored`);
       agentModels[agent.name] = undefined;
     } else {
@@ -157,6 +161,7 @@ export function deployCommand(
   }
 ): void {
   const config = loadConfig();
+  const warnings: string[] = [];
 
   // Validate explicit --provider early (final resolution deferred until mode is known)
   if (opts.provider && !VALID_PROVIDERS.has(opts.provider)) {
@@ -297,7 +302,7 @@ export function deployCommand(
       DEPLOY_ID: "d-000000", OUTPUT_DIR: "/home/user/Documents/ai-usage/output",
       REPO_KEY: "repo",
     };
-    const primerForValidation = generatePrimer({
+    const { content: primerForValidation, warnings: primerWarningsForValidation } = generatePrimer({
       deployId: "d-000000",
       teamName,
       teamConfig,
@@ -314,6 +319,7 @@ export function deployCommand(
       effectiveModels: undefined,
       templateVars: dummyVars,
     });
+    warnings.push(...primerWarningsForValidation);
     const unresolvedMatches = primerForValidation.match(/\{\{[A-Z_]+\}\}/g);
     const unresolved = [...new Set(unresolvedMatches ?? [])];
 
@@ -357,6 +363,7 @@ export function deployCommand(
   if (opts.direct) {
     const modes = teamConfig.deploy_modes;
     if (modes && modes.length > 0 && !modes.find((m) => m.id === "direct")) {
+      warnings.push("--direct used but team has no direct deploy mode");
       console.warn("Warning: --direct used but team has no direct deploy mode — falling back to default mode behavior");
     }
   }
@@ -406,9 +413,11 @@ export function deployCommand(
     } else {
       const validStatuses = ["pending-implementation", "implementing", "requirement-review"];
       if (!validStatuses.includes(ticket.status)) {
+        warnings.push(`Ticket ${opts.ticket} has status "${ticket.status}"`);
         console.error(`Warning: Ticket ${opts.ticket} has status "${ticket.status}" (expected one of: ${validStatuses.join(", ")}). Verify this is the right ticket.`);
       }
       if (ticket.assignee && !ticket.assignee.startsWith(teamName) && ticket.assignee !== "sinh") {
+        warnings.push(`Ticket ${opts.ticket} is assigned to "${ticket.assignee}"`);
         console.error(`Warning: Ticket ${opts.ticket} is assigned to "${ticket.assignee}", not "${teamName}". Verify team alignment.`);
       }
     }
@@ -491,7 +500,7 @@ export function deployCommand(
     teamModel: opts.teamModel,
     agentModel: opts.agentModel,
     modeModel: teamConfig.deploy_modes?.find((m) => m.id === (opts.mode ?? teamConfig.default_mode))?.model,
-  });
+  }, warnings);
   const modelFlag = provider === "minimax" ? "" : (tmModel ? `--model ${tmModel}` : "");
 
   // Deployment env vars passed to claude so hooks can locate the activity log.
@@ -523,7 +532,7 @@ export function deployCommand(
 
   // Generate primer
   const primerFile = resolve(primersDir, `${teamName}-${deployId}-primer.md`);
-  const primerContent = generatePrimer({
+  const { content: primerContent, warnings: primerWarnings } = generatePrimer({
     deployId,
     teamName,
     teamConfig,
@@ -542,9 +551,15 @@ export function deployCommand(
     templateVars: { ...repoTemplateVars, ...opts.templateVars },
     ticket: opts.ticket,
   });
+  warnings.push(...primerWarnings);
   writeFileSync(primerFile, primerContent);
   copyFileSync(primerFile, resolve(deployDir, "primer.md"));
   console.log(`Primer generated: ${primerFile}`);
+
+  // Write warnings to warnings.log if any warnings were collected
+  if (warnings.length > 0) {
+    writeFileSync(resolve(deployDir, "warnings.log"), warnings.join("\n") + "\n");
+  }
 
   // Dry run — print primer and exit
   if (mode === "dry-run") {

@@ -199,13 +199,18 @@ function formatDate(d: Date): string {
 /**
  * Scan primer content for unresolved {{KEY}} template variables and emit stderr warnings.
  * Soft warning only — does not modify or reject the primer.
+ * @returns Array of warning messages (one per unresolved variable, deduplicated)
  */
-function scanUnresolvedVars(primer: string): void {
+function scanUnresolvedVars(primer: string): string[] {
+  const warnings: string[] = [];
   const matches = primer.match(/\{\{[A-Z_]+\}\}/g);
-  if (!matches) return;
+  if (!matches) return warnings;
   for (const v of [...new Set(matches)]) {
-    process.stderr.write(`Warning: unresolved template variable ${v} in primer\n`);
+    const msg = `Warning: unresolved template variable ${v} in primer`;
+    warnings.push(msg);
+    process.stderr.write(`${msg}\n`);
   }
+  return warnings;
 }
 
 /**
@@ -493,8 +498,9 @@ function resolveTemplates(
  *   WHY:  objective, additional instructions
  *   WHAT: available skills (summary table), model policy
  *   HOW:  core standards (inline), reference docs, bulletins, deployment instructions
+ * @returns Object with primer content and any warnings from template variable scanning
  */
-export function generatePrimer(opts: PrimerOptions): string {
+export function generatePrimer(opts: PrimerOptions): { content: string; warnings: string[] } {
   const {
     deployId,
     teamName,
@@ -882,6 +888,6 @@ When spawning unplanned sub-agents, use this policy:
 `;
   }
 
-  scanUnresolvedVars(primer);
-  return primer;
+  const warnings = scanUnresolvedVars(primer);
+  return { content: primer, warnings };
 }
