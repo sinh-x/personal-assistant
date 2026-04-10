@@ -91,6 +91,8 @@ function getLatestCommit(branch: string, cwd: string): BranchSummary["latest_com
 /**
  * Get paginated commit history for a branch.
  * Returns commits with full hash, author info, date, message, and diff summary.
+ * Uses --first-parent to return only commits made directly on this branch
+ * (not commits merged in from other branches).
  */
 function getCommitHistory(
   branch: string,
@@ -100,10 +102,11 @@ function getCommitHistory(
 ): CommitEntry[] {
   const commits: CommitEntry[] = [];
 
-  // Get commit hashes first
+  // Get commit hashes first — --first-parent ensures only branch-specific commits
   const hashOutput = gitRun([
     "log",
     branch,
+    "--first-parent",
     `--format=%H`,
     `-${limit}`,
     `--skip=${offset}`,
