@@ -121,6 +121,8 @@ function getCommitHistory(
     const logOutput = gitRun([
       "log",
       "-1",
+      "-m",
+      "--first-parent",
       `--format=%H%n%h%n%an%n%ae%n%ci%n%s%n`,
       hash,
       "--numstat",
