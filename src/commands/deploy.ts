@@ -135,8 +135,9 @@ function printModesTable(teamName: string, modes: DeployMode[] | undefined): voi
  * Replaces deploy.sh (342 lines).
  */
 const VALID_PROVIDERS = new Set(["anthropic", "minimax"]);
-const MINIMAX_BASE_URL = "https://api.minimax.io/anthropic";
-const MINIMAX_MODEL = "MiniMax-M2.7";
+// Hardcoded fallbacks — used when config.yaml does not specify overrides
+const FALLBACK_MINIMAX_BASE_URL = "https://api.minimax.io/anthropic";
+const FALLBACK_MINIMAX_MODEL = "MiniMax-M2.7";
 
 export function deployCommand(
   spec: string,
@@ -368,10 +369,11 @@ export function deployCommand(
     }
   }
 
-  // Resolve effective provider: explicit --provider > mode-level provider > "anthropic"
+  // Resolve effective provider: explicit --provider > mode-level provider > config default > "anthropic"
   const effectiveModeId = opts.mode ?? teamConfig.default_mode;
   const modeProvider = teamConfig.deploy_modes?.find((m) => m.id === effectiveModeId)?.provider;
-  const provider = opts.provider ?? modeProvider ?? "anthropic";
+  const configDefaultProvider = config.provider_defaults?.default_provider;
+  const provider = opts.provider ?? modeProvider ?? configDefaultProvider ?? "anthropic";
   if (!VALID_PROVIDERS.has(provider)) {
     console.error(`Error: Invalid provider "${provider}" from mode "${effectiveModeId}". Valid values: anthropic, minimax`);
     process.exit(1);
@@ -507,15 +509,20 @@ export function deployCommand(
   // PA_ACTIVITY_LOG must be set here directly — CLAUDE_ENV_FILE only propagates
   // to Bash tool calls, not to hook scripts.
   const activityLog = resolve(deployDir, "activity.jsonl");
+  const minimaxBaseUrl = config.provider_defaults?.providers?.minimax?.base_url ?? FALLBACK_MINIMAX_BASE_URL;
+  const minimaxModels = config.provider_defaults?.providers?.minimax?.models;
+  const minimaxSonner = minimaxModels?.sonnet ?? FALLBACK_MINIMAX_MODEL;
+  const minimaxOpus = minimaxModels?.opus ?? FALLBACK_MINIMAX_MODEL;
+  const minimaxHaiku = minimaxModels?.haiku ?? FALLBACK_MINIMAX_MODEL;
   const minimaxEnv = provider === "minimax"
     ? {
-        ANTHROPIC_BASE_URL: MINIMAX_BASE_URL,
+        ANTHROPIC_BASE_URL: minimaxBaseUrl,
         ANTHROPIC_AUTH_TOKEN: minimaxApiKey ?? "",
-        ANTHROPIC_MODEL: MINIMAX_MODEL,
-        ANTHROPIC_SMALL_FAST_MODEL: MINIMAX_MODEL,
-        ANTHROPIC_DEFAULT_SONNET_MODEL: MINIMAX_MODEL,
-        ANTHROPIC_DEFAULT_OPUS_MODEL: MINIMAX_MODEL,
-        ANTHROPIC_DEFAULT_HAIKU_MODEL: MINIMAX_MODEL,
+        ANTHROPIC_MODEL: minimaxSonner,
+        ANTHROPIC_SMALL_FAST_MODEL: minimaxHaiku,
+        ANTHROPIC_DEFAULT_SONNET_MODEL: minimaxSonner,
+        ANTHROPIC_DEFAULT_OPUS_MODEL: minimaxOpus,
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: minimaxHaiku,
         DISABLE_PROMPT_CACHING: "1",
         CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       }
@@ -729,13 +736,13 @@ Agents:     ${agentNames.join(" ")}
     const envFile = resolve(deployDir, "deploy.env");
     if (provider === "minimax") {
       const escapedKey = minimaxApiKey?.replace(/'/g, "'\\''") ?? "";
-      const envContent = `export ANTHROPIC_BASE_URL='${MINIMAX_BASE_URL}'
+      const envContent = `export ANTHROPIC_BASE_URL='${minimaxBaseUrl}'
 export ANTHROPIC_AUTH_TOKEN='${escapedKey}'
-export ANTHROPIC_MODEL='${MINIMAX_MODEL}'
-export ANTHROPIC_SMALL_FAST_MODEL='${MINIMAX_MODEL}'
-export ANTHROPIC_DEFAULT_SONNET_MODEL='${MINIMAX_MODEL}'
-export ANTHROPIC_DEFAULT_OPUS_MODEL='${MINIMAX_MODEL}'
-export ANTHROPIC_DEFAULT_HAIKU_MODEL='${MINIMAX_MODEL}'
+export ANTHROPIC_MODEL='${minimaxSonner}'
+export ANTHROPIC_SMALL_FAST_MODEL='${minimaxHaiku}'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='${minimaxSonner}'
+export ANTHROPIC_DEFAULT_OPUS_MODEL='${minimaxOpus}'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='${minimaxHaiku}'
 export DISABLE_PROMPT_CACHING='1'
 export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
 `;

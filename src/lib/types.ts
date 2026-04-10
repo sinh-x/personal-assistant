@@ -155,6 +155,32 @@ export interface DeploymentStatus {
   fallback?: boolean;
 }
 
+/** Per-provider model tier overrides */
+export interface ProviderModelTier {
+  sonnet?: string;
+  opus?: string;
+  haiku?: string;
+}
+
+/** Provider-specific configuration for default provider/model fallbacks */
+export interface ProviderDefaults {
+  /** Default provider when no mode-level or CLI provider is specified */
+  default_provider?: "anthropic" | "minimax";
+  /** Default model tier when no mode-level or CLI model is specified */
+  default_model?: "haiku" | "sonnet" | "opus";
+  /** Per-provider model and endpoint overrides */
+  providers?: {
+    anthropic?: {
+      base_url?: string;
+      models?: ProviderModelTier;
+    };
+    minimax?: {
+      base_url?: string;
+      models?: ProviderModelTier;
+    };
+  };
+}
+
 /** PA configuration paths */
 export interface PAConfig {
   /** teams/, skills/ location (user overrides) */
@@ -167,4 +193,6 @@ export interface PAConfig {
   binDir: string;
   /** Minimax API key for --provider minimax deployments */
   minimax_api_key?: string;
+  /** Provider and model defaults loaded from config.yaml */
+  provider_defaults?: ProviderDefaults;
 }
