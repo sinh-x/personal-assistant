@@ -208,7 +208,8 @@ export function documentsRoutes(): Hono {
     interface SectionBody {
       title: string | null;
       content: string;
-      location: number;
+      location?: number;
+      lineText?: string;
     }
 
     let body: SectionBody;
@@ -221,11 +222,18 @@ export function documentsRoutes(): Hono {
       );
     }
 
-    const { title, content, location } = body;
+    const { title, content, location, lineText } = body;
 
-    if (typeof content !== "string" || typeof location !== "number") {
+    if (typeof content !== "string" || content.trim() === "") {
       return c.json(
-        { error: "content must be a string, location must be a number", code: "BAD_REQUEST" },
+        { error: "content must be a non-empty string", code: "BAD_REQUEST" },
+        400
+      );
+    }
+
+    if (lineText !== undefined && typeof lineText !== "string") {
+      return c.json(
+        { error: "lineText must be a string if provided", code: "BAD_REQUEST" },
         400
       );
     }
@@ -241,13 +249,43 @@ export function documentsRoutes(): Hono {
     const fileContent = await readFile(resolvedPath, "utf8");
     const lines = fileContent.split("\n");
 
-    // Compute insert position
-    // location <= 0 → prepend (position 0)
-    // location > lines.length → append (position lines.length)
-    // 1 <= location <= lines.length → insert BEFORE line at that index (1-based)
-    // e.g. location=1 → insert at index 0 (before first line)
-    // e.g. location=3 → insert at index 2 (before third line)
-    const insertPos = location <= 0 ? 0 : Math.min(location - 1, lines.length);
+    // Compute insert position — text match takes priority over location
+    let insertPos: number;
+    let insertedAt: string;
+    let lineNumber: number;
+
+    if (lineText !== undefined && lineText.trim() !== "") {
+      const trimmedLineText = lineText.trim();
+      // Find all occurrences and use the last one (last occurrence)
+      let lastIndex = -1;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i] === trimmedLineText) {
+          lastIndex = i;
+        }
+      }
+
+      if (lastIndex === -1) {
+        // lineText not found — append to end
+        insertPos = lines.length;
+        insertedAt = "end";
+        lineNumber = lines.length;
+      } else {
+        // Insert after the last occurrence (1-based line number for response)
+        insertPos = lastIndex + 1;
+        insertedAt = `after:${lastIndex + 1}`;
+        lineNumber = lastIndex + 1;
+      }
+    } else if (location !== undefined) {
+      // Backward compatibility: use old line-number-based insertion
+      insertPos = location <= 0 ? 0 : Math.min(location - 1, lines.length);
+      insertedAt = `after:${insertPos + 1}`;
+      lineNumber = insertPos + 1;
+    } else {
+      // Neither lineText nor location provided — append to end
+      insertPos = lines.length;
+      insertedAt = "end";
+      lineNumber = lines.length;
+    }
 
     // Build new section: ### <title>\n\n<content>\n (or blockquote-only if isNoHeaderTitle)
     const newSection = isNoHeaderTitle
@@ -267,9 +305,17 @@ export function documentsRoutes(): Hono {
     const docType = detectDocumentType(updatedContent, filename);
     const stat = statSync(resolvedPath);
 
+    // Determine status based on how insertion was done
+    const status = insertedAt === "end" && lineText !== undefined
+      ? "warning"
+      : "ok";
+
     return c.json({
       path: `${folderId}/${fileId}`,
       content: updatedContent,
+      status,
+      insertedAt,
+      lineNumber,
       metadata: {
         ...metadata,
         type: docType,
