@@ -23,6 +23,7 @@ import { ticketRoutes } from "./routes/tickets.js";
 import { focusRoutes } from "./routes/focus.js";
 import { bulletinRoutes } from "./routes/bulletin.js";
 import { documentsRoutes } from "./routes/documents.js";
+import { selfUpdateRoutes } from "./routes/self-update.js";
 import { hub } from "./ws/hub.js";
 import { startWatchers } from "./ws/watchers.js";
 
@@ -118,6 +119,7 @@ export function createApp(opts: AgentApiOptions): AgentApiInstance {
   app.route("/", focusRoutes());
   app.route("/", bulletinRoutes());
   app.route("/", documentsRoutes());
+  app.route("/", selfUpdateRoutes());
 
   // Start hub ping and file watchers
   hub.startPing();
