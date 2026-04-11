@@ -50,6 +50,16 @@ deploy_modes:
     skills:
       - name: pa-session-log
         inject-as: shared-skill
+  - id: repo-health
+    label: Repo Health
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    objective: skills/maintenance/repo-health-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."
