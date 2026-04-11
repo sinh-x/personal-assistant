@@ -59,9 +59,9 @@ export function selfUpdateRoutes(): Hono {
 
     const startedAt = state.startedAt;
 
-    // Spawn detached child process: git pull then bash tool/deploy.sh oppo
+    // Spawn detached child process: run bash tool/deploy.sh oppo
     // Use detached: true, stdio: 'pipe' so we can capture output, then unref
-    const child = spawn("bash", ["-c", "git pull && bash tool/deploy.sh oppo"], {
+    const child = spawn("bash", ["-c", "bash tool/deploy.sh oppo"], {
       cwd: avodahPath,
       detached: true,
       stdio: ["ignore", "pipe", "pipe"],
