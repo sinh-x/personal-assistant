@@ -5,12 +5,13 @@ import { execSync } from "node:child_process";
 import { loadConfig } from "../lib/config.js";
 import { getHomeDir, getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
-import { appendRegistryEvent, getDeploymentEvents } from "../lib/registry.js";
+import { appendRegistryEvent, getDeploymentEvents, queryDeploymentStatus } from "../lib/registry.js";
+import { getDb } from "../lib/registry-db.js";
 import { generatePrimer, resolveGhRepo } from "../lib/primer.js";
 import { resolveRepo, listRepos } from "../lib/repos.js";
 import { isTeamBlocked } from "../lib/bulletins/index.js";
 import { TicketStore } from "../lib/tickets/store.js";
-import { spawnDetached } from "../utils/process.js";
+import { spawnDetached, isProcessAlive } from "../utils/process.js";
 import { localISOTimestamp } from "../lib/time.js";
 import type { DeployMode, RegistryEvent, TeamConfig } from "../lib/types.js";
 
@@ -67,6 +68,342 @@ function generateDeployId(): string {
   const bytes = new Uint8Array(3);
   crypto.getRandomValues(bytes);
   return "d-" + Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Resume a deployment by deploy-id.
+ * Reconstructs the original claude session using the saved session JSONL path.
+ */
+function resumeDeployment(
+  deployId: string,
+  opts: {
+    dryRun?: boolean;
+    background?: boolean;
+    interactive?: boolean;
+    direct?: boolean;
+    teamModel?: string;
+    agentModel?: string;
+    timeout?: number;
+  }
+): void {
+  const config = loadConfig();
+  const paHome = getHomeDir();
+  const dataDir = getDataDir();
+  const logsDir = resolve(dataDir, "logs");
+  const deploymentsDir = resolve(homedir(), "Documents/ai-usage/deployments");
+  const registryDb = getRegistryDbPath();
+
+  // Step 1: Read deployment from registry
+  const status = queryDeploymentStatus(deployId);
+  if (!status) {
+    console.error(`Error: Deployment not found: ${deployId}`);
+    process.exit(1);
+  }
+
+  // Step 2: Validate not currently running
+  if (status.status === "running" && status.pid !== undefined) {
+    if (isProcessAlive(status.pid)) {
+      console.error(`Error: Deployment still running: ${deployId} (PID ${status.pid})`);
+      process.exit(1);
+    }
+    // PID is dead but status still running — proceed (edge case after crash)
+  }
+
+  // Step 3: Validate state is terminal
+  const terminalStatuses = ["success", "partial", "failed", "crashed"];
+  if (!terminalStatuses.includes(status.status)) {
+    console.error(`Error: Deployment status is "${status.status}" — cannot resume. Expected a terminal status.`);
+    process.exit(1);
+  }
+
+  // Step 4: Read session UUID from session-jsonl-path.txt
+  const deployDir = resolve(deploymentsDir, deployId);
+  const sessionPathFile = resolve(deployDir, "session-jsonl-path.txt");
+  if (!existsSync(sessionPathFile)) {
+    console.error(`Error: Session data not found — cannot resume deployment ${deployId}.`);
+    console.error(`  Missing: ${sessionPathFile}`);
+    process.exit(1);
+  }
+  const sessionJsonlPath = readFileSync(sessionPathFile, "utf-8").trim();
+  if (!existsSync(sessionJsonlPath)) {
+    console.error(`Error: Session data not found — cannot resume deployment ${deployId}.`);
+    console.error(`  Session file missing: ${sessionJsonlPath}`);
+    process.exit(1);
+  }
+
+  // Step 5: Extract session UUID from path (last path segment without .jsonl)
+  const sessionUuid = basename(sessionJsonlPath, ".jsonl");
+  if (!sessionUuid) {
+    console.error(`Error: Could not extract session UUID from path: ${sessionJsonlPath}`);
+    process.exit(1);
+  }
+
+  // Step 6: Reconstruct env vars
+  const activityLog = resolve(deployDir, "activity.jsonl");
+  const provider = status.provider ?? "anthropic";
+
+  // Minimax env vars
+  const minimaxBaseUrl = config.provider_defaults?.providers?.minimax?.base_url ?? FALLBACK_MINIMAX_BASE_URL;
+  const minimaxApiKey = config.minimax_api_key;
+  const minimaxModels = config.provider_defaults?.providers?.minimax?.models;
+  const minimaxSonner = minimaxModels?.sonnet ?? FALLBACK_MINIMAX_MODEL;
+  const minimaxOpus = minimaxModels?.opus ?? FALLBACK_MINIMAX_MODEL;
+  const minimaxHaiku = minimaxModels?.haiku ?? FALLBACK_MINIMAX_MODEL;
+  const minimaxEnv = provider === "minimax"
+    ? {
+        ANTHROPIC_BASE_URL: minimaxBaseUrl,
+        ANTHROPIC_AUTH_TOKEN: minimaxApiKey ?? "",
+        ANTHROPIC_MODEL: minimaxSonner,
+        ANTHROPIC_SMALL_FAST_MODEL: minimaxHaiku,
+        ANTHROPIC_DEFAULT_SONNET_MODEL: minimaxSonner,
+        ANTHROPIC_DEFAULT_OPUS_MODEL: minimaxOpus,
+        ANTHROPIC_DEFAULT_HAIKU_MODEL: minimaxHaiku,
+        DISABLE_PROMPT_CACHING: "1",
+        CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      }
+    : {};
+
+  // Determine mode (default to foreground)
+  let mode: "foreground" | "background" | "dry-run" | "direct" | "interactive" = "foreground";
+  if (opts.dryRun) mode = "dry-run";
+  else if (opts.background) mode = "background";
+  else if (opts.direct) mode = "direct";
+  else if (opts.interactive) mode = "interactive";
+
+  // Reconstruct model flag from registry models map (only for non-minimax)
+  let modelFlag = "";
+  if (provider !== "minimax" && status.models) {
+    const tmModel = status.models["team-manager"];
+    if (tmModel) {
+      modelFlag = `--model ${tmModel}`;
+    }
+  }
+
+  const deployEnv = {
+    ...process.env,
+    ...minimaxEnv,
+    PA_DEPLOYMENT_ID: deployId,
+    PA_DEPLOYMENT_DIR: deployDir,
+    PA_ACTIVITY_LOG: activityLog,
+    CLAUDECODE: undefined, // Strip nested-session detection
+    ...(status.ticket_id ? { PA_TICKET_ID: status.ticket_id } : {}),
+  };
+
+  // Step 7: Update registry status back to "running"
+  const db = getDb();
+  db.prepare(`
+    UPDATE deployments
+    SET status = 'running',
+        started_at = @started_at,
+        completed_at = NULL,
+        error = NULL,
+        exit_code = NULL
+    WHERE deployment_id = @deployment_id
+  `).run({
+    deployment_id: deployId,
+    started_at: localISOTimestamp(),
+  });
+  appendRegistryEvent({
+    deployment_id: deployId,
+    team: status.team,
+    event: "started",
+    timestamp: localISOTimestamp(),
+    agents: status.agents,
+    primer: status.primer,
+    models: status.models,
+    ticket_id: status.ticket_id,
+    provider: status.provider,
+    repo: status.repo,
+  });
+
+  mkdirSync(logsDir, { recursive: true });
+
+  // Step 8: Post-session content extraction script
+  const extractScript = resolve(paHome, "scripts/extract-session-content.sh");
+  const runExtraction = () => {
+    if (!existsSync(extractScript)) return;
+    try {
+      execSync(`bash "${extractScript}"`, {
+        env: deployEnv,
+        stdio: ["pipe", "pipe", "inherit"],
+        timeout: 30000,
+      });
+    } catch (err) {
+      console.warn(`[extract] Post-session extraction failed: ${(err as Error).message}`);
+    }
+  };
+
+  // Step 9: Build resume prompt
+  const primerFile = resolve(deployDir, "primer.md");
+  if (!existsSync(primerFile)) {
+    console.error(`Error: Primer not found for deployment ${deployId}: ${primerFile}`);
+    process.exit(1);
+  }
+  const claudePrompt = `Read the deployment primer at '${primerFile}' using the Read tool and follow ALL instructions in it exactly. Start immediately. When finished, write the completion marker and exit.`;
+
+  if (mode === "dry-run") {
+    console.log(`Resume deployment: ${deployId} (dry-run)`);
+    console.log(`  Primer: ${primerFile}`);
+    console.log(`  Session UUID: ${sessionUuid}`);
+    return;
+  }
+
+  if (mode === "direct") {
+    console.log(`Resuming deployment (direct): ${status.team} [${deployId}]`);
+    appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    let exitCode = 0;
+    try {
+      execSync(`claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+        stdio: "inherit",
+        env: deployEnv,
+      });
+    } catch (err) {
+      exitCode = (err as { status?: number }).status ?? 1;
+      appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+    }
+    runExtraction();
+    writeFallbackIfNeeded(deployId, status.team);
+    if (exitCode !== 0) process.exit(exitCode);
+  } else if (mode === "interactive") {
+    console.log(`Resuming deployment (interactive): ${status.team} [${deployId}]`);
+    appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    let exitCode = 0;
+    try {
+      execSync(`claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+        stdio: "inherit",
+        env: deployEnv,
+      });
+    } catch (err) {
+      exitCode = (err as { status?: number }).status ?? 1;
+      appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+    }
+    runExtraction();
+    writeFallbackIfNeeded(deployId, status.team);
+    if (exitCode !== 0) process.exit(exitCode);
+  } else if (mode === "foreground") {
+    console.log(`Resuming deployment (foreground): ${status.team} [${deployId}]`);
+    appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+    let exitCode = 0;
+    try {
+      execSync(`claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+        stdio: "inherit",
+        env: deployEnv,
+      });
+    } catch (err) {
+      exitCode = (err as { status?: number }).status ?? 1;
+      appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+    }
+    runExtraction();
+    writeFallbackIfNeeded(deployId, status.team);
+    if (exitCode !== 0) process.exit(exitCode);
+  } else {
+    // Background mode
+    const logFile = resolve(logsDir, `${status.team}-${deployId}.log`);
+    console.log(`Resuming deployment (background): ${status.team} [${deployId}]`);
+    console.log(`  Log: ${logFile}`);
+    console.log("  Status: pa status");
+
+    // Resolve timeout
+    let maxRuntime = opts.timeout ?? DEFAULT_TIMEOUT;
+
+    // Write log header
+    const logHeader = `=== Resume Log ===
+Deployment: ${deployId}
+Team:       ${status.team}
+Resumed:    ${localISOTimestamp()}
+Mode:       resume
+===
+`;
+    writeFileSync(logFile, logHeader);
+
+    // Resolve bash path (NixOS compatibility)
+    let bashPath: string;
+    try {
+      bashPath = execSync("command -v bash", { encoding: "utf-8" }).trim();
+    } catch {
+      bashPath = "/usr/bin/env bash";
+    }
+
+    // Write sensitive env vars to a file (mode 0o600)
+    const envFile = resolve(deployDir, "deploy.env");
+    if (provider === "minimax") {
+      const escapedKey = minimaxApiKey?.replace(/'/g, "'\\''") ?? "";
+      const envContent = `export ANTHROPIC_BASE_URL='${minimaxBaseUrl}'
+export ANTHROPIC_AUTH_TOKEN='${escapedKey}'
+export ANTHROPIC_MODEL='${minimaxSonner}'
+export ANTHROPIC_SMALL_FAST_MODEL='${minimaxHaiku}'
+export ANTHROPIC_DEFAULT_SONNET_MODEL='${minimaxSonner}'
+export ANTHROPIC_DEFAULT_OPUS_MODEL='${minimaxOpus}'
+export ANTHROPIC_DEFAULT_HAIKU_MODEL='${minimaxHaiku}'
+export DISABLE_PROMPT_CACHING='1'
+export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC='1'
+`;
+      writeFileSync(envFile, envContent, { mode: 0o600 });
+    }
+
+    // Build background script
+    const sourceEnv = provider === "minimax"
+      ? `source '${envFile}' && rm -f '${envFile}'\n`
+      : "";
+    const bgScriptContent =
+      sourceEnv +
+      `unset CLAUDECODE
+echo "[$(date -Iseconds)] claude resuming session..." >> "$PA_LOG_FILE"
+stdbuf -oL timeout "$PA_MAX_RUNTIME" claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions --print "$PA_CLAUDE_PROMPT" >> "$PA_LOG_FILE" 2>"$PA_LOG_FILE.err"
+exit_code=$?
+echo "" >> "$PA_LOG_FILE"
+echo "[$(date -Iseconds)] claude exited with code $exit_code" >> "$PA_LOG_FILE"
+if [[ -s "$PA_LOG_FILE.err" ]]; then
+  echo "" >> "$PA_LOG_FILE"
+  echo "=== STDERR ===" >> "$PA_LOG_FILE"
+  cat "$PA_LOG_FILE.err" >> "$PA_LOG_FILE"
+fi
+rm -f "$PA_LOG_FILE.err"
+# Post-session content extraction
+if [[ -f "$PA_EXTRACT_SCRIPT" ]]; then
+  echo "[$(date -Iseconds)] Running post-session extraction..." >> "$PA_LOG_FILE"
+  bash "$PA_EXTRACT_SCRIPT" 2>> "$PA_LOG_FILE" || echo "[$(date -Iseconds)] Extraction failed (non-fatal)" >> "$PA_LOG_FILE"
+fi
+if [[ $exit_code -eq 124 ]]; then
+  echo "[$(date -Iseconds)] TIMED OUT after $PA_MAX_RUNTIME s" >> "$PA_LOG_FILE"
+  pa registry complete "$PA_DEPLOYMENT_ID" --status failed --summary "Timed out after $PA_MAX_RUNTIME s" 2>> "$PA_LOG_FILE" || true
+elif [[ $exit_code -ne 0 ]]; then
+  echo "[$(date -Iseconds)] claude exited with error code $exit_code" >> "$PA_LOG_FILE"
+  pa registry complete "$PA_DEPLOYMENT_ID" --status failed --summary "Crashed with exit code $exit_code" 2>> "$PA_LOG_FILE" || true
+fi
+# Fallback: clean exit but no completion marker
+if [[ $exit_code -eq 0 ]]; then
+  pa registry complete "$PA_DEPLOYMENT_ID" --status partial --summary "Session ended without completion marker (fallback)" --fallback 2>> "$PA_LOG_FILE" || true
+fi
+`.trimStart();
+
+    const bgScriptFile = resolve(deployDir, "bg-runner.sh");
+    writeFileSync(bgScriptFile, bgScriptContent + "\n", { mode: 0o700 });
+
+    const bgScriptEnv = {
+      ...deployEnv,
+      PA_LOG_FILE: logFile,
+      PA_MAX_RUNTIME: String(maxRuntime),
+      PA_CLAUDE_PROMPT: claudePrompt,
+      PA_EXTRACT_SCRIPT: extractScript,
+    };
+
+    const bgPid = spawnDetached("nohup", [bashPath, bgScriptFile], {
+      cwd: status.repo ? resolveRepo(status.repo).path : process.cwd(),
+      env: bgScriptEnv,
+    });
+
+    console.log(`  PID: ${bgPid}`);
+    console.log(`  Timeout: ${maxRuntime}s`);
+
+    appendRegistryEvent({
+      deployment_id: deployId,
+      team: status.team,
+      event: "pid",
+      timestamp: localISOTimestamp(),
+      pid: bgPid,
+    });
+  }
 }
 
 
@@ -159,8 +496,31 @@ export function deployCommand(
     timeout?: number;
     /** Template variables to substitute in mode objective files */
     templateVars?: Record<string, string>;
+    /** Resume a deployment by deploy-id */
+    resume?: string;
   }
 ): void {
+  // Handle --resume before any other logic
+  if (opts.resume) {
+    // Warn about mutually exclusive flags being ignored
+    if (opts.objective) console.warn("Warning: --resume ignores --objective (using original deploy objective)");
+    if (opts.mode) console.warn("Warning: --resume ignores --mode (using original deploy mode)");
+    if (opts.ticket) console.warn("Warning: --resume ignores --ticket (using original deploy ticket)");
+    if (opts.repo) console.warn("Warning: --resume ignores --repo (using original deploy repo)");
+    if (opts.teamModel) console.warn("Warning: --resume ignores --team-model (model reconstructed from registry)");
+    if (opts.agentModel) console.warn("Warning: --resume ignores --agent-model (model reconstructed from registry)");
+    resumeDeployment(opts.resume, {
+      dryRun: opts.dryRun,
+      background: opts.background,
+      interactive: opts.interactive,
+      direct: opts.direct,
+      teamModel: opts.teamModel,
+      agentModel: opts.agentModel,
+      timeout: opts.timeout,
+    });
+    return;
+  }
+
   const config = loadConfig();
   const warnings: string[] = [];
 
