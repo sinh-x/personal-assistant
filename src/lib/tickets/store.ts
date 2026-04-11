@@ -287,10 +287,24 @@ export class TicketStore {
     const id = this.allocateId(prefix);
     const now = new Date().toISOString();
 
+    // F1010: Default all optional array/scalar fields before processing
+    // Prevents crash at store.ts:293 when doc_refs is undefined
+    const defaulted = {
+      ...input,
+      doc_refs: input.doc_refs ?? [],
+      tags: input.tags ?? [],
+      blockedBy: input.blockedBy ?? [],
+      comments: input.comments ?? [],
+      from: input.from ?? "",
+      to: input.to ?? "",
+      description: input.description ?? "",
+      status: input.status ?? "idea",
+    };
+
     // F6: Dedup guard — deduplicate doc_refs by path (keep last entry per path)
     const dedupedDocRefs: DocRef[] = [];
     const seenPaths = new Set<string>();
-    for (const ref of [...input.doc_refs].reverse()) {
+    for (const ref of [...defaulted.doc_refs].reverse()) {
       if (!seenPaths.has(ref.path)) {
         seenPaths.add(ref.path);
         dedupedDocRefs.unshift(ref);
@@ -298,7 +312,7 @@ export class TicketStore {
     }
 
     const ticket: Ticket = {
-      ...input,
+      ...defaulted,
       project: canonicalKey,
       id,
       subTickets: [],
@@ -307,8 +321,8 @@ export class TicketStore {
       updatedAt: now,
       resolvedAt: input.resolvedAt ?? null,
       doc_refs: dedupedDocRefs,
-      linkedBranches: input.linkedBranches ?? [],
-      linkedCommits: input.linkedCommits ?? [],
+      linkedBranches: defaulted.linkedBranches ?? [],
+      linkedCommits: defaulted.linkedCommits ?? [],
     };
 
     writeFileSync(this.ticketPath(id), JSON.stringify(ticket, null, 2));
