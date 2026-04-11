@@ -68,7 +68,7 @@ pa ticket show <ticket_id>
 
 ## 4. File Deletion Policy
 
-**Never hard-delete PA project files** (skills, teams, objectives, modes). Use `pa trash move` instead:
+**Never hard-delete any file.** Always use `pa trash move` for file deletion.
 
 ```bash
 pa trash move <path> --reason "<why>" --actor <team>/<agent> --type <skill|team|objective|mode|other>
