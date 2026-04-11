@@ -49,6 +49,17 @@ deploy_modes:
       - name: pa-cli
         inject-as: shared-skill
 
+  - id: compare-anthropic
+    label: Provider Comparison (Anthropic)
+    phone_visible: false
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
 context:
   organization: sinh-x
   notes: "Solo agent team. Weekly mode produces rollup reports. Daily-extract mode extracts new items from session logs. Interactive mode for Sinh to walk through the backlog."
