@@ -1191,4 +1191,106 @@ export class TicketStore {
 
     return this.get(newId)!;
   }
+
+  /**
+   * Delete a ticket — soft or hard.
+   *
+   * Soft delete (default): sets status to "cancelled" (reversible via update).
+   * Hard delete: removes the JSON file from disk (irreversible).
+   * Both paths write an audit entry. Hard delete preserves audit trail.
+   *
+   * @param id Ticket ID
+   * @param actor Actor performing the deletion
+   * @param hard True for hard delete (file removal), false for soft delete (status change)
+   * @throws Error if ticket not found
+   */
+  delete(id: string, actor: string, hard = false): void {
+    const now = new Date().toISOString();
+
+    if (hard) {
+      // ── Hard delete: remove ticket file ────────────────────────────────────
+      const ticketPath = this.ticketPath(id);
+      const lockPath = this.lockPath;
+
+      // Check if this ticket is an alias (redirects to another ticket)
+      if (existsSync(ticketPath)) {
+        try {
+          const raw = JSON.parse(readFileSync(ticketPath, "utf-8"));
+          if (raw._alias === true) {
+            throw new Error(`Ticket ${id} is an alias and cannot be deleted directly.`);
+          }
+        } catch (err) {
+          if (err instanceof SyntaxError) {
+            throw new Error(`Ticket file is corrupted: ${id}`);
+          }
+          throw err;
+        }
+      } else {
+        throw new Error(`Ticket not found: ${id}`);
+      }
+
+      // Check for alias files pointing TO this ticket (F1040-6)
+      // Alias files are stored as OLD-ID.json with _alias:true when a ticket is moved.
+      // When a ticket is deleted hard, we warn if any alias file has movedTo → this ticket's ID.
+      // Since we don't have a cross-reference index, scan for alias files.
+      // Alias format: { _alias: true, movedTo: "NEW-ID", movedAt: "...", movedBy: "..." }
+      const allFiles = readdirSync(this.dir).filter((f) => f.endsWith(".json") && f !== "counter.json");
+      const pointingAliases: string[] = [];
+      for (const f of allFiles) {
+        try {
+          const raw = JSON.parse(readFileSync(resolve(this.dir, f), "utf-8"));
+          if (raw._alias === true && raw.movedTo === id) {
+            pointingAliases.push(f.replace(".json", ""));
+          }
+        } catch { /* skip unreadable files */ }
+      }
+      if (pointingAliases.length > 0) {
+        process.stderr.write(
+          `Warning: ${pointingAliases.length} alias file(s) point to ${id}: ${pointingAliases.join(", ")}\n`
+        );
+      }
+
+      // Remove the file atomically under flock
+      const script = [
+        "const fs = require('fs');",
+        `const tp = ${JSON.stringify(ticketPath)};`,
+        "if (!fs.existsSync(tp)) { process.stderr.write('Ticket not found\\n'); process.exit(1); }",
+        "fs.unlinkSync(tp);",
+      ].join("\n");
+
+      const tmpFile = resolve(
+        tmpdir(),
+        `pa-delete-${Date.now()}-${Math.random().toString(36).slice(2)}.cjs`
+      );
+      writeFileSync(tmpFile, script);
+
+      try {
+        execSync(
+          `flock -w 5 ${JSON.stringify(lockPath)} node ${JSON.stringify(tmpFile)}`
+        );
+      } finally {
+        try { writeFileSync(tmpFile, ""); } catch { /* ignore cleanup errors */ }
+      }
+
+      // Write audit entry (audit trail survives hard delete)
+      this.appendAudit({
+        ticket_id: id,
+        action: "deleted",
+        actor,
+        timestamp: now,
+        changes: { mode: ["hard", null] },
+      });
+    } else {
+      // ── Soft delete: set status to cancelled ───────────────────────────────
+      this.update(id, { status: "cancelled" }, actor);
+
+      this.appendAudit({
+        ticket_id: id,
+        action: "deleted",
+        actor,
+        timestamp: now,
+        changes: { mode: ["soft", null] },
+      });
+    }
+  }
 }
