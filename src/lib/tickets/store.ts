@@ -1221,7 +1221,7 @@ export class TicketStore {
           }
         } catch (err) {
           if (err instanceof SyntaxError) {
-            throw new Error(`Ticket file is corrupted: ${id}`);
+            throw new Error(`Ticket file is corrupted: ${id}`, { cause: err });
           }
           throw err;
         }
