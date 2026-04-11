@@ -530,6 +530,61 @@ export function createTicketCommand(): Command {
       }
     });
 
+  // ── delete ─────────────────────────────────────────────────────────────────
+
+  cmd
+    .command("delete")
+    .description("Delete a ticket (soft = cancelled, hard = file removal)")
+    .argument("<id>", "Ticket ID (e.g. PA-001)")
+    .option("--force", "Hard delete: remove the ticket JSON file from disk (irreversible)")
+    .option("--yes", "Skip the confirmation prompt (use with --force)")
+    .option("--actor <name>", "Actor for audit log", "cli-user")
+    .action(async (id: string, opts: { force?: boolean; yes?: boolean; actor: string }) => {
+      const store = new TicketStore();
+
+      // Verify ticket exists
+      if (!store.get(id)) {
+        console.error(`Ticket not found: ${id}`);
+        process.exit(1);
+      }
+
+      if (opts.force) {
+        // Hard delete — require --yes confirmation
+        if (!opts.yes) {
+          console.log(`This will PERMANENTLY delete ticket ${id} and remove its JSON file.`);
+          console.log("Audit entries will be preserved but the ticket file will be gone.");
+          console.log("");
+          const readline = await import("readline");
+          const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+          const answer = await new Promise<string>((resolve) => {
+            rl.question("Type the ticket ID to confirm: ", resolve);
+          });
+          rl.close();
+          if (answer.trim() !== id) {
+            console.error("Confirmation mismatch — aborting.");
+            process.exit(1);
+          }
+        }
+
+        try {
+          store.delete(id, opts.actor, true);
+          console.log(`Deleted (hard): ${id}`);
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      } else {
+        // Soft delete — no confirmation needed
+        try {
+          store.delete(id, opts.actor, false);
+          console.log(`Deleted (soft): ${id} (status → cancelled)`);
+        } catch (err) {
+          console.error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+    });
+
   // ── check-refs ──────────────────────────────────────────────────────────────
 
   cmd
