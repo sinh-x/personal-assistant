@@ -47,6 +47,49 @@ deploy_modes:
     mode_type: work
     provider: minimax
     agents: []  # solo, team-manager executes directly
+  - id: housekeeping-anthropic
+    label: Housekeeping (Anthropic)
+    phone_visible: true
+    mode_type: housekeeping
+    provider: anthropic
+    agents: []
+    objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: triage-anthropic
+    label: Triage (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    agents: []  # solo, team-manager executes directly
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: sprint-review-anthropic
+    label: Sprint Review (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    agents: []  # solo, team-manager executes directly
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: velocity-anthropic
+    label: Velocity (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    agents: []  # solo, team-manager executes directly
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: knowledge-org-anthropic
+    label: Knowledge Org (Anthropic)
+    phone_visible: false
+    mode_type: work
+    provider: anthropic
+    agents: []  # solo, team-manager executes directly
 
 context:
   organization: sinh-x

@@ -26,6 +26,29 @@ deploy_modes:
     phone_visible: true
     mode_type: work
     provider: minimax
+  - id: housekeeping-anthropic
+    label: Housekeeping (Anthropic)
+    phone_visible: true
+    mode_type: housekeeping
+    provider: anthropic
+    agents: []
+    objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: interactive-anthropic
+    label: Interactive (Anthropic)
+    phone_visible: true
+    mode_type: interactive
+    provider: anthropic
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: weekly-review-anthropic
+    label: Weekly Review (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
 
 context:
   organization: sinh-x

@@ -41,6 +41,43 @@ deploy_modes:
     mode_type: interactive
     provider: minimax
     agents: [facilitator]
+  - id: housekeeping-anthropic
+    label: Housekeeping (Anthropic)
+    phone_visible: true
+    mode_type: housekeeping
+    provider: anthropic
+    agents: []
+    objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: background-anthropic
+    label: Background (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: foreground-anthropic
+    label: Foreground (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: interactive-anthropic
+    label: Interactive (Anthropic)
+    phone_visible: false
+    mode_type: interactive
+    provider: anthropic
+  - id: spike-anthropic
+    label: Spike (Anthropic)
+    phone_visible: true
+    mode_type: interactive
+    provider: anthropic
+    agents: [facilitator]
 
 context:
   organization: sinh-x

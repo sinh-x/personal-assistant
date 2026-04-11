@@ -60,6 +60,63 @@ deploy_modes:
     skills:
       - name: pa-session-log
         inject-as: shared-skill
+  - id: housekeeping-anthropic
+    label: Housekeeping (Anthropic)
+    phone_visible: true
+    mode_type: housekeeping
+    provider: anthropic
+    agents: []
+    objective: skills/global/housekeeping-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: background-anthropic
+    label: Background (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: foreground-anthropic
+    label: Foreground (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: interactive-anthropic
+    label: Interactive (Anthropic)
+    phone_visible: false
+    mode_type: interactive
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: repo-scan-anthropic
+    label: Repo Scan (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    objective: skills/maintenance/repo-scan-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: repo-health-anthropic
+    label: Repo Health (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    objective: skills/maintenance/repo-health-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
 context:
   organization: sinh-x
   notes: "Solo agent. Deploy with --objective for specific issues, or plain for health check."

@@ -63,6 +63,66 @@ deploy_modes:
         inject-as: shared-skill
     global_docs:
       - skills/requirements/kpi-definitions.md
+  - id: single-anthropic
+    label: Single Deployment (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    agents: [evaluator]
+    objective: skills/kpi-reviewer/single-objective.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+    global_docs:
+      - skills/requirements/kpi-definitions.md
+  - id: ticket-anthropic
+    label: Ticket Scope (Anthropic)
+    phone_visible: false
+    mode_type: work
+    provider: anthropic
+    agents: [evaluator]
+    objective: skills/kpi-reviewer/ticket-objective.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+    global_docs:
+      - skills/requirements/kpi-definitions.md
+  - id: daily-anthropic
+    label: Daily Scope (Anthropic)
+    phone_visible: false
+    mode_type: work
+    provider: anthropic
+    agents: [evaluator]
+    objective: skills/kpi-reviewer/daily-objective.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+    global_docs:
+      - skills/requirements/kpi-definitions.md
 context:
   organization: sinh-x
   notes: "Solo agent (team manager does the work directly). Evaluates requirements team deployments. Use haiku for data gathering phases, opus for evaluation phases."
