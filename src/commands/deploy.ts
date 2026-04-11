@@ -448,6 +448,13 @@ export function deployCommand(
   const deployDir = resolve(deploymentsDir, deployId);
   mkdirSync(deployDir, { recursive: true });
 
+  // PA-1020: Write objective to file for file-based objective passing
+  let objectiveFile: string | undefined;
+  if (opts.objective) {
+    objectiveFile = resolve(deployDir, "objective.md");
+    writeFileSync(objectiveFile, opts.objective, "utf-8");
+  }
+
   // If running inside a parent PA deployment, write child_deployment event to parent's log
   const parentActivityLog = process.env["PA_ACTIVITY_LOG"];
   if (parentActivityLog) {
@@ -596,7 +603,7 @@ export function deployCommand(
     primer: primerFile,
     ...(anyModelSet ? { models: modelsMap } : {}),
     ...(opts.ticket ? { ticket_id: opts.ticket } : {}),
-    ...(opts.objective ? { objective: opts.objective } : {}),
+    ...(objectiveFile ? { objectiveFile } : {}),
     ...(repoName ? { repo: repoName } : {}),
     provider,
   };
