@@ -15,8 +15,8 @@ Team artifacts directory already exists at `~/Documents/ai-usage/agent-teams/bui
 
 **Initialize Decision Log:**
 ```bash
-echo "| Ticket | Auto-Resolve Rule | Evidence | Outcome | Timestamp |" > ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
-echo "|--------|------------------|----------|---------|-----------|" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+echo "| Ticket | Auto-Resolve Rule | Evidence | CI Verified | Outcome | Timestamp |" > ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+echo "|--------|------------------|----------|------------|---------|-----------|" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
 ```
 
 ### Step 1.5 — Dry-Run Mode Detection
@@ -72,7 +72,7 @@ pa ticket show <TICKET-ID> --json | jq -r '.tags[], .blockedBy[]'
        ```
     2. **Decision Log Entry:**
        ```bash
-       echo "| <TICKET-ID> | BLOCKED (F1) | All blocking tickets (<blocking-ids>) are done | Closed: auto-resolved | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       echo "| <TICKET-ID> | BLOCKED (F1) | All blocking tickets (<blocking-ids>) are done | N/A | Closed: auto-resolved | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
     3. **Category:** BLOCKED-AUTO-RESOLVED
   - If any `blockedBy` ticket is NOT done: proceed to sub-ticket creation
@@ -126,7 +126,7 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
 
 3. **Decision Log Entry:**
    ```bash
-   echo "| <TICKET-ID> | STALE-RESOLVED (F6) | <SUB-TICKET-ID> (<type>) — PR now <state> | Auto-closed | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+   echo "| <TICKET-ID> | STALE-RESOLVED (F6) | <SUB-TICKET-ID> (<type>) — PR now <state> | N/A | Auto-closed | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
    ```
 
 **After resolving stale sub-tickets, continue to the Decision Tree.** The ticket may now be eligible for normal case processing (e.g., a ticket whose CONFLICT sub-ticket was stale now proceeds to Case B for READY-TO-MERGE handling).
@@ -151,20 +151,94 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
      ```bash
      gh pr merge <number> --repo {{GH_REPO}} --admin --merge
      ```
-  2. **Close any existing READY-TO-MERGE sub-ticket:**
+  2. **Poll GitHub Actions for merged commit (max 10 min):**
      ```bash
-     pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager
+     # Wait for CI to complete after merge
+     # Poll every 30s, max 20 attempts (10 min total)
+     CI_POLL_COUNT=0
+     CI_STATUS="unknown"
+     while [ $CI_POLL_COUNT -lt 20 ]; do
+       # Find the run triggered by the merge event on develop
+       RUN_RESULT=$(gh run list --repo {{GH_REPO}} --workflow="CI" --event=merge --branch=develop --json=conclusion,databaseId --limit=1 2>/dev/null)
+       if [ -n "$RUN_RESULT" ] && [ "$RUN_RESULT" != "null" ]; then
+         CI_CONCLUSION=$(echo "$RUN_RESULT" | jq -r '.[0].conclusion')
+         if [ "$CI_CONCLUSION" = "success" ]; then
+           CI_STATUS="pass"
+           break
+         elif [ "$CI_CONCLUSION" = "failure" ]; then
+           CI_STATUS="fail"
+           break
+         elif [ "$CI_CONCLUSION" = "cancelled" ] || [ "$CI_CONCLUSION" = "timed_out" ]; then
+           CI_STATUS="fail"
+           break
+         fi
+         # Still running or queued
+       fi
+       sleep 30
+       CI_POLL_COUNT=$((CI_POLL_COUNT + 1))
+     done
      ```
-  3. **Close parent ticket:**
+  3. **Handle CI result:**
+     - **If CI PASS (CI_STATUS="pass"):**
+       ```bash
+       # Close any existing READY-TO-MERGE sub-ticket
+       pa ticket subticket complete <TICKET-ID> <SUB-TICKET-ID> --actor builder/team-manager 2>/dev/null || true
+       # Return to develop and pull (CI verified, safe to pull)
+       cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+       git checkout develop
+       git pull origin develop
+       # Close parent ticket
+       pa ticket update <TICKET-ID> --status done
+       pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (MERGEABLE + CI passing). CI verified post-merge via polling."
+       # Decision Log Entry
+       echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR MERGEABLE + CI passing | yes | PR #<number> merged, CI passed | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+       **Category:** AUTO-MERGED
+     - **If CI FAIL (CI_STATUS="fail"):**
+       ```bash
+       # Create CI-FAILURE sub-ticket (ticket NOT closed)
+       pa ticket subticket create <TICKET-ID> \
+         --title "CI-FAILURE: PR #<number> CI failed after merge" \
+         --summary "PR #<number> was auto-merged but GitHub Actions CI failed after merge. Action: review CI failure, fix code, revert if needed. PR URL: <url>" \
+         --assignee sinh --priority high --estimate XS \
+         --actor builder/team-manager
+       # Return to develop and pull (but do NOT close ticket)
+       cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+       git checkout develop
+       git pull origin develop
+       # Decision Log Entry
+       echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR merged, CI FAIL | no | CI failed post-merge, sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+       **Category:** AUTO-MERGED-CI-FAIL
+     - **If TIMEOUT (CI_STATUS="unknown" after 20 attempts):**
+       ```bash
+       # Create TIMEOUT sub-ticket
+       pa ticket subticket create <TICKET-ID> \
+         --title "TIMEOUT: PR #<number> CI verification timed out" \
+         --summary "PR #<number> was auto-merged but GitHub Actions CI did not complete within 10 minutes. Action: verify CI status manually, proceed if healthy. PR URL: <url>" \
+         --assignee sinh --priority medium --estimate XS \
+         --actor builder/team-manager
+       # Return to develop and pull
+       cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+       git checkout develop
+       git pull origin develop
+       # Decision Log Entry
+       echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR merged, CI timeout | timeout | CI timed out (>10 min), sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       ```
+       **Category:** AUTO-MERGED-TIMEOUT
+  4. **GitHub API Unreachable (graceful degradation):**
      ```bash
+     # If gh run list fails (network/auth error), fall back to DEGRADED mode
+     # Log warning, skip CI verification, proceed with git pull
+     echo "WARNING: GitHub API unreachable for CI polling — falling back to DEGRADED mode (skip CI verification)" >&2
+     cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
+     git checkout develop
+     git pull origin develop
      pa ticket update <TICKET-ID> --status done
-     pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (MERGEABLE + CI passing). Confirmed via gh."
+     pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (DEGRADED: CI polling failed, proceeding without CI verification)."
+     echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR merged, CI unreachable | degraded | DEGRADED: gh API failed, no CI verification | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
      ```
-  4. **Decision Log Entry:**
-     ```bash
-     echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR MERGEABLE + CI passing | PR #<number> merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
-     ```
-  5. **Category:** AUTO-MERGED
+     **Category:** AUTO-MERGED-DEGRADED
 
 **CASE C — PR found, state=OPEN, mergeable=CONFLICTING:**
 - Check for existing sub-ticket:
@@ -192,7 +266,7 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
        ```
     2. **Decision Log Entry:**
        ```bash
-       echo "| <TICKET-ID> | CONFLICT (F2) | Non-code conflicts auto-resolved | Merged: <branch> into <target-branch> | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       echo "| <TICKET-ID> | CONFLICT (F2) | Non-code conflicts auto-resolved | N/A | Merged: <branch> into <target-branch> | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
     3. **Category:** CONFLICT-AUTO-RESOLVED
   - If conflicts involve code files, or merge fails: proceed to sub-ticket creation
@@ -225,7 +299,7 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
     2. If still OPEN and mergeable: proceed to READY-TO-MERGE handling
     3. **Decision Log Entry:**
        ```bash
-       echo "| <TICKET-ID> | CI-FAILURE (auto-rerun) | Flaky test(s) passed on re-run | Checks: <check-names> now PASSED | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       echo "| <TICKET-ID> | CI-FAILURE (auto-rerun) | Flaky test(s) passed on re-run | yes | Checks: <check-names> now PASSED | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
     4. **Category:** CI-FAILURE-AUTO-RESOLVED
   - If checks still failing or cannot determine: proceed to sub-ticket creation
@@ -296,7 +370,7 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
        ```
     4. **Decision Log Entry:**
        ```bash
-       echo "| <TICKET-ID> | ORPHAN (F4) | Work verified via alternate branch pattern | Closed: merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       echo "| <TICKET-ID> | ORPHAN (F4) | Work verified via alternate branch pattern | N/A | Closed: merged | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
     5. **Category:** ORPHAN-AUTO-RESOLVED
   - If no work found: proceed to sub-ticket creation
@@ -352,7 +426,7 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
   ```
 - Decision Log Entry:
   ```bash
-  echo "| <TICKET-ID> | LOCAL-MERGE (J) | Non-GitHub repo, linked branch merged locally | Closed: done | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+  echo "| <TICKET-ID> | LOCAL-MERGE (J) | Non-GitHub repo, linked branch merged locally | N/A | Closed: done | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
   ```
 - Category: LOCAL-MERGE
 - If dry-run: preview the merge without executing it
@@ -404,7 +478,7 @@ if git show-ref --quiet refs/heads/clean; then
       git push origin develop
       echo "Clean branch merged into develop"
       # Log decision
-      echo "| CLEAN-MERGE | F5 | Clean merge successful | develop <- clean | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+      echo "| CLEAN-MERGE | F5 | Clean merge successful | N/A | develop <- clean | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
     fi
   else
     # Merge has conflicts
@@ -418,7 +492,7 @@ if git show-ref --quiet refs/heads/clean; then
         --summary "Clean branch cannot be auto-merged into develop due to conflicts. Action: resolve manually. Conflicts detected in: $(echo $DRY_MERGE_OUTPUT | grep -E 'CONFLICT|conflict')" \
         --assignee sinh --priority medium --estimate XS \
         --actor builder/team-manager
-      echo "| CLEAN-MERGE | F5 | Conflicts detected | Sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+      echo "| CLEAN-MERGE | F5 | Conflicts detected | N/A | Sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
     fi
   fi
 else
