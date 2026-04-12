@@ -77,19 +77,13 @@ export function deployRoutes(): Hono {
       }
     }
 
-    // Build pa command args
-    // daily team: pa daily <mode>; others: pa deploy <team> --mode <mode> --background
-    const args: string[] = [];
-    if (team === "daily") {
-      args.push("daily", mode ?? "plan");
-    } else {
-      args.push("deploy", team, "--background");
-      if (mode) {
-        args.push("--mode", mode);
-      }
-      if (repo) {
-        args.push("--repo", repo);
-      }
+    // Build pa command args — all teams use pa deploy
+    const args: string[] = ["deploy", team, "--background"];
+    if (mode) {
+      args.push("--mode", mode);
+    }
+    if (repo) {
+      args.push("--repo", repo);
     }
     if (objective && objective.trim()) {
       args.push("--objective", objective.trim());

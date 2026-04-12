@@ -418,6 +418,38 @@ function writeFallbackIfNeeded(deployId: string, teamName: string): void {
   }
 }
 
+/** Planner daily modes that need dynamic template vars (date-based paths, etc.) */
+const PLANNER_DAILY_MODES = new Set(["plan", "plan-review", "progress", "end", "end-review"]);
+
+/**
+ * Compute dynamic template variables for planner team daily modes.
+ * Migrated from daily.ts — these vars are date-relative paths used by mode objective files.
+ */
+function computePlannerVars(mode: string, date?: string): Record<string, string> {
+  if (!PLANNER_DAILY_MODES.has(mode)) return {};
+
+  const today = date || new Date().toISOString().slice(0, 10);
+  const year = today.slice(0, 4);
+  const month = today.slice(5, 7);
+  const home = homedir();
+  const outputDir = resolve(home, `Documents/ai-usage/daily/${year}/${month}`);
+  const dailyInbox = `${home}/Documents/ai-usage/agent-teams/planner/inbox`;
+
+  return {
+    TODAY: today,
+    YEAR: year,
+    MONTH: month,
+    OUTPUT_DIR: outputDir,
+    HOME: home,
+    INPUT_NOTES: resolve(home, `Documents/ai-usage/sinh-inputs/daily-plan/${today}`),
+    RPM_BLOCKS: resolve(home, `Documents/ai-usage/agent-teams/rpm/rpm-blocks.yaml`),
+    DAILY_INBOX: dailyInbox,
+    GATHER_REPORT: `${dailyInbox}/${today}-end-gather.md`,
+    READY_MARKER: `${dailyInbox}/${today}-end-ready.md`,
+    DRAFT_PATH: `${outputDir}/${today}-plan-draft.md`,
+  };
+}
+
 /** Resolve a relative path from PA_CONFIG first, then PA_HOME */
 function makeResolver(configDir: string, homeDir: string) {
   return (relpath: string): string | undefined => {
@@ -913,7 +945,11 @@ export function deployCommand(
     configDir: config.configDir,
     homeDir: paHome,
     effectiveModels: { tmModel, agentModels },
-    templateVars: { ...repoTemplateVars, ...opts.templateVars },
+    templateVars: {
+      ...repoTemplateVars,
+      ...(teamName === "planner" && opts.mode ? computePlannerVars(opts.mode) : {}),
+      ...opts.templateVars,
+    },
     ticket: opts.ticket,
   });
   warnings.push(...primerWarnings);

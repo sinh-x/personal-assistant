@@ -39,9 +39,9 @@ export function scheduleCommand(
       );
       process.exit(1);
     }
-    execCmd = `${paCmd} daily ${dailyMode}`;
+    execCmd = `${paCmd} deploy planner --mode ${dailyMode} --background`;
     unitName = `pa-daily-${dailyMode}`;
-    description = `personal-assistant daily ${dailyMode}`;
+    description = `personal-assistant planner ${dailyMode}`;
   } else if (spec.startsWith("requirements:")) {
     const requirementsMode = spec.slice("requirements:".length);
     if (!["ideas", "focus"].includes(requirementsMode)) {
