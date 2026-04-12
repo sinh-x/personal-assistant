@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 
 let _db: Database.Database | null = null;
 
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 function ensureDir(path: string): void {
   const dir = dirname(path);
@@ -49,6 +49,9 @@ function migrateFrom(db: Database.Database, fromVersion: number): void {
   }
   if (fromVersion < 3) {
     migrateToV3(db);
+  }
+  if (fromVersion < 4) {
+    migrateToV4(db);
   }
 }
 
@@ -226,6 +229,17 @@ function migrateToV3(db: Database.Database): void {
   `);
   db.exec(`
     ALTER TABLE deployments ADD COLUMN fallback INTEGER DEFAULT 0;
+  `);
+}
+
+function migrateToV4(db: Database.Database): void {
+  // V4 adds resumed_from_deployment_id column to both tables.
+  // SQLite supports ALTER TABLE ADD COLUMN without table rebuild.
+  db.exec(`
+    ALTER TABLE registry_events ADD COLUMN resumed_from_deployment_id TEXT;
+  `);
+  db.exec(`
+    ALTER TABLE deployments ADD COLUMN resumed_from_deployment_id TEXT;
   `);
 }
 
