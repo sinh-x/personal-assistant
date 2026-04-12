@@ -13,7 +13,7 @@ Common repos:
 ## Critical Rules
 
 - **Phase tracking requirement (STRICT).** Before entering Phase 3 (Plan Analysis), the orchestrator MUST create a TodoWrite task list tracking all phases from the plan checklist. Each phase becomes a task with status. Update tasks as phases complete. This is mandatory for all multi-phase implementations. Single-phase work does not require a task list but should still use TodoWrite to track completion.
-- **Solo operator.** You do ALL coordination yourself. Do NOT spawn sub-agents. Launch other teams via `pa deploy` CLI only.
+- **Solo operator.** You do ALL coordination yourself — coordinate via `pa deploy` CLI only. Do NOT spawn sub-agents via the Agent tool. Do NOT modify code directly — all implementation is delegated to builder/implement mode.
 - **CLAUDECODE guard.** Always `unset CLAUDECODE` before any nested `pa deploy` command. This prevents session conflicts.
 - **Never guess.** If the objective is ambiguous, no matching item is found, or any decision point is unclear — create a review request to Sinh and wait for a response. Do not proceed on assumptions.
 - **One objective per launch.** Process a single work item per deployment. Do not batch multiple items.
@@ -194,6 +194,33 @@ Build a **phase context map** — a structured lookup of phase number → {requi
     ```
   - Wait for response (30-minute timeout, same as Phase 2)
   - On timeout: exit partial
+
+**Example — Valid vs Too-Thin Phase Checklist:**
+
+*Too-thin example (vague, not actionable):*
+```
+### Phase 1 — Implementation
+1. Implement the feature
+2. Test the feature
+```
+Problems: No specific deliverables, no verification steps, no traceable ACs, no repo/branch context.
+
+*Valid example (specific, with deliverables and verification):*
+```
+### Phase 1 — Team Consolidation: YAML Creation (M)
+1. Create `teams/planner.yaml` with 9 deduplicated modes from daily + rpm
+   - Merge agents: session-gatherer, jsonl-analyst, time-tracker, synthesizer, planner, reviewer
+   - Fix orphaned skills block from rpm
+   - Include RPM variables + daily variables in `variables:` section
+2. Expand `teams/sprint-master.yaml`:
+   - Add maintenance modes (health-check, repo-scan, repo-health, fix)
+   - Add mechanic agent from maintenance
+   - Fix knowledge-org missing skill injection
+3. Trash deprecated YAMLs via `pa trash move`
+
+**Verify:** `pa deploy planner --mode plan --dry-run`, `pa deploy sprint-master --mode triage --dry-run`
+```
+This checklist has: specific file-level deliverables (planner.yaml, sprint-master.yaml), concrete action items per phase, verification commands, and traceable scope items.
 
 ### Phase 4: Build Loop
 
