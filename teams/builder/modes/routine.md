@@ -146,33 +146,119 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
 - Category: CLOSED
 
 **CASE B — PR found, state=OPEN, mergeable=MERGEABLE, checks=PASS:**
+- **Pre-Merge CI Verification (secondary head-branch check):**
+  1. Before merging, run secondary CI confirmation on the PR head branch:
+     ```bash
+     # Verify CI has a successful conclusion on the head branch before auto-merging
+     HEAD_BRANCH_CI=$(gh run list --repo {{GH_REPO}} --workflow="CI" --branch <head-ref> --json conclusion,databaseId --limit 5 2>/dev/null)
+     if [ -n "$HEAD_BRANCH_CI" ] && [ "$HEAD_BRANCH_CI" != "null" ]; then
+       SUCCESS_COUNT=$(echo "$HEAD_BRANCH_CI" | jq '[.[] | select(.conclusion == "success")] | length')
+       if [ "$SUCCESS_COUNT" -gt 0 ]; then
+         # CI has run successfully on head branch, proceed to merge
+         PRE_MERGE_CI_PASS=true
+         HEAD_BRANCH_RUN_ID=$(echo "$HEAD_BRANCH_CI" | jq -r '[.[] | select(.conclusion == "success")] | .[0].databaseId')
+       else
+         # No successful CI on head branch — skip auto-merge, create CI-UNVERIFIED sub-ticket
+         PRE_MERGE_CI_PASS=false
+         HEAD_BRANCH_RUN_ID="none"
+       fi
+     else
+       # Could not determine CI status — treat as unverified
+       PRE_MERGE_CI_PASS=false
+       HEAD_BRANCH_RUN_ID="unknown"
+     fi
+     ```
+  2. **If PRE_MERGE_CI_PASS=false:**
+     ```bash
+     # Create CI-UNVERIFIED sub-ticket instead of auto-merging
+     pa ticket subticket create <TICKET-ID> \
+       --title "CI-UNVERIFIED: PR #<number> head branch has no successful CI run" \
+       --summary "PR #<number> is MERGEABLE with passing checks but the head branch has no confirmed successful CI run (run ID: $HEAD_BRANCH_RUN_ID). Action: wait for CI to complete on head branch, verify success, then merge manually or re-run routine. PR URL: <url>" \
+       --assignee sinh --priority high --estimate XS \
+       --actor builder/team-manager
+     # Decision Log Entry
+     echo "| <TICKET-ID> | AUTO-MERGE-SKIPPED (B) | Head branch CI unverified (run: $HEAD_BRANCH_RUN_ID) | no | CI-UNVERIFIED sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+     ```
+     **Category:** AUTO-MERGE-SKIPPED-CI-UNVERIFIED
+     Skip remaining steps for this ticket.
+  3. **If PRE_MERGE_CI_PASS=true:** Proceed to merge.
 - **Auto-Merge (immediate):**
   1. **Merge the PR:**
      ```bash
      gh pr merge <number> --repo {{GH_REPO}} --admin --merge
      ```
-  2. **Poll GitHub Actions for merged commit (max 10 min):**
+  2. **Poll GitHub Actions for merged commit (max 13 min with graceful extension):**
      ```bash
+     # Get the merge commit SHA for accurate CI polling
+     MERGE_COMMIT=$(gh api repos/:owner/:repo/pulls/<number>/merge --jq '.sha' 2>/dev/null)
+     if [ -z "$MERGE_COMMIT" ] || [ "$MERGE_COMMIT" = "null" ]; then
+       # Fall back to event+branch query if merge commit not available
+       MERGE_COMMIT=""
+     fi
+
+     # Retry wrapper for gh API calls
+     retry_gh_api() {
+       local cmd="$1"
+       local max_attempts=3
+       local attempt=1
+       local delay=5
+       while [ $attempt -le $max_attempts ]; do
+         result=$(eval "$cmd" 2>&1)
+         exit_code=$?
+         if [ $exit_code -eq 0 ] && [ -n "$result" ] && [ "$result" != "null" ]; then
+           echo "$result"
+           return 0
+         fi
+         if [ $attempt -lt $max_attempts ]; then
+           sleep $delay
+           delay=$((delay * 2))  # exponential backoff: 5s, 10s, 20s
+         fi
+         attempt=$((attempt + 1))
+       done
+       # All attempts failed
+       echo "RETRY_EXHAUSTED"
+       return 1
+     }
+
      # Wait for CI to complete after merge
-     # Poll every 30s, max 20 attempts (10 min total)
+     # Poll every 30s, max 26 attempts (13 min total with 3-min grace extension)
      CI_POLL_COUNT=0
      CI_STATUS="unknown"
-     while [ $CI_POLL_COUNT -lt 20 ]; do
-       # Find the run triggered by the merge event on develop
-       RUN_RESULT=$(gh run list --repo {{GH_REPO}} --workflow="CI" --event=merge --branch=develop --json=conclusion,databaseId --limit=1 2>/dev/null)
-       if [ -n "$RUN_RESULT" ] && [ "$RUN_RESULT" != "null" ]; then
-         CI_CONCLUSION=$(echo "$RUN_RESULT" | jq -r '.[0].conclusion')
+     CI_RUN_ID="none"
+     CI_CONCLUSION="unknown"
+     GRACE_USED=false
+     MAX_ATTEMPTS=20
+     GRACE_ATTEMPTS=6  # 3 extra minutes at 30s intervals
+
+     while [ $CI_POLL_COUNT -lt $MAX_ATTEMPTS ]; do
+       # Determine which query to use
+       if [ -n "$MERGE_COMMIT" ] && [ "$MERGE_COMMIT" != "null" ]; then
+         # Prefer merge commit SHA query (F3)
+         RUN_RESULT=$(retry_gh_api "gh run list --repo {{GH_REPO}} --workflow='CI' --commit=$MERGE_COMMIT --json conclusion,databaseId --limit 1 2>/dev/null")
+       else
+         # Fall back to event+branch query
+         RUN_RESULT=$(retry_gh_api "gh run list --repo {{GH_REPO}} --workflow='CI' --event=merge --branch=develop --json conclusion,databaseId --limit 1 2>/dev/null")
+       fi
+
+       if [ "$RUN_RESULT" != "RETRY_EXHAUSTED" ] && [ -n "$RUN_RESULT" ] && [ "$RUN_RESULT" != "null" ]; then
+         CI_CONCLUSION=$(echo "$RUN_RESULT" | jq -r '.[0].conclusion // "null"')
+         CI_RUN_ID=$(echo "$RUN_RESULT" | jq -r '.[0].databaseId // "none"')
+
          if [ "$CI_CONCLUSION" = "success" ]; then
            CI_STATUS="pass"
            break
-         elif [ "$CI_CONCLUSION" = "failure" ]; then
+         elif [ "$CI_CONCLUSION" = "failure" ] || [ "$CI_CONCLUSION" = "cancelled" ] || [ "$CI_CONCLUSION" = "timed_out" ]; then
            CI_STATUS="fail"
            break
-         elif [ "$CI_CONCLUSION" = "cancelled" ] || [ "$CI_CONCLUSION" = "timed_out" ]; then
-           CI_STATUS="fail"
-           break
+         elif [ "$CI_CONCLUSION" = "null" ] || [ "$CI_CONCLUSION" = "in_progress" ] || [ "$CI_CONCLUSION" = "queued" ] || [ "$CI_CONCLUSION" = "waiting" ]; then
+           # CI still running — check for grace period extension
+           if [ $CI_POLL_COUNT -eq 19 ] && [ "$GRACE_USED" = "false" ]; then
+             # At 10-min mark (20 attempts), check if CI shows recent activity (shared runners may be slow)
+             # Extend by 3 minutes (6 more attempts at 30s)
+             MAX_ATTEMPTS=$((MAX_ATTEMPTS + GRACE_ATTEMPTS))
+             GRACE_USED=true
+           fi
          fi
-         # Still running or queued
        fi
        sleep 30
        CI_POLL_COUNT=$((CI_POLL_COUNT + 1))
@@ -189,9 +275,9 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
        git pull origin develop
        # Close parent ticket
        pa ticket update <TICKET-ID> --status done
-       pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (MERGEABLE + CI passing). CI verified post-merge via polling."
-       # Decision Log Entry
-       echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR MERGEABLE + CI passing | yes | PR #<number> merged, CI passed | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (MERGEABLE + CI passing). CI verified post-merge via polling. Run ID: $CI_RUN_ID, Polling attempts: $CI_POLL_COUNT."
+       # Decision Log Entry — updated format with CI Run ID, polling attempts, conclusion
+       echo "| <TICKET-ID> | AUTO-MERGED (B) | PR MERGEABLE + CI passing | yes | PR #<number> merged, CI passed (run:$CI_RUN_ID, attempts:$CI_POLL_COUNT) | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
        **Category:** AUTO-MERGED
      - **If CI FAIL (CI_STATUS="fail"):**
@@ -199,44 +285,43 @@ For each **open** sub-ticket, cross-reference its type against the current PR st
        # Create CI-FAILURE sub-ticket (ticket NOT closed)
        pa ticket subticket create <TICKET-ID> \
          --title "CI-FAILURE: PR #<number> CI failed after merge" \
-         --summary "PR #<number> was auto-merged but GitHub Actions CI failed after merge. Action: review CI failure, fix code, revert if needed. PR URL: <url>" \
+         --summary "PR #<number> was auto-merged but GitHub Actions CI failed after merge (run ID: $CI_RUN_ID). Action: review CI failure, fix code, revert if needed. PR URL: <url>" \
          --assignee sinh --priority high --estimate XS \
          --actor builder/team-manager
        # Return to develop and pull (but do NOT close ticket)
        cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
        git checkout develop
        git pull origin develop
-       # Decision Log Entry
-       echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR merged, CI FAIL | no | CI failed post-merge, sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       # Decision Log Entry — updated format
+       echo "| <TICKET-ID> | AUTO-MERGED (B) | PR merged, CI FAIL | no | CI failed post-merge (run:$CI_RUN_ID, attempts:$CI_POLL_COUNT), sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
        **Category:** AUTO-MERGED-CI-FAIL
-     - **If TIMEOUT (CI_STATUS="unknown" after 20 attempts):**
+     - **If TIMEOUT (CI_STATUS="unknown" after 26 attempts = 13 min, or GRACE_USED and still no conclusion):**
        ```bash
-       # Create TIMEOUT sub-ticket
+       # Create CI-IN-PROGRESS sub-ticket (renamed from TIMEOUT — CI was still running at timeout)
        pa ticket subticket create <TICKET-ID> \
-         --title "TIMEOUT: PR #<number> CI verification timed out" \
-         --summary "PR #<number> was auto-merged but GitHub Actions CI did not complete within 10 minutes. Action: verify CI status manually, proceed if healthy. PR URL: <url>" \
+         --title "CI-IN-PROGRESS: PR #<number> CI verification timed out — CI still running" \
+         --summary "PR #<number> was auto-merged but GitHub Actions CI did not complete within 13 minutes (ran $CI_POLL_COUNT polls, last run ID: $CI_RUN_ID, last conclusion: $CI_CONCLUSION). Action: verify CI status manually, proceed if healthy. PR URL: <url>" \
          --assignee sinh --priority medium --estimate XS \
          --actor builder/team-manager
        # Return to develop and pull
        cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
        git checkout develop
        git pull origin develop
-       # Decision Log Entry
-       echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR merged, CI timeout | timeout | CI timed out (>10 min), sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+       # Decision Log Entry — updated format
+       echo "| <TICKET-ID> | AUTO-MERGED (B) | PR merged, CI timeout | timeout | CI timeout at ${CI_POLL_COUNT} polls (run:$CI_RUN_ID, conclusion:$CI_CONCLUSION), CI-IN-PROGRESS sub-ticket created | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
        ```
-       **Category:** AUTO-MERGED-TIMEOUT
+       **Category:** AUTO-MERGED-CI-IN-PROGRESS
   4. **GitHub API Unreachable (graceful degradation):**
      ```bash
-     # If gh run list fails (network/auth error), fall back to DEGRADED mode
-     # Log warning, skip CI verification, proceed with git pull
-     echo "WARNING: GitHub API unreachable for CI polling — falling back to DEGRADED mode (skip CI verification)" >&2
+     # If gh run list fails after 3 retries (network/auth error), fall back to DEGRADED mode
+     echo "WARNING: GitHub API unreachable for CI polling after 3 retries — falling back to DEGRADED mode (skip CI verification)" >&2
      cd /home/sinh/git-repos/sinh-x/tools/personal-assistant
      git checkout develop
      git pull origin develop
      pa ticket update <TICKET-ID> --status done
-     pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (DEGRADED: CI polling failed, proceeding without CI verification)."
-     echo "| <TICKET-ID> | AUTO-MERGED (F3) | PR merged, CI unreachable | degraded | DEGRADED: gh API failed, no CI verification | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
+     pa ticket comment <TICKET-ID> --author builder/team-manager --content "Auto-merged: PR #<number> merged (DEGRADED: CI polling failed after 3 retries, proceeding without CI verification)."
+     echo "| <TICKET-ID> | AUTO-MERGED (B) | PR merged, CI unreachable | degraded | DEGRADED: gh API failed after 3 retries, no CI verification | $(date -Iseconds) |" >> ~/Documents/ai-usage/deployments/$PA_DEPLOYMENT_ID/routine-decisions-$(date +%Y-%m-%d).md
      ```
      **Category:** AUTO-MERGED-DEGRADED
 
