@@ -126,6 +126,7 @@ export interface RegistryEvent {
   objective?: string;
   repo?: string;
   fallback?: boolean;
+  resumed_from_deployment_id?: string;
 }
 
 /** Computed deployment status from registry events */
@@ -153,6 +154,7 @@ export interface DeploymentStatus {
   provider?: string;
   repo?: string;
   fallback?: boolean;
+  resumed_from_deployment_id?: string;
 }
 
 /** Per-provider model tier overrides */

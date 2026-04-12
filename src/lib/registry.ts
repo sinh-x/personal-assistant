@@ -53,6 +53,7 @@ export function readRegistry(): RegistryEvent[] {
       objective: row.objective as string | undefined,
       repo: row.repo as string | undefined,
       fallback: !!row.fallback,
+      resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
     };
   });
 }
@@ -76,11 +77,11 @@ export function appendRegistryEvent(event: RegistryEvent): void {
     INSERT INTO registry_events (
       deployment_id, team, event, timestamp, pid, status, summary,
       log_file, primer, agents, models, error, exit_code,
-      ticket_id, provider, rating, objective, repo, fallback
+      ticket_id, provider, rating, objective, repo, fallback, resumed_from_deployment_id
     ) VALUES (
       @deployment_id, @team, @event, @timestamp, @pid, @status, @summary,
       @log_file, @primer, @agents, @models, @error, @exit_code,
-      @ticket_id, @provider, @rating, @objective, @repo, @fallback
+      @ticket_id, @provider, @rating, @objective, @repo, @fallback, @resumed_from_deployment_id
     )
   `).run({
     deployment_id: event.deployment_id,
@@ -102,6 +103,7 @@ export function appendRegistryEvent(event: RegistryEvent): void {
     objective: event.objective ?? null,
     repo: event.repo ?? null,
     fallback: event.fallback ? 1 : 0,
+    resumed_from_deployment_id: event.resumed_from_deployment_id ?? null,
   });
 
   // UPSERT INTO deployments materialized view
@@ -121,11 +123,23 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
       db.prepare(`
         INSERT INTO deployments (
           deployment_id, team, status, started_at, pid, primer,
-          agents, models, ticket_id, objective, repo, provider
+          agents, models, ticket_id, objective, repo, provider, resumed_from_deployment_id
         ) VALUES (
           @deployment_id, @team, 'running', @started_at, @pid, @primer,
-          @agents, @models, @ticket_id, @objective, @repo, @provider
+          @agents, @models, @ticket_id, @objective, @repo, @provider, @resumed_from_deployment_id
         )
+        ON CONFLICT(deployment_id) DO UPDATE SET
+          status = excluded.status,
+          started_at = excluded.started_at,
+          pid = excluded.pid,
+          primer = excluded.primer,
+          agents = excluded.agents,
+          models = excluded.models,
+          ticket_id = excluded.ticket_id,
+          objective = excluded.objective,
+          repo = excluded.repo,
+          provider = excluded.provider,
+          resumed_from_deployment_id = excluded.resumed_from_deployment_id
       `).run({
         deployment_id: event.deployment_id,
         team: event.team,
@@ -138,6 +152,7 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
         objective: event.objective ?? null,
         repo: event.repo ?? null,
         provider: event.provider ?? null,
+        resumed_from_deployment_id: event.resumed_from_deployment_id ?? null,
       });
       break;
 
@@ -234,6 +249,7 @@ export function getDeploymentEvents(deployId: string): RegistryEvent[] {
       objective: row.objective as string | undefined,
       repo: row.repo as string | undefined,
       fallback: !!row.fallback,
+      resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
     };
   });
 }
@@ -337,6 +353,7 @@ export function queryDeploymentStatuses(): DeploymentStatus[] {
     provider: row.provider as string | undefined,
     repo: row.repo as string | undefined,
     fallback: !!row.fallback,
+    resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
   }));
 }
 
@@ -370,6 +387,7 @@ export function queryDeploymentStatus(deployId: string): DeploymentStatus | null
     provider: row.provider as string | undefined,
     repo: row.repo as string | undefined,
     fallback: !!row.fallback,
+    resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
   };
 }
 
@@ -402,5 +420,6 @@ export function getDeploymentsByTicketId(ticketId: string): DeploymentStatus[] {
     provider: row.provider as string | undefined,
     repo: row.repo as string | undefined,
     fallback: !!row.fallback,
+    resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
   }));
 }
