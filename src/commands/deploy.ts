@@ -71,11 +71,44 @@ function generateDeployId(): string {
 }
 
 /**
+ * Execute a resumed claude session in foreground-like modes (direct, interactive, foreground).
+ * Shared logic extracted from 3 identical exec blocks.
+ */
+function executeResumedSession(opts: {
+  sessionId: string;
+  deployId: string;
+  teamName: string;
+  modelFlag: string;
+  claudePrompt: string;
+  cwd: string;
+  deployEnv: NodeJS.ProcessEnv;
+  runExtraction: () => void;
+}): number {
+  const { sessionId, deployId, teamName, modelFlag, claudePrompt, cwd, deployEnv, runExtraction } = opts;
+  console.log(`Resuming deployment (foreground): ${teamName} [${deployId}]`);
+  appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
+  let exitCode = 0;
+  try {
+    execSync(`claude --resume ${sessionId} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
+      stdio: "inherit",
+      env: deployEnv,
+      cwd,
+    });
+  } catch (err) {
+    exitCode = (err as { status?: number }).status ?? 1;
+    appendRegistryEvent({ deployment_id: deployId, team: teamName, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
+  }
+  runExtraction();
+  writeFallbackIfNeeded(deployId, teamName);
+  return exitCode;
+}
+
+/**
  * Resume a deployment by deploy-id.
  * Reconstructs the original claude session using the saved session JSONL path.
  */
 function resumeDeployment(
-  deployId: string,
+  originalDeployId: string,
   opts: {
     dryRun?: boolean;
     background?: boolean;
@@ -93,17 +126,20 @@ function resumeDeployment(
   const deploymentsDir = resolve(homedir(), "Documents/ai-usage/deployments");
   const registryDb = getRegistryDbPath();
 
+  // Generate fresh deployment ID for the resumed deployment (ARCH-1)
+  const deployId = generateDeployId();
+
   // Step 1: Read deployment from registry
-  const status = queryDeploymentStatus(deployId);
+  const status = queryDeploymentStatus(originalDeployId);
   if (!status) {
-    console.error(`Error: Deployment not found: ${deployId}`);
+    console.error(`Error: Deployment not found: ${originalDeployId}`);
     process.exit(1);
   }
 
   // Step 2: Validate not currently running
   if (status.status === "running" && status.pid !== undefined) {
     if (isProcessAlive(status.pid)) {
-      console.error(`Error: Deployment still running: ${deployId} (PID ${status.pid})`);
+      console.error(`Error: Deployment still running: ${originalDeployId} (PID ${status.pid})`);
       process.exit(1);
     }
     // PID is dead but status still running — proceed (edge case after crash)
@@ -117,16 +153,16 @@ function resumeDeployment(
   }
 
   // Step 4: Read session UUID from session-jsonl-path.txt
-  const deployDir = resolve(deploymentsDir, deployId);
-  const sessionPathFile = resolve(deployDir, "session-jsonl-path.txt");
+  const originalDeployDir = resolve(deploymentsDir, originalDeployId);
+  const sessionPathFile = resolve(originalDeployDir, "session-jsonl-path.txt");
   if (!existsSync(sessionPathFile)) {
-    console.error(`Error: Session data not found — cannot resume deployment ${deployId}.`);
+    console.error(`Error: Session data not found — cannot resume deployment ${originalDeployId}.`);
     console.error(`  Missing: ${sessionPathFile}`);
     process.exit(1);
   }
   const sessionJsonlPath = readFileSync(sessionPathFile, "utf-8").trim();
   if (!existsSync(sessionJsonlPath)) {
-    console.error(`Error: Session data not found — cannot resume deployment ${deployId}.`);
+    console.error(`Error: Session data not found — cannot resume deployment ${originalDeployId}.`);
     console.error(`  Session file missing: ${sessionJsonlPath}`);
     process.exit(1);
   }
@@ -139,7 +175,9 @@ function resumeDeployment(
   }
 
   // Step 6: Reconstruct env vars
-  const activityLog = resolve(deployDir, "activity.jsonl");
+  // activityLog goes to the NEW deployment directory
+  const newDeployDir = resolve(deploymentsDir, deployId);
+  const activityLog = resolve(newDeployDir, "activity.jsonl");
   const provider = status.provider ?? "anthropic";
 
   // Minimax env vars
@@ -183,26 +221,14 @@ function resumeDeployment(
     ...process.env,
     ...minimaxEnv,
     PA_DEPLOYMENT_ID: deployId,
-    PA_DEPLOYMENT_DIR: deployDir,
+    PA_DEPLOYMENT_DIR: newDeployDir,
     PA_ACTIVITY_LOG: activityLog,
     CLAUDECODE: undefined, // Strip nested-session detection
     ...(status.ticket_id ? { PA_TICKET_ID: status.ticket_id } : {}),
   };
 
-  // Step 7: Update registry status back to "running"
-  const db = getDb();
-  db.prepare(`
-    UPDATE deployments
-    SET status = 'running',
-        started_at = @started_at,
-        completed_at = NULL,
-        error = NULL,
-        exit_code = NULL
-    WHERE deployment_id = @deployment_id
-  `).run({
-    deployment_id: deployId,
-    started_at: localISOTimestamp(),
-  });
+  // Step 7: Write "started" event for the new resumed deployment (no UPDATE to original)
+  // BUG-1 fix: original deployment stays terminal, new deployment gets fresh ID + lineage
   appendRegistryEvent({
     deployment_id: deployId,
     team: status.team,
@@ -214,6 +240,7 @@ function resumeDeployment(
     ticket_id: status.ticket_id,
     provider: status.provider,
     repo: status.repo,
+    resumed_from_deployment_id: originalDeployId,
   });
 
   mkdirSync(logsDir, { recursive: true });
@@ -234,9 +261,9 @@ function resumeDeployment(
   };
 
   // Step 9: Build resume prompt
-  const primerFile = resolve(deployDir, "primer.md");
+  const primerFile = resolve(originalDeployDir, "primer.md");
   if (!existsSync(primerFile)) {
-    console.error(`Error: Primer not found for deployment ${deployId}: ${primerFile}`);
+    console.error(`Error: Primer not found for deployment ${originalDeployId}: ${primerFile}`);
     process.exit(1);
   }
   const claudePrompt = `Read the deployment primer at '${primerFile}' using the Read tool and follow ALL instructions in it exactly. Start immediately. When finished, write the completion marker and exit.`;
@@ -248,53 +275,19 @@ function resumeDeployment(
     return;
   }
 
-  if (mode === "direct") {
-    console.log(`Resuming deployment (direct): ${status.team} [${deployId}]`);
-    appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
-    let exitCode = 0;
-    try {
-      execSync(`claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
-        stdio: "inherit",
-        env: deployEnv,
-      });
-    } catch (err) {
-      exitCode = (err as { status?: number }).status ?? 1;
-      appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
-    }
-    runExtraction();
-    writeFallbackIfNeeded(deployId, status.team);
-    if (exitCode !== 0) process.exit(exitCode);
-  } else if (mode === "interactive") {
-    console.log(`Resuming deployment (interactive): ${status.team} [${deployId}]`);
-    appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
-    let exitCode = 0;
-    try {
-      execSync(`claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
-        stdio: "inherit",
-        env: deployEnv,
-      });
-    } catch (err) {
-      exitCode = (err as { status?: number }).status ?? 1;
-      appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
-    }
-    runExtraction();
-    writeFallbackIfNeeded(deployId, status.team);
-    if (exitCode !== 0) process.exit(exitCode);
-  } else if (mode === "foreground") {
-    console.log(`Resuming deployment (foreground): ${status.team} [${deployId}]`);
-    appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "pid", timestamp: localISOTimestamp(), pid: process.pid });
-    let exitCode = 0;
-    try {
-      execSync(`claude --resume ${sessionUuid} ${modelFlag} --dangerously-skip-permissions ${JSON.stringify(claudePrompt)}`.trim(), {
-        stdio: "inherit",
-        env: deployEnv,
-      });
-    } catch (err) {
-      exitCode = (err as { status?: number }).status ?? 1;
-      appendRegistryEvent({ deployment_id: deployId, team: status.team, event: "crashed", timestamp: localISOTimestamp(), exit_code: exitCode });
-    }
-    runExtraction();
-    writeFallbackIfNeeded(deployId, status.team);
+  // DEDUP-1: Extract common exec+recovery logic into helper; CWD-1: restore repo_root for foreground modes
+  const foregroundCwd = status.repo ? resolveRepo(status.repo).path : process.cwd();
+  if (mode === "direct" || mode === "interactive" || mode === "foreground") {
+    const exitCode = executeResumedSession({
+      sessionId: sessionUuid,
+      deployId,
+      teamName: status.team,
+      modelFlag,
+      claudePrompt,
+      cwd: foregroundCwd,
+      deployEnv,
+      runExtraction,
+    });
     if (exitCode !== 0) process.exit(exitCode);
   } else {
     // Background mode
@@ -325,7 +318,7 @@ Mode:       resume
     }
 
     // Write sensitive env vars to a file (mode 0o600)
-    const envFile = resolve(deployDir, "deploy.env");
+    const envFile = resolve(originalDeployDir, "deploy.env");
     if (provider === "minimax") {
       const escapedKey = minimaxApiKey?.replace(/'/g, "'\\''") ?? "";
       const envContent = `export ANTHROPIC_BASE_URL='${minimaxBaseUrl}'
@@ -377,7 +370,7 @@ if [[ $exit_code -eq 0 ]]; then
 fi
 `.trimStart();
 
-    const bgScriptFile = resolve(deployDir, "bg-runner.sh");
+    const bgScriptFile = resolve(originalDeployDir, "bg-runner.sh");
     writeFileSync(bgScriptFile, bgScriptContent + "\n", { mode: 0o700 });
 
     const bgScriptEnv = {
@@ -509,6 +502,7 @@ export function deployCommand(
     if (opts.repo) console.warn("Warning: --resume ignores --repo (using original deploy repo)");
     if (opts.teamModel) console.warn("Warning: --resume ignores --team-model (model reconstructed from registry)");
     if (opts.agentModel) console.warn("Warning: --resume ignores --agent-model (model reconstructed from registry)");
+    if (opts.provider) console.warn("Warning: --resume ignores --provider (using original deploy provider)");
     resumeDeployment(opts.resume, {
       dryRun: opts.dryRun,
       background: opts.background,
