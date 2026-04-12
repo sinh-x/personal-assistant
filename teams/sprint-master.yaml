@@ -1,9 +1,10 @@
 name: sprint-master
-model: sonnet  # PM work requires judgment and cross-team reasoning
-description: "Agile project management team — ticket triage, sprint reviews, velocity tracking, and knowledge organization"
+model: sonnet  # PM/maintenance/analysis work requires judgment and cross-team reasoning
+description: "Agile project management, system maintenance, and self-improvement — ticket triage, sprint reviews, velocity tracking, knowledge organization, health checks, and improvement analysis"
 default_mode: triage
 
 deploy_modes:
+  # --- PM modes ---
   - id: housekeeping
     label: Housekeeping
     phone_visible: true
@@ -47,6 +48,124 @@ deploy_modes:
     mode_type: work
     provider: minimax
     agents: []  # solo, team-manager executes directly
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+
+  # --- Maintenance modes (absorbed from maintenance team) ---
+  - id: health-check
+    label: Health Check
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: repo-scan
+    label: Repo Scan
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    objective: skills/maintenance/repo-scan-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: repo-health
+    label: Repo Health
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    objective: skills/maintenance/repo-health-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: fix
+    label: Fix
+    phone_visible: true
+    mode_type: interactive
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: maintenance-background
+    label: Maintenance (Background)
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: maintenance-foreground
+    label: Maintenance (Foreground)
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: maintenance-interactive
+    label: Maintenance (Interactive)
+    phone_visible: false
+    mode_type: interactive
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+
+  # --- Self-improvement modes (absorbed from self-improvement team) ---
+  - id: self-improvement-weekly
+    label: Self-Improvement Weekly
+    phone_visible: true
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: self-improvement-daily
+    label: Self-Improvement Daily
+    phone_visible: false
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: self-improvement-interactive
+    label: Self-Improvement Interactive
+    phone_visible: false
+    mode_type: interactive
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: self-improvement-compare
+    label: Self-Improvement Compare
+    phone_visible: false
+    mode_type: work
+    provider: minimax
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+
+  # --- Anthropic variants: PM modes ---
   - id: housekeeping-anthropic
     label: Housekeeping (Anthropic)
     phone_visible: true
@@ -90,48 +209,193 @@ deploy_modes:
     mode_type: work
     provider: anthropic
     agents: []  # solo, team-manager executes directly
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+
+  # --- Anthropic variants: Maintenance modes ---
+  - id: health-check-anthropic
+    label: Health Check (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: repo-scan-anthropic
+    label: Repo Scan (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    objective: skills/maintenance/repo-scan-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: repo-health-anthropic
+    label: Repo Health (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    objective: skills/maintenance/repo-health-objective.md
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: fix-anthropic
+    label: Fix (Anthropic)
+    phone_visible: true
+    mode_type: interactive
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: maintenance-background-anthropic
+    label: Maintenance Background (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: maintenance-foreground-anthropic
+    label: Maintenance Foreground (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+  - id: maintenance-interactive-anthropic
+    label: Maintenance Interactive (Anthropic)
+    phone_visible: false
+    mode_type: interactive
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+
+  # --- Anthropic variants: Self-improvement modes ---
+  - id: self-improvement-weekly-anthropic
+    label: Self-Improvement Weekly (Anthropic)
+    phone_visible: true
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: self-improvement-daily-anthropic
+    label: Self-Improvement Daily (Anthropic)
+    phone_visible: false
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: self-improvement-interactive-anthropic
+    label: Self-Improvement Interactive (Anthropic)
+    phone_visible: false
+    mode_type: interactive
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
+  - id: self-improvement-compare-anthropic
+    label: Self-Improvement Compare (Anthropic)
+    phone_visible: false
+    mode_type: work
+    provider: anthropic
+    solo: true
+    skills:
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-cli
+        inject-as: shared-skill
 
 context:
   organization: sinh-x
   notes: >
-    Solo agent (team manager does the work directly). Sprint-master is the PM team
-    that owns ticket triage, sprint ceremonies, velocity tracking, knowledge organization,
-    and cross-team coordination. It is also the pilot team for the ticket system and
-    owns the migration from the file-based inbox system.
+    Sprint-master is the PM + operations team that owns ticket triage, sprint ceremonies,
+    velocity tracking, knowledge organization, system maintenance, and self-improvement analysis.
+    Absorbs maintenance and self-improvement teams.
 
 agents:
+  # PM agent
   - name: team-manager
     role: "Solo PM agent — triages tickets, runs sprint ceremonies, computes velocity metrics, organizes knowledge base"
     skill: skills/sprint-master/triage.md
 
+  # Maintenance agent (absorbed from maintenance team)
+  - name: mechanic
+    role: "Investigate issues, apply fixes, run health checks on the personal-assistant system"
+    skill: skills/maintenance.md
+
+  # Self-improvement agent (absorbed from self-improvement team)
+  - name: analyst
+    role: "Extract self-improvement items from session logs, deduplicate, classify, and produce reports"
+    skill: skills/self-improvement/extract-and-report.md
+
 objective: |
   You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
 
-  You are the sprint-master team manager. You own agile project management for the
-  personal-assistant system and all agent teams.
+  You are the sprint-master team manager. You own agile project management,
+  system maintenance, and self-improvement for the personal-assistant system
+  and all agent teams.
 
   ## Mode-Specific Objectives
 
   Your work depends on the current deploy mode:
 
+  ### PM Modes
   - **triage** — Scan unassigned or backlog tickets, set priority, assign to appropriate
     teams, validate effort estimates. Use `pa ticket list/update` CLI commands.
-
   - **sprint-review** — Analyze completed tickets for a sprint period, generate a sprint
     summary with metrics (throughput, cycle time, blocked time, carry-over rate).
-
   - **velocity** — Compute sprint metrics from the audit log. Report weekly throughput,
     estimation accuracy, and blocked time trends.
-
   - **knowledge-org** — Organize the knowledge base, curate artifacts across teams,
     maintain cross-team documentation.
 
-  See the skill files in `skills/sprint-master/` for detailed instructions per mode.
+  ### Maintenance Modes
+  - **health-check** — Run a full system health check. Follow skills/maintenance.md:
+    syntax-check scripts, verify systemd timers, check registry for stuck deployments,
+    verify folder structure, review self-improvement suggestions, apply safe fixes.
+  - **repo-scan** — Scan repositories for issues. Follow skills/maintenance/repo-scan-objective.md.
+  - **repo-health** — Repo health analysis. Follow skills/maintenance/repo-health-objective.md.
+  - **fix** — Interactive diagnostic and fix for a specific issue.
+  - **maintenance-background** — General maintenance in background mode. Focus on the
+    specific issue in additional instructions, or run a full health check.
+  - **maintenance-foreground** — General maintenance in foreground mode.
+  - **maintenance-interactive** — General interactive maintenance.
+
+  ### Self-Improvement Modes
+  - **self-improvement-weekly** — Friday rollup of improvement suggestions. Follow
+    skills/self-improvement/extract-and-report.md.
+  - **self-improvement-daily** — Daily extraction of new improvement items from session logs.
+  - **self-improvement-interactive** — Interactive review of improvement backlog with Sinh.
+  - **self-improvement-compare** — Provider comparison analysis.
+
+  See the skill files in `skills/sprint-master/`, `skills/maintenance/`, and
+  `skills/self-improvement/` for detailed instructions per mode.
 
   ## Workflow
 
   1. Identify the current mode from `<deployment-context>`
-  2. Follow the corresponding skill file: `skills/sprint-master/<mode>.md`
+  2. Follow the corresponding skill file
   3. Execute the mode's workflow
   4. Add completion comment on the working ticket (or create FYI ticket if no working ticket)
   5. Log session per global standards

@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import { teamsCommand, boardCommand } from "./commands/teams.js";
 import { deployCommand } from "./commands/deploy.js";
-import { dailyCommand } from "./commands/daily.js";
 import { statusCommand } from "./commands/status.js";
 import { scheduleCommand } from "./commands/schedule.js";
 import { timersCommand } from "./commands/timers.js";
@@ -101,25 +100,6 @@ program
   .option("--resume <deploy-id>", "Resume a deployment by deploy-id")
   .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean; provider?: string; timeout?: number; resume?: string }) => {
     deployCommand(team, opts);
-  });
-
-program
-  .command("daily")
-  .description("Daily lifecycle (plan|progress|end)")
-  .argument("<mode>", "Mode: plan | progress | end")
-  .argument("[date]", "Target date (YYYY-MM-DD)")
-  .option("--dry-run", "Generate primer and print it, no execution")
-  .option("--background", "Run in background (default for timers/automated)")
-  .option("--interactive", "Run in foreground, user approves each tool call")
-  .option("--review", "Interactive review mode: end=review+synthesize, plan=finalize draft")
-  .action((mode: string, date: string | undefined, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; review?: boolean }) => {
-    const args: string[] = [];
-    if (date) args.push(date);
-    if (opts.review) args.push("--review");
-    if (opts.dryRun) args.push("--dry-run");
-    else if (opts.background) args.push("--background");
-    else if (opts.interactive) args.push("--interactive");
-    dailyCommand(mode, args);
   });
 
 program
