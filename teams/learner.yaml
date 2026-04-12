@@ -1,4 +1,5 @@
-name: knowledge-hub
+name: learner
+model: sonnet  # synthesis and analysis require judgment
 description: Learning, research & intel team — multi-source knowledge ingestion, curation, interactive learning, and Johari blind-spot analysis
 default_mode: background
 
@@ -81,7 +82,7 @@ deploy_modes:
 
 context:
   organization: sinh-x
-  notes: "Unified learning hub: YouTube, RSS, podcasts, system logs, and Johari blind-spot tracking. Absorbs youtube-processor team."
+  notes: "Unified learning hub: YouTube, RSS, podcasts, system logs, and Johari blind-spot tracking. Absorbs youtube-processor team. Renamed from knowledge-hub."
 
 variables:
   project_root: /home/sinh/git-repos/sinh-x/tools/personal-assistant
@@ -165,7 +166,7 @@ agents:
     skill: skills/knowledge-hub/analyze.md
 
 objective: |
-  ## Autonomous daily mode (cron / pa deploy knowledge-hub)
+  ## Autonomous daily mode (cron / pa deploy learner)
 
   Run phases in order. Each agent produces a report to its deployment workspace.
 
@@ -182,20 +183,20 @@ objective: |
      - Output: curation report with new connections found
 
   3. analyst:
-     - Read johari-tracker.md (~/Documents/ai-usage/agent-teams/knowledge-hub/johari-tracker.md)
+     - Read johari-tracker.md (~/Documents/ai-usage/agent-teams/learner/johari-tracker.md)
      - Read gatherer and curator reports
      - Determine cadence (daily micro / weekly / monthly / etc.) from tracker timestamps
      - Update johari-tracker.md with today's engagement data
      - Output: cadence-appropriate Johari analysis
 
   4. Synthesize into intel digest → save to team artifacts + notify via FYI ticket
-     - File: ~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/YYYY-MM-DD-daily-digest.md
+     - File: ~/Documents/ai-usage/agent-teams/learner/artifacts/YYYY-MM-DD-daily-digest.md
      - Contains: N items processed, system flags, daily Johari micro-note
-     - Notify: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: Knowledge-hub digest YYYY-MM-DD" --summary "<N items processed, key topics, any flags>"`
+     - Notify: `pa ticket create --type fyi --assignee sinh --priority low --estimate XS --title "FYI: Learner digest YYYY-MM-DD" --summary "<N items processed, key topics, any flags>"`
 
   Empty queue / no new content: exit cleanly with "Nothing new to process" and minimal digest confirming the run.
 
-  ## Interactive mode (pa deploy knowledge-hub --interactive)
+  ## Interactive mode (pa deploy learner --interactive)
 
   Determine user intent from context:
   - "quiz me on <topic>": facilitator reads knowledge base → generates ≥5 questions → interactive quiz
@@ -203,7 +204,7 @@ objective: |
   - "Q&A" / "what do you know about X": facilitator answers from ingested content
   - "join my learning session": facilitator loads relevant notes → assists live
 
-  ## Spike mode (pa deploy knowledge-hub --mode spike)
+  ## Spike mode (pa deploy learner --mode spike)
 
   Focused, time-boxed exploration of a single topic provided by Sinh.
 
@@ -217,6 +218,6 @@ objective: |
 
   - YouTube queue file path must remain ~/Documents/ai-usage/queue/youtube-video-queue.txt (backward compatible)
   - Knowledge base: ~/Documents/ai-usage/knowledge-base/learning/ and knowledge-base/intel/
-  - Johari tracker: ~/Documents/ai-usage/agent-teams/knowledge-hub/johari-tracker.md
-  - Intel digest: ~/Documents/ai-usage/agent-teams/knowledge-hub/artifacts/ + FYI ticket per global standards §4
+  - Johari tracker: ~/Documents/ai-usage/agent-teams/learner/johari-tracker.md
+  - Intel digest: ~/Documents/ai-usage/agent-teams/learner/artifacts/ + FYI ticket per global standards §4
   - Session logs per global standards §4 (all agents log before shutting down)
