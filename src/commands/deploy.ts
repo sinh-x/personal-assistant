@@ -6,7 +6,6 @@ import { loadConfig } from "../lib/config.js";
 import { getHomeDir, getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
 import { appendRegistryEvent, getDeploymentEvents, queryDeploymentStatus } from "../lib/registry.js";
-import { getDb } from "../lib/registry-db.js";
 import { generatePrimer, resolveGhRepo } from "../lib/primer.js";
 import { resolveRepo, listRepos } from "../lib/repos.js";
 import { isTeamBlocked } from "../lib/bulletins/index.js";
@@ -124,8 +123,6 @@ function resumeDeployment(
   const dataDir = getDataDir();
   const logsDir = resolve(dataDir, "logs");
   const deploymentsDir = resolve(homedir(), "Documents/ai-usage/deployments");
-  const registryDb = getRegistryDbPath();
-
   // Generate fresh deployment ID for the resumed deployment (ARCH-1)
   const deployId = generateDeployId();
 
@@ -297,7 +294,7 @@ function resumeDeployment(
     console.log("  Status: pa status");
 
     // Resolve timeout
-    let maxRuntime = opts.timeout ?? DEFAULT_TIMEOUT;
+    const maxRuntime = opts.timeout ?? DEFAULT_TIMEOUT;
 
     // Write log header
     const logHeader = `=== Resume Log ===
