@@ -1,7 +1,7 @@
-name: sprint-master
+name: maintenance
 model: sonnet
-description: "Agile project management — ticket triage, sprint reviews, and velocity tracking"
-default_mode: triage
+description: "System maintenance — health checks, repo scanning, repo health analysis, and issue remediation"
+default_mode: housekeeping
 
 deploy_modes:
   - id: housekeeping
@@ -25,12 +25,12 @@ deploy_modes:
       - name: pa-registry
         inject-as: shared-skill
 
-  - id: triage
-    label: Triage
+  - id: health-check
+    label: Health Check
     phone_visible: true
     mode_type: work
     provider: minimax
-    agents: []  # solo, team-manager executes directly
+    solo: true
     skills:
       - name: pa-cli
         inject-as: shared-skill
@@ -45,12 +45,13 @@ deploy_modes:
       - name: pa-registry
         inject-as: shared-skill
 
-  - id: sprint-review
-    label: Sprint Review
+  - id: repo-scan
+    label: Repo Scan
     phone_visible: true
     mode_type: work
     provider: minimax
-    agents: []  # solo, team-manager executes directly
+    solo: true
+    objective: skills/maintenance/repo-scan-objective.md
     skills:
       - name: pa-cli
         inject-as: shared-skill
@@ -65,12 +66,33 @@ deploy_modes:
       - name: pa-registry
         inject-as: shared-skill
 
-  - id: velocity
-    label: Velocity
+  - id: repo-health
+    label: Repo Health
     phone_visible: true
     mode_type: work
     provider: minimax
-    agents: []  # solo, team-manager executes directly
+    solo: true
+    objective: skills/maintenance/repo-health-objective.md
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+      - name: pa-registry
+        inject-as: shared-skill
+
+  - id: fix
+    label: Fix
+    phone_visible: false
+    mode_type: interactive
+    provider: minimax
+    solo: true
     skills:
       - name: pa-cli
         inject-as: shared-skill
@@ -88,30 +110,35 @@ deploy_modes:
 context:
   organization: sinh-x
   notes: >
-    Sprint-master is the PM team — owns ticket triage, sprint ceremonies, and velocity tracking.
-    Maintenance and self-improvement domains moved to separate teams (maintenance, insights).
+    Maintenance team for system health, repo scanning, and issue remediation.
+    Absorbed from sprint-master's maintenance domain.
+    Workspace: agent-teams/maintenance/
 
 agents:
   - name: team-manager
-    role: "Solo PM agent — triages tickets, runs sprint ceremonies, computes velocity metrics"
-    skill: skills/sprint-master/triage.md
+    role: "Solo maintenance operator — runs health checks, repo scans, and applies fixes"
+    skill: skills/maintenance.md
+
+  - name: mechanic
+    role: "Investigate issues, apply fixes, run health checks on the personal-assistant system"
+    skill: skills/maintenance.md
 
 objective: |
   You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
 
-  You are the sprint-master team manager. You own agile project management
-  for the personal-assistant system.
+  You are the maintenance team manager. You own system health, repo scanning,
+  and issue remediation for the personal-assistant system.
 
   ## Mode-Specific Objectives
 
-  - **triage** — Scan unassigned or backlog tickets, set priority, assign to appropriate
-    teams, validate effort estimates. Use `pa ticket list/update` CLI commands.
-  - **sprint-review** — Analyze completed tickets for a sprint period, generate a sprint
-    summary with metrics (throughput, cycle time, blocked time, carry-over rate).
-  - **velocity** — Compute sprint metrics from the audit log. Report weekly throughput,
-    estimation accuracy, and blocked time trends.
+  - **health-check** — Run a full system health check. Follow skills/maintenance.md:
+    syntax-check scripts, verify systemd timers, check registry for stuck deployments,
+    verify folder structure, review self-improvement suggestions, apply safe fixes.
+  - **repo-scan** — Scan repositories for issues. Follow skills/maintenance/repo-scan-objective.md.
+  - **repo-health** — Repo health analysis. Follow skills/maintenance/repo-health-objective.md.
+  - **fix** — Interactive diagnostic and fix for a specific issue.
 
-  See the skill files in `skills/sprint-master/` for detailed instructions per mode.
+  See the skill files in `skills/maintenance/` for detailed instructions per mode.
 
   ## Workflow
 
