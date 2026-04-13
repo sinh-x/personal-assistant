@@ -2,6 +2,7 @@ name: maintenance
 model: sonnet
 description: "System maintenance — health checks, repo scanning, repo health analysis, and issue remediation"
 default_mode: housekeeping
+terse_mode: true
 
 deploy_modes:
   - id: housekeeping

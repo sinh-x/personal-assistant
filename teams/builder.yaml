@@ -1,6 +1,7 @@
 name: builder
 description: "Execute multi-phase implementation projects for the personal-assistant system"
 default_mode: implement
+terse_mode: true
 
 deploy_modes:
   - id: housekeeping

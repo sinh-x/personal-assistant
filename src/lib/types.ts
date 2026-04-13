@@ -80,6 +80,11 @@ export interface TeamConfig {
    * workflow/policy docs across all their work modes.
    */
   global_docs?: string[];
+  /**
+   * Enable terse mode for this team. When true, the terse-mode SKILL.md is
+   * injected into primers for all agents in this team.
+   */
+  terse_mode?: boolean;
 }
 
 /** Agent definition within a team */
