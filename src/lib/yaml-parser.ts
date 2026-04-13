@@ -87,5 +87,6 @@ export function parseTeamYaml(filePath: string): TeamConfig {
     ...(hierarchy ? { hierarchy } : {}),
     ...(raw["timeout"] ? { timeout: raw["timeout"] as number } : {}),
     ...(raw["global_docs"] ? { global_docs: raw["global_docs"] as string[] } : {}),
+    ...(raw["terse_mode"] !== undefined ? { terse_mode: raw["terse_mode"] as boolean } : {}),
   };
 }

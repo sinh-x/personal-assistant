@@ -812,6 +812,18 @@ When spawning unplanned sub-agents, use this policy:
     primer += "\n</global-skill>\n\n";
   }
 
+  // Inject terse-mode skill if team has terse_mode: true
+  if (teamConfig.terse_mode === true) {
+    const terseSkillPath = resolve(homedir(), ".claude/skills", "terse-mode", "SKILL.md");
+    if (existsSync(terseSkillPath)) {
+      const terseContent = readFileSync(terseSkillPath, "utf-8");
+      primer += `<global-skill name="terse-mode">\n`;
+      primer += terseContent;
+      if (!terseContent.endsWith("\n")) primer += "\n";
+      primer += "\n</global-skill>\n\n";
+    }
+  }
+
   // Inject Codebase Context section if graph exists for the repo
   const codeContextSection = injectCodeContext(repoRoot);
   if (codeContextSection) {
