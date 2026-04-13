@@ -21,6 +21,7 @@
             util-linux    # flock
             systemd
             git
+            sqlcipher     # Signal Desktop DB access (read-only)
           ]);
         in
         pkgs.stdenv.mkDerivation (finalAttrs: {
@@ -168,6 +169,8 @@
               # TypeScript
               nodejs_22
               pnpm
+              # Signal Desktop DB access
+              sqlcipher
               # Dev wrappers
               dev-pa
               dev-pa-serve
