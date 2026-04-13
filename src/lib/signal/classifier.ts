@@ -341,8 +341,7 @@ export function getTicketInputs(
   const mapping = CLASSIFICATION_MAP[note.classification.type];
 
   // Build summary from note content
-  const bodyContent = readFileSync(note.originalPath, "utf-8");
-  const bodyWithoutFrontmatter = bodyContent.replace(/^---[\s\S]*?---\n/, "");
+  const { frontmatter, body: bodyContent } = parseRawNote(note.originalPath);
 
   const summary = [
     `## Signal Note Classification`,
@@ -350,13 +349,29 @@ export function getTicketInputs(
     `Confidence: ${(note.classification.confidence * 100).toFixed(0)}%`,
     ``,
     `## Original`,
-    bodyWithoutFrontmatter.slice(0, 500),
-  ].join("\n");
+    bodyContent.slice(0, 500),
+  ];
+
+  // Include attachment references if any were copied
+  const attachmentsCopiedRaw = frontmatter["attachmentsCopied"];
+  if (attachmentsCopiedRaw) {
+    try {
+      const attachmentPaths = JSON.parse(attachmentsCopiedRaw) as string[];
+      if (attachmentPaths.length > 0) {
+        summary.push(``, `## Attachments`);
+        for (const p of attachmentPaths) {
+          summary.push(`- ${p}`);
+        }
+      }
+    } catch {
+      // ignore malformed JSON
+    }
+  }
 
   return {
     project: "pa",
     title: note.classification.title,
-    summary,
+    summary: summary.join("\n"),
     description: "",
     status: "idea",
     type: mapping.ticketType,

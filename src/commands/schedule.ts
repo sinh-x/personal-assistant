@@ -26,6 +26,61 @@ export function scheduleCommand(
     times = ["09:00"];
   }
 
+  // Special case: signal:collect — runs pa signal collect every 2 hours
+  if (spec === "signal:collect") {
+    const execCmd = `${paCmd} signal collect`;
+    const unitName = "pa-signal-collect";
+    const description = "personal-assistant signal collect (every 2 hours)";
+
+    const systemdDir = resolve(
+      process.env["XDG_CONFIG_HOME"] ?? resolve(homedir(), ".config"),
+      "systemd/user"
+    );
+    mkdirSync(systemdDir, { recursive: true });
+
+    let envLines = `Environment=HOME=${homedir()}`;
+    const paData = process.env["PA_DATA"] ?? "";
+    if (paData) envLines += `\nEnvironment=PA_DATA=${paData}`;
+    if (paBin) envLines += `\nEnvironment=PA_BIN=${paBin}`;
+
+    const serviceContent = `[Unit]
+Description=${description}
+
+[Service]
+Type=oneshot
+ExecStart=${execCmd}
+KillMode=process
+${envLines}
+`;
+    const timerContent = `[Unit]
+Description=${description}
+
+[Timer]
+OnCalendar=*:0/2:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+`;
+
+    writeFileSync(resolve(systemdDir, `${unitName}.service`), serviceContent);
+    writeFileSync(resolve(systemdDir, `${unitName}.timer`), timerContent);
+
+    execSync("systemctl --user daemon-reload", { stdio: "ignore" });
+    execSync(`systemctl --user enable --now "${unitName}.timer"`, {
+      stdio: "ignore",
+    });
+
+    console.log(`Scheduled: ${unitName} (every 2 hours)`);
+    console.log(`Timer: ${unitName}.timer`);
+    console.log("");
+    console.log("Manage with:");
+    console.log(`  systemctl --user status ${unitName}.timer`);
+    console.log(`  systemctl --user list-timers '${unitName}*'`);
+    console.log(`  pa remove-timer ${unitName.replace(/^pa-/, "")}`);
+    return;
+  }
+
   // Determine exec command and unit name
   let execCmd: string;
   let unitName: string;

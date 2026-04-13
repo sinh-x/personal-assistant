@@ -16,9 +16,9 @@
  */
 
 import { execSync } from "node:child_process";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { createHash } from "node:crypto";
 import type {
   SignalConversation,
@@ -292,13 +292,61 @@ export function buildNoteToSelfMessage(
 
 const SIGNAL_BASE_DIR = join(homedir(), "Documents/ai-usage/signal");
 const SIGNAL_RAW_DIR = join(SIGNAL_BASE_DIR, "raw");
+const SIGNAL_ATTACHMENTS_DIR = join(SIGNAL_BASE_DIR, "attachments");
 const STATE_FILE_PATH = join(SIGNAL_BASE_DIR, "state.json");
 
-/** Ensure the signal/ folder structure exists (signal/raw/). */
+/** Ensure the signal/ folder structure exists (signal/raw/, signal/attachments/). */
 export function ensureSignalFolderStructure(): void {
-  if (!existsSync(SIGNAL_RAW_DIR)) {
-    mkdirSync(SIGNAL_RAW_DIR, { recursive: true });
+  for (const dir of [SIGNAL_RAW_DIR, SIGNAL_ATTACHMENTS_DIR]) {
+    if (!existsSync(dir)) {
+      mkdirSync(dir, { recursive: true });
+    }
   }
+}
+
+/**
+ * Copy attachments from Signal's storage to ~/Documents/ai-usage/signal/attachments/.
+ * Returns array of destination absolute paths for successfully copied files.
+ * Logs a warning for any attachment that cannot be found or copied.
+ *
+ * Destination filename: YYYY-MM-DD-HH-MM-<originalBasename>
+ * Preserves the original file extension.
+ */
+export function copyAttachments(
+  note: NoteToSelfMessage,
+  attachmentsDir = DEFAULT_ATTACHMENTS_DIR
+): string[] {
+  if (note.attachments.length === 0) return [];
+
+  ensureSignalFolderStructure();
+  const destPaths: string[] = [];
+
+  for (const att of note.attachments) {
+    if (!att.path) continue;
+
+    const srcPath = join(attachmentsDir, att.path);
+    if (!existsSync(srcPath)) {
+      console.warn(`Warning: attachment source not found: ${srcPath}`);
+      continue;
+    }
+
+    // Derive destination filename: prefix with timestamp to ensure uniqueness
+    const originalName = att.fileName ?? basename(att.path);
+    const prefix = formatTimestampForFile(note.sentAt);
+    const destName = `${prefix}-${originalName}`;
+    const destPath = join(SIGNAL_ATTACHMENTS_DIR, destName);
+
+    try {
+      copyFileSync(srcPath, destPath);
+      destPaths.push(destPath);
+    } catch (err) {
+      console.warn(
+        `Warning: failed to copy attachment ${srcPath}: ${(err as Error).message}`
+      );
+    }
+  }
+
+  return destPaths;
 }
 
 /**
@@ -360,8 +408,10 @@ function generateMessageHash(id: string, timestampMs: number): string {
  * Save a NoteToSelfMessage as a raw note file.
  * Filename: YYYY-MM-DD-HH-MM-<hash>.md
  * Format: Markdown with frontmatter containing metadata.
+ *
+ * @param copiedAttachmentPaths - absolute paths of attachments already copied to signal/attachments/
  */
-export function saveRawNote(note: NoteToSelfMessage): string {
+export function saveRawNote(note: NoteToSelfMessage, copiedAttachmentPaths: string[] = []): string {
   ensureSignalFolderStructure();
 
   const timestampStr = formatTimestampForFile(note.sentAt);
@@ -383,6 +433,9 @@ export function saveRawNote(note: NoteToSelfMessage): string {
     `hasAttachments: ${note.attachments.length > 0}`,
     attachmentPaths.length > 0 ? `attachments:` : null,
     ...attachmentPaths.map((p) => `  - ${p}`),
+    copiedAttachmentPaths.length > 0
+      ? `attachmentsCopied: ${JSON.stringify(copiedAttachmentPaths)}`
+      : null,
     "---",
     "",
   ]
@@ -427,7 +480,8 @@ export function extractNotesSinceLastRun(
 
   for (const msg of messages) {
     const noteMsg = buildNoteToSelfMessage(msg, dbPath, key);
-    const filePath = saveRawNote(noteMsg);
+    const copiedPaths = copyAttachments(noteMsg);
+    const filePath = saveRawNote(noteMsg, copiedPaths);
     files.push(filePath);
     lastTimestamp = Math.max(lastTimestamp, msg.sent_at);
   }
