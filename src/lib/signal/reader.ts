@@ -16,15 +16,17 @@
  */
 
 import { execSync } from "node:child_process";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import type {
   SignalConversation,
   SignalAccountIdentity,
   NoteToSelfMessage,
   AttachmentMeta,
   SignalMessage,
+  SignalCollectorState,
 } from "./types.js";
 
 // Default paths
@@ -282,4 +284,161 @@ export function buildNoteToSelfMessage(
     body: msg.body,
     attachments,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2: State management and raw note file saving
+// ---------------------------------------------------------------------------
+
+const SIGNAL_BASE_DIR = join(homedir(), "Documents/ai-usage/signal");
+const SIGNAL_RAW_DIR = join(SIGNAL_BASE_DIR, "raw");
+const STATE_FILE_PATH = join(SIGNAL_BASE_DIR, "state.json");
+
+/** Ensure the signal/ folder structure exists (signal/raw/). */
+export function ensureSignalFolderStructure(): void {
+  if (!existsSync(SIGNAL_RAW_DIR)) {
+    mkdirSync(SIGNAL_RAW_DIR, { recursive: true });
+  }
+}
+
+/**
+ * Read the collector state from state.json.
+ * Returns a default state if the file doesn't exist yet.
+ */
+export function readCollectorState(): SignalCollectorState {
+  if (!existsSync(STATE_FILE_PATH)) {
+    return {
+      lastProcessedAt: 0,
+      lastRunAt: null,
+      totalProcessed: 0,
+    };
+  }
+  try {
+    const raw = readFileSync(STATE_FILE_PATH, "utf-8");
+    return JSON.parse(raw) as SignalCollectorState;
+  } catch {
+    return {
+      lastProcessedAt: 0,
+      lastRunAt: null,
+      totalProcessed: 0,
+    };
+  }
+}
+
+/**
+ * Write the collector state to state.json atomically.
+ */
+export function writeCollectorState(state: SignalCollectorState): void {
+  ensureSignalFolderStructure();
+  writeFileSync(STATE_FILE_PATH, JSON.stringify(state, null, 2), "utf-8");
+}
+
+/**
+ * Format a Unix timestamp (ms) as a date string for filenames.
+ * Format: YYYY-MM-DD-HH-MM (24-hour, no leading zeros on components)
+ */
+function formatTimestampForFile(timestampMs: number): string {
+  const d = new Date(timestampMs);
+  const yyyy = d.getFullYear();
+  const mm = d.getMonth() + 1; // 1-indexed
+  const dd = d.getDate();
+  const HH = d.getHours();
+  const MM = d.getMinutes();
+  return `${yyyy}-${mm}-${dd}-${HH}-${MM}`;
+}
+
+/**
+ * Generate a short hash from a message ID + timestamp for unique filenames.
+ * Uses SHA256 truncated to 8 hex chars.
+ */
+function generateMessageHash(id: string, timestampMs: number): string {
+  const input = `${id}:${timestampMs}`;
+  return createHash("sha256").update(input).digest("hex").slice(0, 8);
+}
+
+/**
+ * Save a NoteToSelfMessage as a raw note file.
+ * Filename: YYYY-MM-DD-HH-MM-<hash>.md
+ * Format: Markdown with frontmatter containing metadata.
+ */
+export function saveRawNote(note: NoteToSelfMessage): string {
+  ensureSignalFolderStructure();
+
+  const timestampStr = formatTimestampForFile(note.sentAt);
+  const hash = generateMessageHash(note.id, note.sentAt);
+  const filename = `${timestampStr}-${hash}.md`;
+  const filePath = join(SIGNAL_RAW_DIR, filename);
+
+  // Build frontmatter
+  const attachmentPaths = note.attachments
+    .map((a) => a.path)
+    .filter((p): p is string => p !== null);
+
+  const frontmatter = [
+    "---",
+    `id: ${note.id}`,
+    `conversationId: ${note.conversationId}`,
+    `sentAt: ${note.sentAt}`,
+    `sentAtISO: ${new Date(note.sentAt).toISOString()}`,
+    `hasAttachments: ${note.attachments.length > 0}`,
+    attachmentPaths.length > 0 ? `attachments:` : null,
+    ...attachmentPaths.map((p) => `  - ${p}`),
+    "---",
+    "",
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
+
+  const body = note.body ?? "";
+  const content = frontmatter + body + "\n";
+
+  writeFileSync(filePath, content, "utf-8");
+  return filePath;
+}
+
+/**
+ * Extract Note to Self messages since last run and save as raw notes.
+ * Returns the number of new messages processed and their file paths.
+ */
+export function extractNotesSinceLastRun(
+  conversationId: string,
+  dbPath = DEFAULT_DB_PATH,
+  key?: string
+): { count: number; files: string[]; lastTimestamp: number } {
+  const state = readCollectorState();
+  const sinceMs = state.lastProcessedAt;
+
+  const messages = fetchNotesSince(conversationId, sinceMs, dbPath, key);
+
+  ensureSignalFolderStructure();
+
+  if (messages.length === 0) {
+    // Still update lastRunAt even when no new messages
+    const newState: SignalCollectorState = {
+      ...state,
+      lastRunAt: new Date().toISOString(),
+    };
+    writeCollectorState(newState);
+    return { count: 0, files: [], lastTimestamp: sinceMs };
+  }
+
+  const files: string[] = [];
+  let lastTimestamp = sinceMs;
+
+  for (const msg of messages) {
+    const noteMsg = buildNoteToSelfMessage(msg, dbPath, key);
+    const filePath = saveRawNote(noteMsg);
+    files.push(filePath);
+    lastTimestamp = Math.max(lastTimestamp, msg.sent_at);
+  }
+
+  // Update state
+  const newState: SignalCollectorState = {
+    lastProcessedAt: lastTimestamp,
+    lastRunAt: new Date().toISOString(),
+    totalProcessed: state.totalProcessed + messages.length,
+  };
+  writeCollectorState(newState);
+
+  return { count: messages.length, files, lastTimestamp };
 }

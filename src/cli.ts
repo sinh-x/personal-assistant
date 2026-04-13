@@ -16,6 +16,7 @@ import { createBulletinCommand } from "./commands/bulletin.js";
 import { createRegistryCommand } from "./commands/registry.js";
 import { createTrashCommand } from "./commands/trash.js";
 import { createCodeCtxCommand } from "./commands/codectx.js";
+import { createSignalCommand } from "./commands/signal.js";
 
 declare const __PA_VERSION__: string;
 
@@ -190,6 +191,8 @@ program
   .action(async () => {
     await ideaCommand();
   });
+
+program.addCommand(createSignalCommand());
 
 program
   .command("report")
