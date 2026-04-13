@@ -1,7 +1,7 @@
-name: sprint-master
+name: insights
 model: sonnet
-description: "Agile project management — ticket triage, sprint reviews, and velocity tracking"
-default_mode: triage
+description: "Knowledge organization and self-improvement analysis — knowledge base curation, session log analysis, and improvement extraction"
+default_mode: housekeeping
 
 deploy_modes:
   - id: housekeeping
@@ -25,12 +25,12 @@ deploy_modes:
       - name: pa-registry
         inject-as: shared-skill
 
-  - id: triage
-    label: Triage
-    phone_visible: true
+  - id: knowledge-org
+    label: Knowledge Org
+    phone_visible: false
     mode_type: work
     provider: minimax
-    agents: []  # solo, team-manager executes directly
+    solo: true
     skills:
       - name: pa-cli
         inject-as: shared-skill
@@ -45,12 +45,12 @@ deploy_modes:
       - name: pa-registry
         inject-as: shared-skill
 
-  - id: sprint-review
-    label: Sprint Review
+  - id: self-improvement-weekly
+    label: Self-Improvement Weekly
     phone_visible: true
     mode_type: work
     provider: minimax
-    agents: []  # solo, team-manager executes directly
+    solo: true
     skills:
       - name: pa-cli
         inject-as: shared-skill
@@ -65,12 +65,32 @@ deploy_modes:
       - name: pa-registry
         inject-as: shared-skill
 
-  - id: velocity
-    label: Velocity
-    phone_visible: true
+  - id: self-improvement-daily
+    label: Self-Improvement Daily
+    phone_visible: false
     mode_type: work
     provider: minimax
-    agents: []  # solo, team-manager executes directly
+    solo: true
+    skills:
+      - name: pa-cli
+        inject-as: shared-skill
+      - name: pa-session-log
+        inject-as: shared-skill
+      - name: pa-ticket-workflow
+        inject-as: shared-skill
+      - name: pa-startup
+        inject-as: shared-skill
+      - name: pa-self-improvement
+        inject-as: shared-skill
+      - name: pa-registry
+        inject-as: shared-skill
+
+  - id: self-improvement-compare
+    label: Self-Improvement Compare
+    phone_visible: false
+    mode_type: work
+    provider: minimax
+    solo: true
     skills:
       - name: pa-cli
         inject-as: shared-skill
@@ -88,30 +108,35 @@ deploy_modes:
 context:
   organization: sinh-x
   notes: >
-    Sprint-master is the PM team — owns ticket triage, sprint ceremonies, and velocity tracking.
-    Maintenance and self-improvement domains moved to separate teams (maintenance, insights).
+    Insights team for knowledge organization and self-improvement analysis.
+    Absorbed from sprint-master's self-improvement domain.
+    Workspace: agent-teams/self-improvement/ (skills data path; team uses agent-teams/insights/ for team workspace)
 
 agents:
   - name: team-manager
-    role: "Solo PM agent — triages tickets, runs sprint ceremonies, computes velocity metrics"
-    skill: skills/sprint-master/triage.md
+    role: "Solo insights operator — organizes knowledge base, extracts and analyzes self-improvement items"
+    skill: skills/self-improvement/extract-and-report.md
+
+  - name: analyst
+    role: "Extract self-improvement items from session logs, deduplicate, classify, and produce reports"
+    skill: skills/self-improvement/extract-and-report.md
 
 objective: |
   You are a SOLO operator — do ALL work yourself, do NOT spawn sub-agents.
 
-  You are the sprint-master team manager. You own agile project management
-  for the personal-assistant system.
+  You are the insights team manager. You own knowledge organization and
+  self-improvement analysis for the personal-assistant system.
 
   ## Mode-Specific Objectives
 
-  - **triage** — Scan unassigned or backlog tickets, set priority, assign to appropriate
-    teams, validate effort estimates. Use `pa ticket list/update` CLI commands.
-  - **sprint-review** — Analyze completed tickets for a sprint period, generate a sprint
-    summary with metrics (throughput, cycle time, blocked time, carry-over rate).
-  - **velocity** — Compute sprint metrics from the audit log. Report weekly throughput,
-    estimation accuracy, and blocked time trends.
+  - **knowledge-org** — Organize the knowledge base, curate artifacts across teams,
+    maintain cross-team documentation.
+  - **self-improvement-weekly** — Friday rollup of improvement suggestions. Follow
+    skills/self-improvement/extract-and-report.md.
+  - **self-improvement-daily** — Daily extraction of new improvement items from session logs.
+  - **self-improvement-compare** — Provider comparison analysis.
 
-  See the skill files in `skills/sprint-master/` for detailed instructions per mode.
+  See the skill files in `skills/self-improvement/` for detailed instructions per mode.
 
   ## Workflow
 
