@@ -101,7 +101,7 @@ const TAG_DESTINATION: Record<PrefixTag, RouteDestination> = {
 function parseFrontmatter(content: string): { frontmatter: Record<string, string>; body: string } {
   const lines = content.split("\n");
   const fm: Record<string, string> = {};
-  let bodyLines: string[] = [];
+  const bodyLines: string[] = [];
   let inFm = false;
   let bodyStarted = false;
 

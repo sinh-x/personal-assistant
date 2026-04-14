@@ -71,7 +71,7 @@ function parseRawNote(filePath: string): { frontmatter: Record<string, string>; 
   const lines = content.split("\n");
 
   const frontmatter: Record<string, string> = {};
-  let bodyLines: string[] = [];
+  const bodyLines: string[] = [];
   let inFrontmatter = false;
   let bodyStarted = false;
 

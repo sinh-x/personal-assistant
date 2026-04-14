@@ -96,7 +96,7 @@ async function runCollect(
   }
 
   // Find Note to Self conversation
-  let conversation: SignalConversation | null = null;
+  let conversation: SignalConversation | null;
 
   if (conversationIdOverride) {
     conversation = {
