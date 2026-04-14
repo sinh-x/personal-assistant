@@ -5,8 +5,10 @@ import {
   writeFileSync,
   mkdirSync,
   copyFileSync,
+  cpSync,
   unlinkSync,
   rmSync,
+  statSync,
 } from "node:fs";
 import { resolve, basename, dirname } from "node:path";
 import { tmpdir } from "node:os";
@@ -147,13 +149,20 @@ export class TrashStore {
 
     const destPath = resolve(trashSubDir, fileName);
 
-    // Cross-filesystem safe: try rename, fallback to copy+unlink
+    const isDir = statSync(absPath).isDirectory();
+
+    // Cross-filesystem safe: try rename, fallback to copy+remove
     try {
       const { renameSync } = require("node:fs") as typeof import("node:fs");
       renameSync(absPath, destPath);
     } catch {
-      copyFileSync(absPath, destPath);
-      unlinkSync(absPath);
+      if (isDir) {
+        cpSync(absPath, destPath, { recursive: true });
+        rmSync(absPath, { recursive: true });
+      } else {
+        copyFileSync(absPath, destPath);
+        unlinkSync(absPath);
+      }
     }
 
     const entry: TrashEntry = {
@@ -243,13 +252,20 @@ export class TrashStore {
     const parentDir = dirname(entry.originalPath);
     mkdirSync(parentDir, { recursive: true });
 
-    // Move back: try rename, fallback to copy+unlink
+    const isDir = statSync(trashFilePath).isDirectory();
+
+    // Move back: try rename, fallback to copy+remove
     try {
       const { renameSync } = require("node:fs") as typeof import("node:fs");
       renameSync(trashFilePath, entry.originalPath);
     } catch {
-      copyFileSync(trashFilePath, entry.originalPath);
-      unlinkSync(trashFilePath);
+      if (isDir) {
+        cpSync(trashFilePath, entry.originalPath, { recursive: true });
+        rmSync(trashFilePath, { recursive: true });
+      } else {
+        copyFileSync(trashFilePath, entry.originalPath);
+        unlinkSync(trashFilePath);
+      }
     }
 
     // Update manifest
@@ -293,10 +309,10 @@ export class TrashStore {
     const now = new Date().toISOString();
 
     for (const entry of toPurge) {
-      // Delete the file from trash
+      // Delete the file/directory from trash
       const trashFilePath = resolve(this.filesDir, entry.trashPath);
       if (existsSync(trashFilePath)) {
-        unlinkSync(trashFilePath);
+        rmSync(trashFilePath, { recursive: true });
       }
 
       // Remove empty subdirectory
