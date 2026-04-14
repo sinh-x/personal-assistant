@@ -29,6 +29,7 @@ const LEARNING_REPO = join(
   "git-repos/sinh-x/tools/learning-management"
 );
 const JOURNALS_DIR = join(LEARNING_REPO, "journals");
+const PAGES_DIR = join(LEARNING_REPO, "pages");
 const SIGNAL_BASE = join(homedir(), "Documents/ai-usage/signal");
 const SENSITIVE_DIR = join(SIGNAL_BASE, "sensitive");
 const YOUTUBE_QUEUE = join(
@@ -142,6 +143,16 @@ export function cleanSignalEntries(): number {
     }
   }
 
+  // Clean signal pages
+  const signalPagesDir = join(PAGES_DIR, "signal");
+  if (existsSync(signalPagesDir)) {
+    const pages = readdirSync(signalPagesDir).filter((f) => f.endsWith(".md"));
+    for (const file of pages) {
+      unlinkSync(join(signalPagesDir, file));
+      cleaned++;
+    }
+  }
+
   return cleaned;
 }
 
@@ -251,18 +262,92 @@ function writeYoutubeQueue(result: RoutingResult, date: Date): WriteResult {
     appendFileSync(YOUTUBE_QUEUE, `${url}\n`, "utf-8");
   }
 
-  // Also log to Logseq journal
-  const block = `- #signal #youtube ${url}`;
-  const journalPath = appendToJournal(date, block);
-
-  return { destination: "youtube-queue", path: journalPath };
+  return writeMediaEntry(result, date, "youtube", url);
 }
 
 function writeSpikeQueue(result: RoutingResult, date: Date): WriteResult {
   const url = result.detectedUrl ?? result.content.trim();
-  const block = `- #signal #toread ${url}`;
-  const journalPath = appendToJournal(date, block);
-  return { destination: "spike-queue", path: journalPath };
+  return writeMediaEntry(result, date, "article", url);
+}
+
+/**
+ * Create a structured Logseq page + PA ticket for YouTube/article URLs.
+ * Page goes to pages/signal/<slug>.md with Logseq properties.
+ * Ticket goes to pending-approval for processing.
+ * Journal entry links to both.
+ */
+function writeMediaEntry(
+  _result: RoutingResult,
+  date: Date,
+  mediaType: "youtube" | "article",
+  url: string,
+): WriteResult {
+  const ds = dateStr(date);
+  const slug = urlToSlug(url);
+  const pageName = `signal/${ds}-${slug}`;
+  const pageDir = join(PAGES_DIR, "signal");
+  const pagePath = join(pageDir, `${ds}-${slug}.md`);
+
+  // Create PA ticket
+  const store = new TicketStore();
+  const tagLabel = mediaType === "youtube" ? "#youtube" : "#article";
+  const ticket = store.create(
+    {
+      project: "pa",
+      title: `${mediaType === "youtube" ? "Watch" : "Read"}: ${url.slice(0, 50)}`,
+      summary: `${mediaType === "youtube" ? "YouTube video" : "Article"} from Signal Note to Self.\n\nURL: ${url}\nLogseq page: [[${pageName}]]`,
+      description: "",
+      status: "pending-approval",
+      priority: "low",
+      type: "task",
+      assignee: "sinh",
+      estimate: "S" as "S",
+      tags: ["source:signal", `category:${mediaType}`],
+      blockedBy: [],
+      doc_refs: [],
+      comments: [],
+      from: "",
+      to: "",
+    },
+    "pa-signal-collector",
+  );
+
+  // Create Logseq page with properties
+  ensureDir(pageDir);
+  const pageContent = [
+    `type:: ${mediaType}`,
+    `url:: ${url}`,
+    `source:: signal`,
+    `status:: pending`,
+    `ticket:: ${ticket.id}`,
+    `date:: ${ds}`,
+    "",
+    `- ${tagLabel} ${url}`,
+    `- ticket: ${ticket.id}`,
+    "",
+  ].join("\n");
+
+  writeFileSync(pagePath, pageContent, "utf-8");
+
+  // Journal entry linking to page + ticket
+  const block = `- #signal ${tagLabel} [[${pageName}]] (${ticket.id})`;
+  appendToJournal(date, block);
+
+  return {
+    destination: `${mediaType}-page`,
+    path: pagePath,
+    ticketId: ticket.id,
+  };
+}
+
+/** Convert a URL to a filesystem-safe slug. */
+function urlToSlug(url: string): string {
+  return url
+    .replace(/^https?:\/\//, "")
+    .replace(/[^a-zA-Z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 60);
 }
 
 function writeBookmark(result: RoutingResult, date: Date): WriteResult {
