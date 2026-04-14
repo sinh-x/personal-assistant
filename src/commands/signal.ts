@@ -9,7 +9,7 @@
  */
 
 import { Command } from "commander";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import {
@@ -20,7 +20,7 @@ import {
   ensureSignalFolderStructure,
 } from "../lib/signal/reader.js";
 import { routeMessage } from "../lib/signal/router.js";
-import { writeRoutedMessage } from "../lib/signal/writers.js";
+import { writeRoutedMessage, cleanSignalEntries } from "../lib/signal/writers.js";
 import { markAsProcessed } from "../lib/signal/classifier.js";
 import type { SignalConversation } from "../lib/signal/types.js";
 
@@ -208,10 +208,17 @@ async function runReprocess(dryRun: boolean): Promise<void> {
   if (dryRun) {
     for (const file of files) {
       const result = routeMessage(file);
-      console.log(`  ${file} → ${result.destination}`);
+      const sentAt = extractSentAtFromFile(file);
+      const date = new Date(sentAt).toISOString().slice(0, 10);
+      console.log(`  [${date}] ${result.destination} ← ${file}`);
     }
     console.log("\n[DRY RUN] No files written.");
   } else {
+    // Clean existing #signal entries to avoid duplicates
+    console.log("Cleaning previous #signal entries from journals...");
+    const cleaned = cleanSignalEntries();
+    console.log(`Removed ${cleaned} previous entries.\n`);
+
     routeFiles(files);
   }
 }
@@ -251,13 +258,8 @@ function routeFiles(files: string[]): void {
  * Falls back to file modification time if frontmatter parse fails.
  */
 function extractSentAtFromFile(filePath: string): number {
-  try {
-    const { readFileSync } = require("node:fs");
-    const content = readFileSync(filePath, "utf-8");
-    const match = content.match(/^sentAt:\s*(\d+)/m);
-    if (match) return parseInt(match[1], 10);
-  } catch {
-    // fallback
-  }
+  const content = readFileSync(filePath, "utf-8");
+  const match = content.match(/^sentAt:\s*(\d+)/m);
+  if (match) return parseInt(match[1], 10);
   return Date.now();
 }

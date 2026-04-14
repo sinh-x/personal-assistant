@@ -7,10 +7,13 @@
 
 import {
   writeFileSync,
+  readFileSync,
+  readdirSync,
   appendFileSync,
   existsSync,
   mkdirSync,
   chmodSync,
+  unlinkSync,
 } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
@@ -78,6 +81,68 @@ function appendToJournal(date: Date, block: string): string {
 
   appendFileSync(filePath, block + "\n", "utf-8");
   return filePath;
+}
+
+// ---------------------------------------------------------------------------
+// Cleanup (for reprocessing)
+// ---------------------------------------------------------------------------
+
+/**
+ * Remove all #signal entries from Logseq journal files.
+ * Used before reprocessing to avoid duplicates.
+ * Also clears the sensitive log file.
+ */
+export function cleanSignalEntries(): number {
+  let cleaned = 0;
+
+  // Clean journal files
+  if (existsSync(JOURNALS_DIR)) {
+    const files = readdirSync(JOURNALS_DIR).filter((f) => f.endsWith(".md"));
+    for (const file of files) {
+      const filePath = join(JOURNALS_DIR, file);
+      const content = readFileSync(filePath, "utf-8");
+      const lines = content.split("\n");
+
+      const filtered: string[] = [];
+      let skipIndented = false;
+
+      for (const line of lines) {
+        // Check if this is a #signal top-level block
+        if (line.startsWith("- #signal ")) {
+          skipIndented = true;
+          cleaned++;
+          continue;
+        }
+        // Skip indented children of a #signal block
+        if (skipIndented && line.startsWith("  - ")) {
+          continue;
+        }
+        skipIndented = false;
+        filtered.push(line);
+      }
+
+      // Write back if anything changed
+      if (filtered.length < lines.length) {
+        const result = filtered.join("\n");
+        // If only empty first block remains, remove the file
+        if (result.trim() === "-" || result.trim() === "") {
+          unlinkSync(filePath);
+        } else {
+          writeFileSync(filePath, result, "utf-8");
+        }
+      }
+    }
+  }
+
+  // Clean sensitive log files
+  if (existsSync(SENSITIVE_DIR)) {
+    const files = readdirSync(SENSITIVE_DIR).filter((f) => f.endsWith(".log"));
+    for (const file of files) {
+      unlinkSync(join(SENSITIVE_DIR, file));
+    }
+  }
+
+  return cleaned;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,10 +293,8 @@ function writeDailyLog(result: RoutingResult, date: Date): WriteResult {
 }
 
 function writeAttachmentLog(result: RoutingResult, date: Date): WriteResult {
-  const attachList = result.attachmentPaths
-    .map((p) => `\n  - ${p}`)
-    .join("");
-  const block = `- #signal #attachment (attachment-only)${attachList}`;
+  const count = result.attachmentPaths.length;
+  const block = `- #signal #attachment ${count} file(s) — encrypted Signal attachment(s), review in Signal Desktop`;
   const journalPath = appendToJournal(date, block);
   return { destination: "attachment-only", path: journalPath };
 }
