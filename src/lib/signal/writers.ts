@@ -288,12 +288,12 @@ function writeMediaEntry(
   const pageDir = join(PAGES_DIR, "signal");
   const pagePath = join(pageDir, `${ds}-${slug}.md`);
 
-  // Create PA ticket
+  // Create LM ticket
   const store = new TicketStore();
   const tagLabel = mediaType === "youtube" ? "#youtube" : "#article";
   const ticket = store.create(
     {
-      project: "pa",
+      project: "lm",
       title: `${mediaType === "youtube" ? "Watch" : "Read"}: ${url.slice(0, 50)}`,
       summary: `${mediaType === "youtube" ? "YouTube video" : "Article"} from Signal Note to Self.\n\nURL: ${url}\nLogseq page: [[${pageName}]]`,
       description: "",
