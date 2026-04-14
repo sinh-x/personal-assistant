@@ -80,3 +80,40 @@ export interface SignalCollectorState {
   /** Total messages processed across all runs. */
   totalProcessed: number;
 }
+
+// ---------------------------------------------------------------------------
+// Routing types (classification rework — rule-based, no AI)
+// ---------------------------------------------------------------------------
+
+/** Prefix tags that Sinh can use on Signal messages. */
+export type PrefixTag = "idea" | "task" | "learn" | "yt" | "buy" | "link" | "secret";
+
+/** Destination for a routed message. */
+export type RouteDestination =
+  | "ticket-idea"
+  | "ticket-task"
+  | "ticket-buy"
+  | "youtube-queue"
+  | "spike-queue"
+  | "bookmark"
+  | "sensitive"
+  | "daily-log"
+  | "attachment-only";
+
+/** Result of routing a single raw note. */
+export interface RoutingResult {
+  /** Where the message should go. */
+  destination: RouteDestination;
+  /** The content after tag stripping (or original body). */
+  content: string;
+  /** Detected prefix tag, if any. */
+  tag: PrefixTag | null;
+  /** Detected URL, if any. */
+  detectedUrl: string | null;
+  /** Whether sensitive content was auto-detected. */
+  sensitiveDetected: boolean;
+  /** Has attachments but no text body. */
+  attachmentOnly: boolean;
+  /** Copied attachment paths (from frontmatter). */
+  attachmentPaths: string[];
+}

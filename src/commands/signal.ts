@@ -2,12 +2,16 @@
  * pa signal collect - Signal Note to Self message collector.
  *
  * Extracts new messages from Signal Desktop's "Note to Self" conversation,
- * classifies them using MiniMax AI, and creates PA tickets.
+ * routes them via rule-based tag/URL/sensitive detection, and saves to
+ * appropriate destinations (Logseq journal, PA tickets, sensitive file, queues).
  *
- * Supports --dry-run to preview without creating tickets.
+ * Supports --dry-run to preview without writing, --reprocess to re-route existing raw notes.
  */
 
 import { Command } from "commander";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import {
   getOwnIdentity,
   findNoteToSelfConversation,
@@ -15,12 +19,12 @@ import {
   readCollectorState,
   ensureSignalFolderStructure,
 } from "../lib/signal/reader.js";
-import {
-  classifyRawNotes,
-  markAsProcessed,
-  getTicketInputs,
-} from "../lib/signal/classifier.js";
-import { TicketStore } from "../lib/tickets/store.js";
+import { routeMessage } from "../lib/signal/router.js";
+import { writeRoutedMessage } from "../lib/signal/writers.js";
+import { markAsProcessed } from "../lib/signal/classifier.js";
+import type { SignalConversation } from "../lib/signal/types.js";
+
+const SIGNAL_RAW_DIR = join(homedir(), "Documents/ai-usage/signal/raw");
 
 export function createSignalCommand(): Command {
   const cmd = new Command("signal");
@@ -28,69 +32,111 @@ export function createSignalCommand(): Command {
 
   const collect = new Command("collect");
   collect
-    .description("Extract, classify, and create tickets from Note to Self messages")
+    .description("Extract and route Note to Self messages (rule-based, no AI)")
     .option(
       "--dry-run",
-      "Show what would be extracted and classified without creating tickets",
-      false
+      "Show what would be extracted and routed without writing anything",
+      false,
     )
     .option(
-      "--skip-classify",
-      "Extract raw notes but skip AI classification (for testing extraction)",
-      false
+      "--skip-route",
+      "Extract raw notes but skip routing (for testing extraction only)",
+      false,
     )
-    .action(async (opts: { dryRun: boolean; skipClassify: boolean }) => {
-      await runCollect(opts.dryRun, opts.skipClassify);
-    });
+    .option(
+      "--reprocess",
+      "Re-route all existing raw/ messages through the new router",
+      false,
+    )
+    .option(
+      "--conversation-id <id>",
+      "Override Note to Self conversation ID (debug/override)",
+    )
+    .action(
+      async (opts: {
+        dryRun: boolean;
+        skipRoute: boolean;
+        reprocess: boolean;
+        conversationId?: string;
+      }) => {
+        if (opts.reprocess) {
+          await runReprocess(opts.dryRun);
+        } else {
+          await runCollect(opts.dryRun, opts.skipRoute, opts.conversationId);
+        }
+      },
+    );
 
   cmd.addCommand(collect);
   return cmd;
 }
 
-async function runCollect(dryRun: boolean, skipClassify: boolean): Promise<void> {
+async function runCollect(
+  dryRun: boolean,
+  skipRoute: boolean,
+  conversationIdOverride?: string,
+): Promise<void> {
   console.log("=== Signal Note to Self Collector ===\n");
 
   if (dryRun) {
-    console.log("[DRY RUN] No files will be created, no tickets created, state not updated.\n");
+    console.log(
+      "[DRY RUN] No files will be created, no tickets created, state not updated.\n",
+    );
   }
 
-  // Read current state
   const state = readCollectorState();
-  console.log(`Last processed: ${state.lastProcessedAt > 0 ? new Date(state.lastProcessedAt).toISOString() : "never"}`);
+  console.log(
+    `Last processed: ${state.lastProcessedAt > 0 ? new Date(state.lastProcessedAt).toISOString() : "never"}`,
+  );
   console.log(`Total processed: ${state.totalProcessed}`);
   console.log("");
 
-  // Ensure folder structure exists
   if (!dryRun) {
     ensureSignalFolderStructure();
   }
 
-  // Read Signal identity
-  let identity;
-  try {
-    identity = getOwnIdentity();
-    console.log(`Own identity: ${identity.e164} (${identity.uuid})`);
-  } catch (err) {
-    console.error("Error: Could not read Signal identity from DB.");
-    console.error("Is Signal Desktop installed and synced?");
-    console.error("");
-    console.error((err as Error).message);
-    process.exit(1);
-  }
-
   // Find Note to Self conversation
-  const conversation = findNoteToSelfConversation(identity);
-  if (!conversation) {
-    console.error("Error: Could not find Note to Self conversation.");
-    console.error("Make sure you have sent at least one Note to Self message.");
-    process.exit(1);
+  let conversation: SignalConversation | null = null;
+
+  if (conversationIdOverride) {
+    conversation = {
+      id: conversationIdOverride,
+      type: "private",
+      name: null,
+      profileName: null,
+      profileFullName: null,
+      e164: null,
+      serviceId: null,
+      active_at: null,
+    };
+    console.log(`Note to Self conversation: ${conversation.id} (override)`);
+  } else {
+    let identity;
+    try {
+      identity = getOwnIdentity();
+      console.log(`Own identity: ${identity.e164} (${identity.uuid})`);
+    } catch (err) {
+      console.error("Error: Could not read Signal identity from DB.");
+      console.error("Is Signal Desktop installed and synced?");
+      console.error("");
+      console.error((err as Error).message);
+      process.exit(1);
+    }
+
+    conversation = findNoteToSelfConversation(identity);
+    if (!conversation) {
+      console.error("Error: Could not find Note to Self conversation.");
+      console.error(
+        "Make sure you have sent at least one Note to Self message.",
+      );
+      process.exit(1);
+    }
+    console.log(`Note to Self conversation: ${conversation.id}`);
   }
-  console.log(`Note to Self conversation: ${conversation.id}`);
   console.log("");
 
-  // Extract messages
   if (dryRun) {
-    // Dry-run: preview what would be extracted
+    // Preview extraction + routing
     const { fetchNotesSince } = await import("../lib/signal/reader.js");
     const messages = fetchNotesSince(conversation.id, state.lastProcessedAt);
     if (messages.length === 0) {
@@ -99,20 +145,17 @@ async function runCollect(dryRun: boolean, skipClassify: boolean): Promise<void>
       console.log(`Would extract ${messages.length} new message(s):\n`);
       for (const msg of messages) {
         const preview = msg.body
-          ? msg.body.slice(0, 80).replace(/\n/g, " ") + (msg.body.length > 80 ? "..." : "")
+          ? msg.body.slice(0, 80).replace(/\n/g, " ") +
+            (msg.body.length > 80 ? "..." : "")
           : "(no text body)";
         console.log(`  [${new Date(msg.sent_at).toISOString()}] ${preview}`);
         if (msg.hasAttachments > 0) {
           console.log(`    + ${msg.hasAttachments} attachment(s)`);
         }
       }
-      console.log("");
-      console.log("Classification preview (using MiniMax AI):");
-      console.log("  Each note would be classified as: idea | task | learning | data");
-      console.log("  Then a PA ticket would be created with the classified type.");
     }
   } else {
-    // Actual extraction
+    // Extract
     let extractedFiles: string[] = [];
     try {
       const result = extractNotesSinceLastRun(conversation.id);
@@ -126,7 +169,6 @@ async function runCollect(dryRun: boolean, skipClassify: boolean): Promise<void>
         extractedFiles = result.files;
       }
 
-      // Show updated state
       const newState = readCollectorState();
       console.log("");
       console.log(`Updated state: lastProcessedAt=${newState.lastProcessedAt}`);
@@ -137,51 +179,85 @@ async function runCollect(dryRun: boolean, skipClassify: boolean): Promise<void>
       process.exit(1);
     }
 
-    // Phase 3: Classification
-    if (!skipClassify && extractedFiles.length > 0) {
-      console.log("\n=== Classification ===\n");
-      try {
-        const classified = await classifyRawNotes();
-        console.log(`\nClassified ${classified.length} note(s).\n`);
-
-        // Create tickets
-        console.log("=== Ticket Creation ===\n");
-        const store = new TicketStore();
-
-        for (const note of classified) {
-          const inputs = getTicketInputs(note);
-          const ticket = store.create(
-            {
-              project: inputs.project,
-              title: inputs.title,
-              summary: inputs.summary,
-              description: inputs.description,
-              status: inputs.status as "idea",
-              priority: inputs.priority as "low" | "medium" | "high",
-              type: inputs.type as "idea" | "task",
-              assignee: inputs.assignee,
-              estimate: inputs.estimate as "XS" | "S" | "M" | "L" | "XL",
-              tags: inputs.tags,
-              blockedBy: [],
-              doc_refs: [],
-              comments: [],
-              from: "",
-              to: "",
-            },
-            "pa-signal-collector"
-          );
-          console.log(`  Created ${ticket.id} (${note.classification.type}): ${inputs.title}`);
-
-          // Mark as processed
-          markAsProcessed(note.originalPath);
-        }
-
-        console.log(`\nCreated ${classified.length} ticket(s).`);
-      } catch (err) {
-        console.error("Error during classification:");
-        console.error((err as Error).message);
-        console.error("Raw notes were extracted but not classified.");
-      }
+    // Route extracted notes
+    if (!skipRoute && extractedFiles.length > 0) {
+      console.log("\n=== Routing ===\n");
+      routeFiles(extractedFiles);
     }
   }
+}
+
+/**
+ * Reprocess all existing raw/ messages through the router.
+ * Useful for migrating old messages to the new routing system.
+ */
+async function runReprocess(dryRun: boolean): Promise<void> {
+  console.log("=== Reprocessing existing raw notes ===\n");
+
+  if (!readdirSync(SIGNAL_RAW_DIR).length) {
+    console.log("No raw notes found in signal/raw/.");
+    return;
+  }
+
+  const files = readdirSync(SIGNAL_RAW_DIR)
+    .filter((f) => f.endsWith(".md"))
+    .map((f) => join(SIGNAL_RAW_DIR, f));
+
+  console.log(`Found ${files.length} raw note(s) to reprocess.\n`);
+
+  if (dryRun) {
+    for (const file of files) {
+      const result = routeMessage(file);
+      console.log(`  ${file} → ${result.destination}`);
+    }
+    console.log("\n[DRY RUN] No files written.");
+  } else {
+    routeFiles(files);
+  }
+}
+
+/**
+ * Route a list of raw note files and write to destinations.
+ */
+function routeFiles(files: string[]): void {
+  let routed = 0;
+  let errors = 0;
+
+  for (const file of files) {
+    try {
+      const result = routeMessage(file);
+
+      // Extract sentAt from filename: YYYY-M-D-H-M-<hash>.md
+      const sentAt = extractSentAtFromFile(file);
+
+      const writeResult = writeRoutedMessage(result, sentAt);
+      console.log(
+        `  ${result.destination.padEnd(16)} → ${writeResult.path}${writeResult.ticketId ? ` (${writeResult.ticketId})` : ""}`,
+      );
+
+      markAsProcessed(file);
+      routed++;
+    } catch (err) {
+      console.error(`  ERROR: ${file}: ${(err as Error).message}`);
+      errors++;
+    }
+  }
+
+  console.log(`\nRouted ${routed} note(s). Errors: ${errors}.`);
+}
+
+/**
+ * Extract sentAt timestamp from raw note frontmatter.
+ * Falls back to file modification time if frontmatter parse fails.
+ */
+function extractSentAtFromFile(filePath: string): number {
+  try {
+    const { readFileSync } = require("node:fs");
+    const content = readFileSync(filePath, "utf-8");
+    const match = content.match(/^sentAt:\s*(\d+)/m);
+    if (match) return parseInt(match[1], 10);
+  } catch {
+    // fallback
+  }
+  return Date.now();
 }
