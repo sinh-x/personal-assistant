@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 
 let _db: Database.Database | null = null;
 
-const CURRENT_SCHEMA_VERSION = 4;
+const CURRENT_SCHEMA_VERSION = 5;
 
 function ensureDir(path: string): void {
   const dir = dirname(path);
@@ -52,6 +52,9 @@ function migrateFrom(db: Database.Database, fromVersion: number): void {
   }
   if (fromVersion < 4) {
     migrateToV4(db);
+  }
+  if (fromVersion < 5) {
+    migrateToV5(db);
   }
 }
 
@@ -240,6 +243,25 @@ function migrateToV4(db: Database.Database): void {
   `);
   db.exec(`
     ALTER TABLE deployments ADD COLUMN resumed_from_deployment_id TEXT;
+  `);
+}
+
+function migrateToV5(db: Database.Database): void {
+  // V5 adds health_snapshots table for pa health trend persistence.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS health_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      overall_score INTEGER NOT NULL,
+      window_since TEXT NOT NULL,
+      window_until TEXT NOT NULL,
+      categories TEXT NOT NULL,
+      findings_summary TEXT
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_health_timestamp ON health_snapshots(timestamp);
   `);
 }
 
