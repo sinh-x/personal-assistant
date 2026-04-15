@@ -347,7 +347,7 @@ export function checkAgents(window: HealthWindow): CategoryResult {
 // Tickets check
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function checkTickets(_window: HealthWindow): CategoryResult {
+export function checkTickets(window: HealthWindow): CategoryResult {
   const category: HealthCategory = "tickets";
   const findings: HealthFinding[] = [];
 
@@ -365,6 +365,7 @@ export function checkTickets(_window: HealthWindow): CategoryResult {
   }
 
   const now = Date.now();
+  const windowStart = new Date(window.since).getTime();
   const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
   const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
 
@@ -384,11 +385,12 @@ export function checkTickets(_window: HealthWindow): CategoryResult {
       const status = ticket.status ?? "unknown";
       statusCounts[status] = (statusCounts[status] ?? 0) + 1;
 
-      // Check stale: active status, no update >7 days
+      // Check stale: active status, no update >7 days, and ticket was updated within window
       if (ticket.updatedAt) {
         const updatedAt = new Date(ticket.updatedAt).getTime();
         const age = now - updatedAt;
-        if (age > sevenDaysMs && !["done", "rejected", "cancelled"].includes(status)) {
+        // Only flag tickets updated within the window period (relevant to current health)
+        if (updatedAt >= windowStart && age > sevenDaysMs && !["done", "rejected", "cancelled"].includes(status)) {
           staleCount++;
           findings.push(
             finding(
@@ -403,7 +405,7 @@ export function checkTickets(_window: HealthWindow): CategoryResult {
 
       // Check handoff statuses without doc_refs
       if (HANDOFF_STATUSES.has(status)) {
-        const hasDocRefs = ticket.docRefs && ticket.docRefs.length > 0;
+        const hasDocRefs = ticket.doc_refs && ticket.doc_refs.length > 0;
         const hasNeedsDocRefTag = ticket.tags && ticket.tags.includes("needs-doc-ref");
         if (!hasDocRefs || hasNeedsDocRefTag) {
           missingDocRefCount++;
@@ -617,25 +619,45 @@ export function checkSchedules(): CategoryResult {
       // Skip separator lines and empty lines
       if (line.match(/^──/) || line.trim() === "") continue;
 
-      // Timer line format: UNIT                      ACTIVE   SUB
-      // Or with NEXT/DELAY: UNIT                      Active   Elapsed
-      const match = line.match(/^(pa-[^\s]+)\s+(\S+)\s+(\S+)/);
-      if (match) {
-        timerCount++;
-        const [, unit, active, sub] = match;
-        const isActive = active.toLowerCase() !== "inactive";
+      // Timer line format from systemctl --user list-timers 'pa-*':
+      // Columns are separated by varying whitespace (2+ spaces between columns,
+      // but timestamps contain spaces). We use regex to find the UNIT column
+      // directly - it always starts with 'pa-' and ends with '.timer'.
+      const unitMatch = line.match(/(pa-[a-zA-Z0-9_-]+\.timer)/);
+      if (!unitMatch) continue;
 
-        if (!isActive) {
-          inactiveCount++;
-          findings.push(
-            finding(
-              "fail",
-              category,
-              `Inactive timer: ${unit}`,
-              `State: ${active} / ${sub}`
-            )
-          );
-        }
+      timerCount++;
+      const unit = unitMatch[1];
+
+      // ACTIVATES column is the service this timer activates (pa-*.service)
+      const activatesMatch = line.match(/(pa-[a-zA-Z0-9_-]+\.service)\s*$/);
+      const activates = activatesMatch ? activatesMatch[1] : "";
+
+      // Check the actual timer active state via systemctl show
+      // This gives the real state (active/inactive) regardless of whether
+      // the service it activates is running
+      let isActive = true;
+      try {
+        const stateOutput = execSync(`systemctl --user show '${unit}' -p ActiveState --value`, {
+          encoding: "utf-8",
+          stdio: ["inherit", "pipe", "inherit"],
+        });
+        isActive = stateOutput.trim().toLowerCase() === "active";
+      } catch {
+        // If we can't query, assume inactive
+        isActive = false;
+      }
+
+      if (!isActive) {
+        inactiveCount++;
+        findings.push(
+          finding(
+            "fail",
+            category,
+            `Inactive timer: ${unit}`,
+            `Activates: ${activates}`
+          )
+        );
       }
     }
 

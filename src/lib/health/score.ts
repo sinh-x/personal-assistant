@@ -5,6 +5,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { getHealthConfigPath } from "../paths.js";
+import yaml from "js-yaml";
 import type { HealthConfig, HealthCategory, CategoryResult } from "./types.js";
 
 /** Default weights if no config file */
@@ -39,8 +40,7 @@ export function loadConfig(): HealthConfig {
 
   try {
     const content = readFileSync(configPath, "utf-8");
-    // Simple YAML-like parsing for weights and thresholds
-    const config = parseSimpleYaml(content);
+    const config = yaml.load(content) as Record<string, Record<string, unknown>>;
 
     const weights: Record<HealthCategory, number> = { ...DEFAULT_WEIGHTS };
     if (config.weights) {
@@ -68,52 +68,6 @@ export function loadConfig(): HealthConfig {
       thresholds: { ...DEFAULT_THRESHOLDS },
     };
   }
-}
-
-/**
- * Simple YAML-like parser for health config.
- * Handles only the structure we need: weights and thresholds.
- */
-function parseSimpleYaml(content: string): Record<string, Record<string, unknown>> {
-  const result: Record<string, Record<string, unknown>> = {};
-  let currentSection: string | null = null;
-  let currentValues: Record<string, unknown> = {};
-
-  for (const line of content.split("\n")) {
-    const trimmed = line.trim();
-
-    // Skip comments and empty lines
-    if (trimmed.startsWith("#") || trimmed === "") continue;
-
-    // Check for section header
-    const sectionMatch = trimmed.match(/^(\w+):\s*$/);
-    if (sectionMatch) {
-      if (currentSection && Object.keys(currentValues).length > 0) {
-        result[currentSection] = currentValues;
-      }
-      currentSection = sectionMatch[1];
-      currentValues = {};
-      continue;
-    }
-
-    // Check for key: value
-    const kvMatch = trimmed.match(/^(\w+):\s*(\S+)\s*$/);
-    if (kvMatch && currentSection) {
-      const key = kvMatch[1];
-      const value = kvMatch[2];
-
-      // Try to parse as number
-      const numValue = Number(value);
-      currentValues[key] = isNaN(numValue) ? value : numValue;
-    }
-  }
-
-  // Save last section
-  if (currentSection && Object.keys(currentValues).length > 0) {
-    result[currentSection] = currentValues;
-  }
-
-  return result;
 }
 
 /**

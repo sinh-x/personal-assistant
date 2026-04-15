@@ -76,34 +76,34 @@ export function parseActivityLog(deployId: string): ActivityAnalysis {
 
 /**
  * Detect error loops — 3+ consecutive tool_failure events by the same agent.
+ * Tracks consecutive failures per agent, resetting the count on any tool_success
+ * or tool_call event. Only flags when there are genuinely N consecutive failures
+ * with no successes in between.
  */
 export function detectErrorLoops(events: ActivityEvent[]): ActivityAnalysis["errorLoops"] {
   const loops: ActivityAnalysis["errorLoops"] = [];
 
-  // Group events by agent
+  // Group events by agent, preserving chronological order
   const agentEvents = new Map<string, ActivityEvent[]>();
   for (const evt of events) {
-    if (evt.event === "tool_failure") {
+    if (evt.event === "tool_call" || evt.event === "tool_success" || evt.event === "tool_failure") {
       const existing = agentEvents.get(evt.agent) ?? [];
       existing.push(evt);
       agentEvents.set(evt.agent, existing);
     }
   }
 
-  // Check each agent for consecutive failures
-  for (const [agent, failEvents] of agentEvents) {
-    // Sort by timestamp
-    const sorted = failEvents.sort((a, b) => a.ts.localeCompare(b.ts));
-
+  // Check each agent for consecutive failure sequences
+  for (const [agent, evts] of agentEvents) {
+    // Events are already in chronological order from the JSONL
     let consecutiveCount = 0;
     let firstTs = "";
 
-    for (const evt of sorted) {
-      if (firstTs === "") {
-        firstTs = evt.ts;
-        consecutiveCount = 1;
-      } else {
-        // Check if this failure is within a reasonable window (consecutive in the log)
+    for (const evt of evts) {
+      if (evt.event === "tool_failure") {
+        if (consecutiveCount === 0) {
+          firstTs = evt.ts;
+        }
         consecutiveCount++;
 
         if (consecutiveCount >= ERROR_LOOP_THRESHOLD) {
@@ -112,10 +112,14 @@ export function detectErrorLoops(events: ActivityEvent[]): ActivityAnalysis["err
             consecutiveCount,
             firstTs,
           });
-          // Reset after finding a loop
-          firstTs = "";
+          // Reset after finding a loop — next failure starts fresh
           consecutiveCount = 0;
+          firstTs = "";
         }
+      } else {
+        // tool_call or tool_success resets the consecutive counter
+        consecutiveCount = 0;
+        firstTs = "";
       }
     }
   }
