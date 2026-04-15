@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { homedir } from "node:os";
 
 /** Resolve ~ to actual home directory */
-function expandHome(p: string): string {
+export function expandHome(p: string): string {
   if (p.startsWith("~")) {
     return resolve(homedir(), p.slice(2));
   }
@@ -78,6 +78,21 @@ export function getAgentTeamsDir(): string {
 /** Flat ticket storage directory */
 export function getTicketsDir(): string {
   return expandHome("~/Documents/ai-usage/tickets");
+}
+
+/** Sessions directory — agent session logs */
+export function getSessionsDir(): string {
+  return expandHome("~/Documents/ai-usage/sessions");
+}
+
+/** Deployments directory — per-run workspaces */
+export function getDeploymentsDir(): string {
+  return expandHome("~/Documents/ai-usage/deployments");
+}
+
+/** Health config file path */
+export function getHealthConfigPath(): string {
+  return resolve(homedir(), ".config/sinh-x/personal-assistant/health.yaml");
 }
 
 /** Bulletins directory (contains active/ and resolved/ subdirs) */

@@ -17,6 +17,7 @@ import { createRegistryCommand } from "./commands/registry.js";
 import { createTrashCommand } from "./commands/trash.js";
 import { createCodeCtxCommand } from "./commands/codectx.js";
 import { createSignalCommand } from "./commands/signal.js";
+import { createHealthCommand } from "./commands/health.js";
 
 declare const __PA_VERSION__: string;
 
@@ -262,5 +263,6 @@ program.addCommand(createBulletinCommand());
 program.addCommand(createRegistryCommand());
 program.addCommand(createTrashCommand());
 program.addCommand(createCodeCtxCommand());
+program.addCommand(createHealthCommand());
 
 program.parse();
