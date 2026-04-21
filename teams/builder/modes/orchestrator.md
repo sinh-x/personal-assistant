@@ -545,6 +545,8 @@ pa ticket update <ticket_id> --status review-uat --assignee sinh \
 # Add one --doc-ref per review cycle
 ```
 
+> **Note — re-attach is idempotent.** The orchestration `--doc-ref` line above RE-ATTACHES the same path that was added (non-primary) at orchestrator start. The store upserts on matching path, and `--doc-ref-primary` promotes that existing entry — no duplicate row is created and no command change is required.
+
 **Step 3 — Completion comment:**
 
 ```bash
@@ -567,7 +569,7 @@ The orchestration report at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-or
 
 | Event | What to write |
 |-------|---------------|
-| Orchestrator start (or resume) | If file does not exist: create with header, `## Summary` placeholder, empty metadata block, empty Timeline, empty Sub-Deploys, `Cycles: Current: 0 / 3`, `Status: in-progress`. If it exists: read it; reconcile `in-flight` rows against `pa registry status`; append Timeline entry `<HH:MM> — Orchestrator resumed (d-<new-orch-id>)`; add a row under `## Orchestrator runs`. |
+| Orchestrator start (or resume) | **Fresh run** (file does not exist): create with header, `## Summary` placeholder, empty metadata block, empty Timeline, empty Sub-Deploys, `Cycles: Current: 0 / 3`, `Status: in-progress`. **Then immediately attach the report to the ticket: `pa ticket update <ticket_id> --doc-ref "orchestration:<path>"` (NON-PRIMARY — Phase 6 re-attaches the same path with `--doc-ref-primary` to promote it).** This makes the live report discoverable from the ticket from the moment it is created. **Resume** (file exists): read it; reconcile `in-flight` rows against `pa registry status`; append Timeline entry `<HH:MM> — Orchestrator resumed (d-<new-orch-id>)`; add a row under `## Orchestrator runs`. **Do NOT re-attach the doc_ref on resume — it already exists on the ticket (that is exactly how the resume branch was detected at Phase 0).** |
 | Phase 1 (Understand Objective) complete | Write `## Summary` — 1-paragraph TL;DR of what the orchestrator is building (goal, scope, success definition). Populate `Repo:` (and `Branch:` once resolved in Phase 4 pre-flight) in the top-level metadata block. Save the file. |
 | Sub-deploy launched | Append Timeline entry `<HH:MM> — Phase <N> (<brief scope>) launched <deploy-id>`. Append row to Sub-Deploys table with status `in-flight`. Save the file. |
 | Sub-deploy completed | Update the corresponding Sub-Deploys row (status, severity counts, exit code). Append Timeline entry `<HH:MM> — Phase <N> (<brief scope>) completed <deploy-id> <status>`. Save the file. |
@@ -605,7 +607,7 @@ The orchestration report at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-or
 ## Ticket Tracking Protocol
 
 When working with builder tickets:
-1. Orchestrator claims the ticket on start: `pa ticket update <id> --status implementing --assignee builder/team-manager`
+1. Orchestrator claims the ticket on start: `pa ticket update <id> --status implementing --assignee builder/team-manager`, and attaches the orchestration report via `pa ticket update <id> --doc-ref "orchestration:<path>"` (non-primary; promoted to primary in Phase 6) so the live report is discoverable from the ticket throughout the run
 2. Implement-mode agents do NOT change ticket status — they only build and report back
 3. Orchestrator tracks progress by reading the plan document's phase checklist
 4. On completion, orchestrator hands off to review: `pa ticket update <id> --status review-uat --assignee sinh`
@@ -632,7 +634,7 @@ When working with builder tickets:
 
 All communication with Sinh goes through the **existing ticket** (`ticket_id` from `<deployment-context>`). The orchestrator never creates tickets — see the "Never create tickets" rule in Critical Rules.
 
-- **Orchestration report (primary handoff)** → `pa ticket update <ticket_id> --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md" --doc-ref-primary` (written in Phase 6 alongside the `review-uat → sinh` advance)
+- **Orchestration report (primary handoff)** → attached **non-primary** at orchestrator start (Phase 0 / fresh-run trigger) so the ticket points to the live report at all times during the run. **Re-attached as primary in Phase 6** alongside the `review-uat → sinh` advance via `pa ticket update <ticket_id> --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md" --doc-ref-primary` (idempotent — the store upserts on matching path and `--doc-ref-primary` promotes the existing entry).
 - **Completion** → `pa ticket comment <ticket_id> --author builder/orchestrator --content-file <tmp>` with summary and session log reference, then Phase 6's `pa ticket update` advances the ticket.
 - **Review requests / questions** → `pa ticket comment <ticket_id>` with the question, then `pa ticket update <ticket_id> --assignee sinh --doc-ref "orchestration:<path>"`. Exit partial. Sinh reads the comment + report and decides the next move.
 - **Failure reports** → `pa ticket comment <ticket_id>` with the failure details, then `pa ticket update <ticket_id> --assignee sinh --doc-ref "orchestration:<path>"`. Do NOT advance status — Sinh decides retry vs. abort.
