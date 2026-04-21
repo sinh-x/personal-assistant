@@ -18,9 +18,16 @@ Common repos:
 - **Never guess.** If the objective is ambiguous, no matching item is found, or any decision point is unclear — create a review request to Sinh and wait for a response. Do not proceed on assumptions.
 - **One objective per launch.** Process a single work item per deployment. Do not batch multiple items.
 - **Never modify builder or requirements configs.** Use those teams as-is. You coordinate, they execute.
-- **PA_MAX_RUNTIME.** Orchestrator deployments should run with PA_MAX_RUNTIME=10800 (3 hours). If approaching timeout, write a partial work report and exit gracefully.
+- **PA_MAX_RUNTIME.** Orchestrator deployments run with PA_MAX_RUNTIME=7200 (120 min) by default; sub-deploys are launched with explicit caps (2700 for builder/implement, 1800 for requirements/review-auto).
 - **Requirements doc gate (STRICT).** Never proceed to Phase 3/4 without a requirements doc attached to the ticket via `doc_refs`. If a ticket has no `doc_refs` with type `requirements` or marked primary, you MUST: (1) gather implementation context from the codebase, (2) add a discovery comment to the ticket, (3) push the ticket back to `requirement-review` status assigned to `requirements`, and (4) exit. Do NOT launch the requirements team inline — let the normal requirements pipeline handle it.
 - **Ticket propagation.** Always pass `--ticket <ticket_id>` to child `pa deploy` commands when your `<deployment-context>` includes a `ticket_id`. This ensures registry traceability across the deployment chain. If no `ticket_id` is set, omit the flag.
+- **Objective overrides (optional).** Sinh can inject directives into the orchestrator `--objective` text to adjust behavior. Supported keys (one per line, case-insensitive):
+  - `Reviewer provider: anthropic` — use `review-auto-anthropic` instead of default `review-auto` (MiniMax)
+  - `Max review cycles: N` — override fix-loop cap (1, 2, or 3; default 3, global)
+  - `Skip review-auto: true` — skip Phases 5.5 + 5.6; go direct to Phase 6
+  - `Total runtime: Nm` — set `PA_MAX_RUNTIME` for the orchestrator (default 7200 = 120m; acceptable 60-240 min)
+  Parse these at Phase 1 (Understand Objective) and persist in the phase context.
+- **No time-check logic.** The orchestrator does NOT estimate remaining budget or attempt a graceful exit before the runtime cap. It writes the report continuously; if killed, the report is the source of truth for resume.
 
 ## Workflow
 
@@ -43,23 +50,27 @@ Common repos:
 
 ## Time-Boxing Rules
 
-Each phase has a maximum time allocation. If a phase approaches its limit, write a partial work report and exit gracefully rather than running indefinitely.
+The orchestrator runs under a single wall-clock cap that covers all phases and all sub-deploy wait time. Sub-deploys get their own explicit caps. There are **no per-phase budgets** and **no self-aware time-check logic** inside the orchestrator.
 
-| Phase | Name | Time Limit | Action on Timeout |
-|-------|------|------------|-------------------|
-| 0 | Repo Resolution | 2 minutes | Fail immediately — repo must be resolvable |
-| 1 | Understand Objective | 5 minutes | If ticket not found or ambiguous, create review-request and exit |
-| 2 | Requirements Gathering | 30 minutes | Exit partial, notify Sinh via FYI ticket |
-| 3 | Plan Analysis | 10 minutes | If plan too thin, create review-request and exit |
-| 4 | Build Loop (per phase) | 60 minutes | Exit partial, report failure via FYI ticket |
-| 5 | PR Creation & UAT Handoff | 10 minutes | If strategy unclear, create review-request and exit |
-| 6 | Report and Shutdown | 5 minutes | Log and exit regardless |
+| Scope | Cap | Override |
+|-------|-----|----------|
+| Orchestrator (total wall-clock) | `PA_MAX_RUNTIME=7200` (120 min) | `Total runtime: Nm` in `--objective` (60–240 min; out-of-range values are ignored) |
+| Sub-deploy: `builder/implement` | `PA_MAX_RUNTIME=2700` (45 min) | None — set per launch |
+| Sub-deploy: `requirements/review-auto` | `PA_MAX_RUNTIME=1800` (30 min) | None — set per launch |
 
-**Total budget:** PA_MAX_RUNTIME (default 3 hours) minus overhead for coordination.
+**No time-check logic inside the orchestrator.** Write the report continuously; resume handles partial state. If the runtime kills the process, the last row in the orchestration report is the stop point — the Resume Playbook picks it up on the next launch.
 
 ---
 
 ## Phase 0: Repo Resolution (mandatory pre-flight)
+
+**Resume check (run first).** Before any other work, if your `<deployment-context>` has a `ticket_id`, check whether the ticket already has an `orchestration:` doc-ref:
+
+```bash
+pa ticket show <ticket_id> --json | jq '.doc_refs[] | select(.type == "orchestration")'
+```
+
+If a row is returned → this is a resumed orchestration. Follow the **Resume Playbook** (standalone section at the end of this file) to reconcile in-flight rows via `pa registry status`, abort if a prior orchestrator is still `running`, read the existing `## Resume Hint` and `## Cycles` counter, and continue in the same report file. Do NOT create a new orchestration report. Otherwise, continue below as a fresh run.
 
 Determine the target repository **before any other work**. This is mandatory — fail immediately if the repo cannot be resolved.
 
@@ -96,6 +107,19 @@ pa ticket create \
 ### Phase 1: Understand Objective
 
 Parse the `--objective` to identify the target work.
+
+**Step 0 — Parse objective overrides (case-insensitive, one per line).** Scan the raw `--objective` text for the following directives and persist their values in the phase context so later phases can read them:
+
+| Directive | Effect | Default |
+|-----------|--------|---------|
+| `Reviewer provider: anthropic` | Phase 5.5 uses `--mode review-auto-anthropic` instead of `review-auto` | `review-auto` (MiniMax) |
+| `Max review cycles: N` | Cap the Phase 5.6 global cycle counter at N (valid: 1, 2, 3) | 3 |
+| `Skip review-auto: true` | Skip Phases 5.5 and 5.6 entirely; go directly from Phase 5 to Phase 6 | false |
+| `Total runtime: Nm` | Set orchestrator `PA_MAX_RUNTIME` to `N * 60` seconds (valid: 60–240 min) | 7200 (120 min) |
+
+If a directive's value is out of range, ignore it and use the default. Directives that do not appear keep their defaults.
+
+After directive parsing, continue with objective interpretation:
 
 1. **If objective points to a specific file** — read it directly as the plan document. Skip ticket scan.
 2. **If objective is a ticket ID** (e.g., `AVO-028`, `PA-042`) — show the ticket directly: `pa ticket show <id>`
@@ -226,6 +250,8 @@ This checklist has: specific file-level deliverables (planner.yaml, sprint-maste
 
 **Delegation guardrail (STRICT):** The orchestrator must NEVER run build, test, or typecheck commands directly. All verification must be delegated to the builder team via `pa deploy`. Running verification directly bypasses the builder agent's execution context and breaks traceability. If verification is needed, include it in the builder objective for the appropriate phase.
 
+**Continuous-report contract.** Before launching each `builder/implement` sub-deploy, append a Timeline entry and a Sub-Deploys row (status `in-flight`) to the orchestration report. After each sub-deploy completes (success or failure), update the row with the final status and append a completion Timeline entry. See the **Continuous Report Contract** standalone section at the end of this file for the exact trigger events and report skeleton.
+
 Execute each unchecked phase by launching the builder team in implement mode.
 
 **Pre-flight — Branch Management (orchestrator responsibility):**
@@ -279,23 +305,28 @@ Use the phase context map from Phase 3 to build a structured, self-contained obj
 - If a phase has no mapped ACs, flag this as a gap: add a note `No acceptance criteria mapped to this phase — builder should verify deliverables match the phase description`
 - Keep the objective readable — prefer concise bullet points over paragraphs
 
-**b. Launch builder in implement mode:**
+**b. Write launch row to orchestration report:**
+Append a Timeline entry (`<ts> Phase <N> launched <deploy-id>`) and a Sub-Deploys row with status `in-flight`. Save the file **before** the `pa deploy` call (or immediately after, using the returned deploy-id — but before moving on to the wait step).
+
+**c. Launch builder in implement mode:**
 ```bash
 # If ticket_id is set in your <deployment-context>, pass --ticket to enable traceability:
-unset CLAUDECODE && pa deploy builder --mode implement --background --objective "<structured objective from step a>"$([ -n "$ticket_id" ] && echo " --ticket $ticket_id")
+unset CLAUDECODE && PA_MAX_RUNTIME=2700 pa deploy builder --mode implement --background --objective "<structured objective from step a>"$([ -n "$ticket_id" ] && echo " --ticket $ticket_id")
 ```
 
-**c. Wait for builder to complete:**
+**d. Wait for builder to complete:**
 ```bash
 pa status <deploy-id> --wait
 ```
 
-**d. Check result:**
+**e. Check result:**
 ```bash
 pa status <deploy-id> --report
 ```
 
-**e. Evaluate outcome:**
+**f. Update orchestration report row** with final status (success/failed/partial) and append a Timeline entry (`<ts> Phase <N> completed <deploy-id> <status>`). Save the file before proceeding.
+
+**g. Evaluate outcome:**
 
 | Result | Action |
 |--------|--------|
@@ -320,9 +351,9 @@ pa ticket create \
 
 After creating the failure ticket, **stop**. Do not continue to the next phase or attempt the merge.
 
-### Phase 5: PR Creation & UAT Handoff
+### Phase 5: PR Creation & UAT Artifact
 
-After all phases complete successfully, the orchestrator creates a PR (if GitHub), produces a UAT review artifact, and advances the ticket to `review-uat`. **The orchestrator never merges — routine mode handles merge after Sinh's UAT sign-off.**
+After all Phase 4 phases complete successfully, the orchestrator creates a PR (if GitHub) and produces a UAT review artifact. **The orchestrator does NOT advance the ticket here — ticket advancement happens only in Phase 6 on clean completion.** **The orchestrator never merges — routine mode handles merge after Sinh's UAT sign-off.**
 
 **Step 1 — Push feature branch:**
 
@@ -344,51 +375,233 @@ Check these sources in order:
 gh pr create --base develop --head <feature-branch> --title "<ticket-id>: <title>" --body "<summary with AC checklist>"
 ```
 
+For non-GitHub repos, skip this step — merge is handled by routine mode via local `git merge --no-ff`.
+
 **Step 4 — Produce UAT review artifact:**
 
 1. Read the requirements UAT doc from the ticket's `doc_refs` (type `uat`)
 2. Read the UAT review template (`skills/templates/uat-review.md`)
 3. Populate the template: fill test scenarios from requirements UAT, add regression checks based on changed files, note the PR URL
-4. Save to deployment workspace and team artifacts:
+4. Save to persistent team artifacts:
    ```bash
    cp <artifact> ~/Documents/ai-usage/agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-uat-review.md
    ```
 
-**Step 5 — Advance ticket to `review-uat`:**
+**Step 5 — Write Phase 5 row to orchestration report.** Append a Timeline entry (`<ts> Phase 5 complete — PR <url>, UAT artifact <path>`). Do NOT advance the ticket here.
+
+**Step 6 — Proceed to Phase 5.5 (Review-Auto Gate).** Unless the objective contained `Skip review-auto: true`, continue to Phase 5.5. If skipping, jump directly to Phase 6.
+
+### Phase 5.5: Review-Auto Gate
+
+After Phase 5 (PR created, UAT artifact produced), launch an automated review of the feature-branch changes. Write a `Phase 5.5 launched` row to the orchestration report before spawning.
+
+**Step 1 — Parse reviewer provider from objective:**
+
+Default: `review-auto` (MiniMax). If the original `--objective` contains `Reviewer provider: anthropic` (case-insensitive), use `review-auto-anthropic`. If it contains `Skip review-auto: true`, skip Phase 5.5 + 5.6 and go straight to Phase 6.
+
+**Step 2 — Collect change surface:**
 
 ```bash
-pa ticket update <ticket-id> --status review-uat --assignee sinh \
-  --doc-ref "uat-review:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-uat-review.md"
+cd <repo_path>
+changed_files=$(git diff --name-only develop...<feature-branch>)
+pr_url=<PR URL from Phase 5>
 ```
 
-**Step 6 — Non-GitHub repos:**
+**Step 3 — Compose review objective:**
 
-Skip PR creation (Step 3), but still produce UAT review artifact (Step 4) and advance ticket to `review-uat` (Step 5). Merge is handled by routine mode via local `git merge --no-ff`.
+```
+Review the changes on feature branch <branch> relative to develop.
 
-### Phase 6: Report and Shutdown
+Repo: <repo_path>
+PR: <pr_url>
+Ticket: <ticket_id>
 
-**Step 1 — Create completion ticket comment or FYI ticket:**
+Changed files:
+<changed_files list>
 
-If the orchestrator was working on an assigned ticket, add a completion comment:
+Scope: Review ONLY these files and their diffs. Do not audit the entire repo.
+Areas: Code Quality, Security, Ops (skip UI/UAT unless UI files are in the changed set).
+Output: Standard review-report.md with severity-rated findings (Critical/Major/Minor/Info).
+```
+
+**Step 4 — Write launch row to orchestration report** (status `in-flight`).
+
+**Step 5 — Launch review-auto:**
+
 ```bash
-pa ticket comment <ticket-id> --author team-manager --content "Orchestration complete for '<objective>'. All N phases done, PR #<N> created, awaiting UAT sign-off. Routine mode will merge after approval. Session log: sessions/YYYY/MM/agent-team/<filename>.md"
+unset CLAUDECODE && PA_MAX_RUNTIME=1800 pa deploy requirements --mode <review-auto|review-auto-anthropic> --background \
+  --objective "<composed objective from Step 3>" \
+  $([ -n "$ticket_id" ] && echo "--ticket $ticket_id")
 ```
 
-If no working ticket (standalone orchestration), create an FYI ticket:
+**Step 6 — Wait, read report, update orchestration report row** with final status + severity counts.
+
 ```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "FYI: Builder orchestrator complete — <objective>" \
-  --type fyi \
-  --assignee sinh \
-  --priority low \
-  --estimate XS \
-  --summary "STATUS: <success|partial|failed>. Phases: <N completed>. Merge: <status>. Builder deploys: <deploy-id list>. Outputs: <key files/branch>. Next: <what comes next>"
+pa status <review-deploy-id> --wait
+pa status <review-deploy-id> --report
 ```
 
-**Step 2 — Session log** per standards (deployment workspace).
+Locate the review report via `doc_refs` on the review-request ticket produced by review-auto, or from `agent-teams/requirements/artifacts/YYYY-MM-DD-review-*.md`.
 
-**Step 3 — Registry completion marker** per standards.
+**Step 7 — Proceed to Phase 5.6.**
+
+### Phase 5.6: Fix Loop
+
+Iterate until either zero qualifying findings OR global cycle counter reaches 3. Global counter is read from `## Cycles` in the orchestration report — it is NOT reset on a relaunched orchestrator.
+
+Write a row to the orchestration report on every launch and completion inside this phase. Do NOT do time checks.
+
+**Step 1 — Read latest review report. Filter to Critical+Major+Minor (skip Info).**
+
+**Step 2 — Exit conditions:**
+
+- Zero qualifying findings → set `fix_loop_status=clean`, exit loop, proceed to Phase 6.
+- `cycle_count >= 3` → set `fix_loop_status=capped`; if any Critical remain, mark `orchestration_status=partial`. Exit to Phase 6.
+
+**Step 3 — Compose fix objective** (only current-cycle findings):
+
+- Finding ID (e.g., `CQ-3`)
+- Severity
+- File path and line number(s)
+- Short description
+- Recommended fix (from review report)
+
+Add: "Fix each finding in place on the current feature branch. Commit and push. Do not add unrelated changes."
+
+**Step 4 — Write launch row to orchestration report** (status `in-flight`; phase `5.6-c<N>-fix`).
+
+**Step 5 — Launch builder/implement:**
+
+```bash
+unset CLAUDECODE && PA_MAX_RUNTIME=2700 pa deploy builder --mode implement --background \
+  --objective "<fix objective from Step 3>" \
+  $([ -n "$ticket_id" ] && echo "--ticket $ticket_id")
+```
+
+**Step 6 — Wait, update orchestration report row.**
+
+```bash
+pa status <fix-deploy-id> --wait
+pa status <fix-deploy-id> --report
+```
+
+If the fix deployment failed (exit 1) → update row as failed. If transient and retry makes sense, retry once. If still failing → exit loop with `fix_loop_status=build-failed`, `orchestration_status=partial`.
+
+**Step 7 — Re-run review-auto** (Phase 5.5 Steps 4-6 with updated branch; log as phase `5.6-c<N>-review`).
+
+**Step 8 — Increment cycle_count. Update `## Cycles: N / 3` in report. Go to Step 1.**
+
+### Phase 6: Final Report and Shutdown
+
+**Only reached on clean completion of Phase 5.6 (either clean review or cycle cap hit).**
+**Only this phase advances the ticket to review-uat → sinh.**
+
+**Step 1 — Finalize orchestration report** at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md`:
+- Set `Status: success` or `partial` (partial if any Critical remains after cycle cap).
+- Fill in final Timeline entry.
+- Fill in `## Remaining Findings` section.
+- Fill in `## Sub-Deploy IDs` summary.
+- Update `## Resume Hint` to `COMPLETE — no resume needed`.
+
+**Step 2 — Advance ticket** (only here):
+
+```bash
+pa ticket update <ticket_id> --status review-uat --assignee sinh \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md" --doc-ref-primary \
+  --doc-ref "uat:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-uat-review.md" \
+  --doc-ref "review:agent-teams/requirements/artifacts/YYYY-MM-DD-review-<topic>-cycle1.md"
+# Add one --doc-ref per review cycle
+```
+
+**Step 3 — Completion comment:**
+
+```bash
+pa ticket comment <ticket_id> --author builder/team-manager --content \
+  "Orchestration complete. <N> implementation phases, <M> review cycles. Findings: <counts>. PR: <url>. Full report attached as primary doc-ref. Awaiting Sinh UAT."
+```
+
+**Step 4 — Session log + registry marker** (existing standard).
+
+## Continuous Report Contract
+
+The orchestration report at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md` is a **living document**. The orchestrator rewrites it at four events — no exceptions, no skipping.
+
+### Trigger events
+
+| Event | What to write |
+|-------|---------------|
+| Orchestrator start (or resume) | If file does not exist: create with header, empty Timeline, empty Sub-Deploys, `Cycles: 0 / 3`, `Status: in-progress`. If it exists: read it; reconcile `in-flight` rows against `pa registry status`; append Timeline entry `<ts> Orchestrator resumed`. |
+| Sub-deploy launched | Append Timeline entry `<ts> <phase> launched <deploy-id>`. Append row to Sub-Deploys table with status `in-flight`. Save the file. |
+| Sub-deploy completed | Update the corresponding Sub-Deploys row (status, severity counts, exit code). Append Timeline entry `<ts> <phase> completed <deploy-id> <status>`. Save the file. |
+| Phase 6 reached cleanly | Set `Status: success` (or `partial`). Populate `Remaining Findings`, `Sub-Deploy IDs`, final Timeline entry. Set `Resume Hint: COMPLETE`. Save the file. |
+
+### Report skeleton
+
+```markdown
+# Orchestration Report: <topic>
+
+> Ticket: <id> | Started: <ts> | Last updated: <ts>
+> Status: in-progress | success | partial
+
+## Timeline
+- <ts> Orchestrator started (d-<orch-id>)
+- <ts> Phase 4.1 launched d-abc123
+- <ts> Phase 4.1 completed d-abc123 success
+- <ts> Phase 5.5 launched d-xyz789
+- ...
+
+## Sub-Deploys
+| Phase | Deploy ID | Mode | Status | Severity |
+|-------|-----------|------|--------|----------|
+| 4.1 | d-abc123 | builder/implement | success | — |
+| 5.5 | d-xyz789 | requirements/review-auto | success | C0 M2 Mn1 I3 |
+| 5.6-c1-fix | d-fff111 | builder/implement | in-flight | — |
+
+## Cycles
+Current: 1 / 3
+
+## Remaining Findings (latest review)
+(Populated from the most recent review report.)
+
+## Sub-Deploy IDs
+- Implementation: d-abc123, d-def456
+- Review: d-xyz789
+- Fix: d-fff111
+
+## Resume Hint
+Next: Phase 5.6 cycle 1 re-review (after fix d-fff111 finishes)
+
+## Orchestrator runs
+- d-<orch-id-1>: started <ts>, killed <ts>, reason: runtime cap
+- d-<orch-id-2>: started <ts>, in-progress
+```
+
+## Resume Playbook
+
+**On every orchestrator launch** (Phase 0, before repo resolution):
+
+1. **Check ticket for existing orchestration doc-ref.**
+   ```bash
+   pa ticket view <ticket_id> --json | jq '.doc_refs[] | select(.type == "orchestration")'
+   ```
+   If none → fresh run, skip to Phase 0 repo resolution.
+
+2. **Read the report.** Locate and read `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md`.
+
+3. **Reconcile in-flight rows.** For every Sub-Deploys row with status `in-flight`:
+   ```bash
+   pa registry status <deploy-id>
+   ```
+   - If deploy is `running` → **ABORT**. Another orchestrator is alive. Print clear error; exit 1. Do not double-execute.
+   - If deploy is `complete` (success/partial/failed) → update the row with the true status and severity counts. Append Timeline entry `<ts> <deploy-id> reconciled as <status>`.
+
+4. **Determine entry point from `## Resume Hint`** — that tells you which phase to resume in.
+
+5. **Read `## Cycles` counter.** The fix loop uses this as its starting point (do not reset to 0).
+
+6. **Append Timeline entry `<ts> Orchestrator resumed (d-<new-orch-id>)`** and add a row under `## Orchestrator runs`.
+
+7. **Continue from the resume phase.** All subsequent writes go to the same report file.
 
 ## Ticket Tracking Protocol
 
@@ -410,12 +623,16 @@ When working with builder tickets:
 | Builder phase fails (transient) | Retry once |
 | Builder phase fails (real) | Report to Sinh, stop |
 | Merge strategy unclear | Ask Sinh, wait for response |
-| Approaching PA_MAX_RUNTIME | Write partial report, exit gracefully |
+| Review-auto fails (crash/timeout) | Update Sub-Deploys row as `failed`; treat as zero qualifying findings; note in report; proceed to Phase 6 |
+| Fix loop exceeds cycle cap with Critical findings remaining | Set `orchestration_status=partial`; proceed to Phase 6 and advance ticket with `partial` status in the report |
+| Orchestrator killed by PA_MAX_RUNTIME cap | No cleanup needed — last written report row is the stop point; next orchestrator launch follows the Resume Playbook |
+| Concurrent orchestrator detected on resume (prior in-flight deploy still `running`) | Abort immediately with a clear error; do not double-execute (see Resume Playbook step 3) |
 | Item checklist and git log disagree | Trust the checklist (same rule as builder) |
 
 ## Communication with Sinh
 
 All communication with Sinh goes through the ticket system:
+- **Orchestration report (primary handoff)** → `pa ticket update <id> --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md" --doc-ref-primary` (written in Phase 6 alongside the `review-uat → sinh` advance)
 - **Completion (working ticket)** → `pa ticket comment <ticket-id>` with summary and session log reference
 - **Completion (no ticket)** → `pa ticket create --type fyi --assignee sinh`
 - **Review requests** → `pa ticket create --type review-request --assignee sinh`
@@ -425,6 +642,6 @@ All communication with Sinh goes through the ticket system:
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| PA_MAX_RUNTIME | Maximum runtime in seconds | 10800 (3 hours) |
+| PA_MAX_RUNTIME | Maximum orchestrator runtime in seconds (overridable via `Total runtime: Nm` directive) | 7200 (120 min) |
 | PA_DEPLOY_MODE | foreground or background | foreground (CLI), background (phone) |
 | CLAUDECODE | Must be unset before nested `pa deploy` | — |
