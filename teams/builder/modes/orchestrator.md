@@ -556,57 +556,24 @@ pa ticket comment <ticket_id> --author builder/team-manager --content \
 
 ## Continuous Report Contract
 
-The orchestration report at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md` is a **living document**. The orchestrator rewrites it at four events — no exceptions, no skipping.
+The orchestration report at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md` is a **living document**. The orchestrator rewrites it at every lifecycle trigger below — no exceptions, no skipping.
+
+**Post-PA-1207, the orchestration report is the sole handoff artifact on partial/failure paths too** (the orchestrator can no longer create tickets). Treat the report as load-bearing: always update `## Timeline`, set a terminal `Status:` value, and attach via `pa ticket update <id> --doc-ref "orchestration:<path>"` before exiting — on every exit path, not only on Phase 6 success.
+
+> **Template:** Read `skills/templates/orchestration-report.md` for the standard orchestration report format (v1.0).
+> Every orchestration report MUST follow this template. It covers the full section set (`## Summary`, top-level `Repo:`/`Branch:`/`PR:` metadata, `## Timeline`, `## Sub-Deploys` + severity legend, `## Cycles` lifecycle, `## Remaining Findings` format, `## Sub-Deploy IDs`, `## Resume Hint`, `## Orchestrator runs`, `## Session Log`), the `Status:` enum (`in-progress | success | partial | failed`), phase numbering convention (`4.N` / `5` / `5.5` / `5.6-c<N>-{fix|review}` / `6`), Timeline entry format, and timestamp precision rules.
 
 ### Trigger events
 
 | Event | What to write |
 |-------|---------------|
-| Orchestrator start (or resume) | If file does not exist: create with header, empty Timeline, empty Sub-Deploys, `Cycles: 0 / 3`, `Status: in-progress`. If it exists: read it; reconcile `in-flight` rows against `pa registry status`; append Timeline entry `<ts> Orchestrator resumed`. |
-| Sub-deploy launched | Append Timeline entry `<ts> <phase> launched <deploy-id>`. Append row to Sub-Deploys table with status `in-flight`. Save the file. |
-| Sub-deploy completed | Update the corresponding Sub-Deploys row (status, severity counts, exit code). Append Timeline entry `<ts> <phase> completed <deploy-id> <status>`. Save the file. |
-| Phase 6 reached cleanly | Set `Status: success` (or `partial`). Populate `Remaining Findings`, `Sub-Deploy IDs`, final Timeline entry. Set `Resume Hint: COMPLETE`. Save the file. |
-
-### Report skeleton
-
-```markdown
-# Orchestration Report: <topic>
-
-> Ticket: <id> | Started: <ts> | Last updated: <ts>
-> Status: in-progress | success | partial
-
-## Timeline
-- <ts> Orchestrator started (d-<orch-id>)
-- <ts> Phase 4.1 launched d-abc123
-- <ts> Phase 4.1 completed d-abc123 success
-- <ts> Phase 5.5 launched d-xyz789
-- ...
-
-## Sub-Deploys
-| Phase | Deploy ID | Mode | Status | Severity |
-|-------|-----------|------|--------|----------|
-| 4.1 | d-abc123 | builder/implement | success | — |
-| 5.5 | d-xyz789 | requirements/review-auto | success | C0 M2 Mn1 I3 |
-| 5.6-c1-fix | d-fff111 | builder/implement | in-flight | — |
-
-## Cycles
-Current: 1 / 3
-
-## Remaining Findings (latest review)
-(Populated from the most recent review report.)
-
-## Sub-Deploy IDs
-- Implementation: d-abc123, d-def456
-- Review: d-xyz789
-- Fix: d-fff111
-
-## Resume Hint
-Next: Phase 5.6 cycle 1 re-review (after fix d-fff111 finishes)
-
-## Orchestrator runs
-- d-<orch-id-1>: started <ts>, killed <ts>, reason: runtime cap
-- d-<orch-id-2>: started <ts>, in-progress
-```
+| Orchestrator start (or resume) | If file does not exist: create with header, `## Summary` placeholder, empty metadata block, empty Timeline, empty Sub-Deploys, `Cycles: Current: 0 / 3`, `Status: in-progress`. If it exists: read it; reconcile `in-flight` rows against `pa registry status`; append Timeline entry `<HH:MM> — Orchestrator resumed (d-<new-orch-id>)`; add a row under `## Orchestrator runs`. |
+| Phase 1 (Understand Objective) complete | Write `## Summary` — 1-paragraph TL;DR of what the orchestrator is building (goal, scope, success definition). Populate `Repo:` (and `Branch:` once resolved in Phase 4 pre-flight) in the top-level metadata block. Save the file. |
+| Sub-deploy launched | Append Timeline entry `<HH:MM> — Phase <N> (<brief scope>) launched <deploy-id>`. Append row to Sub-Deploys table with status `in-flight`. Save the file. |
+| Sub-deploy completed | Update the corresponding Sub-Deploys row (status, severity counts, exit code). Append Timeline entry `<HH:MM> — Phase <N> (<brief scope>) completed <deploy-id> <status>`. Save the file. |
+| Phase 5 (PR created) | Update top-level metadata block with `PR: <url>` and confirm `Branch:` is set. Append Timeline entry `<HH:MM> — Phase 5 (PR creation) complete — PR <url>`. Save the file. |
+| Phase 6 reached cleanly | Set `Status: success` (or `partial` if cycle cap hit with Critical remaining). Convert `## Cycles` to `Final: N / 3 — <reason>`. Populate `## Remaining Findings` (per-severity format), `## Sub-Deploy IDs`, final Timeline entry. Set `## Resume Hint: COMPLETE — no resume needed`. Populate `## Session Log` with the manager session log path. Save the file. |
+| Partial / failure exit (any phase) | Append failure details to Timeline (actionable — Sinh should know the next move). Set `Status: partial` or `Status: failed`. Attach via `pa ticket update <id> --doc-ref "orchestration:<path>"` before exit. |
 
 ## Resume Playbook
 
