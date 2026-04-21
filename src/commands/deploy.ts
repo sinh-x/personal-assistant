@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, appendFileSync, cop
 import { resolve, basename, dirname } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
+import { resolveContentInput } from "../lib/cli/read-content-input.js";
 import { loadConfig } from "../lib/config.js";
 import { getHomeDir, getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { parseTeamYaml } from "../lib/yaml-parser.js";
@@ -505,6 +506,7 @@ export function deployCommand(
     background?: boolean;
     interactive?: boolean;
     objective?: string;
+    objectiveFile?: string;
     direct?: boolean;
     teamModel?: string;
     agentModel?: string;
@@ -522,6 +524,9 @@ export function deployCommand(
     resume?: string;
   }
 ): void {
+  // Resolve --objective / --objective-file into a single string (shell-safe file input)
+  opts.objective = resolveContentInput(opts.objective, opts.objectiveFile, "objective");
+
   // Handle --resume before any other logic
   if (opts.resume) {
     // Warn about mutually exclusive flags being ignored

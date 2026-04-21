@@ -89,6 +89,7 @@ program
   .option("--background", "Run in background (default for timers/automated)")
   .option("--interactive", "Run in foreground, user approves each tool call")
   .option("--objective <text>", "Append extra instructions to the team objective")
+  .option("--objective-file <path>", "Read objective from a file — safer than --objective for multi-line content with quotes/code")
   .option("--direct", "Lightweight direct mode — no sub-agents, skip-permissions")
   .option("--team-model <model>", "Model for the team-manager process (haiku|sonnet|opus)")
   .option("--agent-model <model>", "Model for all named agents, overrides per-agent YAML (haiku|sonnet|opus)")
@@ -100,7 +101,7 @@ program
   .option("--provider <name>", "API provider: anthropic (default) or minimax")
   .option("--timeout <seconds>", "Override deployment timeout in seconds (default: 2700, min: 60, max: 7200)")
   .option("--resume <deploy-id>", "Resume a deployment by deploy-id")
-  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean; provider?: string; timeout?: number; resume?: string }) => {
+  .action((team: string, opts: { dryRun?: boolean; background?: boolean; interactive?: boolean; objective?: string; objectiveFile?: string; direct?: boolean; teamModel?: string; agentModel?: string; mode?: string; listModes?: boolean; repo?: string; ticket?: string; validate?: boolean; provider?: string; timeout?: number; resume?: string }) => {
     deployCommand(team, opts);
   });
 
