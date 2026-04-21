@@ -4,6 +4,16 @@ You are running as a solo requirements reviewer — do NOT spawn sub-agents.
 
 ---
 
+## STANDING RULE — NEVER CREATE TICKETS
+
+Agents do **not** create tickets. Ticket creation is Sinh's exclusive decision.
+
+- If the deployment context supplies `ticket_id`, attach the review report to that ticket via `pa ticket update <ticket_id> --doc-ref "review:<path>"` and add a summary comment.
+- If no `ticket_id` is attached, save the report to artifacts only and print a stderr note telling Sinh to create a ticket manually if follow-up work is needed.
+- Do NOT call `pa ticket create` under any circumstance.
+
+---
+
 ## PHASE CHECKLIST
 
 Follow each phase in order. Log gate status after each phase before proceeding.
@@ -107,7 +117,7 @@ Follow each phase in order. Log gate status after each phase before proceeding.
 
 **Gate Criteria:** Do not save until: (1) all 4 area sections present, (2) all findings have evidence, (3) recommendations are specific and actionable.
 
-**Output Expectation:** Complete review report saved to 3 destinations with review-request ticket created.
+**Output Expectation:** Complete review report saved to artifacts and, if a ticket is attached to this deployment, attached to that ticket via `--doc-ref`.
 
 ---
 
@@ -127,14 +137,31 @@ Follow each phase in order. Log gate status after each phase before proceeding.
 Save the review report to:
 1. `~/Documents/ai-usage/deployments/<deployment_id>/team-manager/review-report.md`
 2. `~/Documents/ai-usage/agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md`
-3. Create review-request ticket:
+3. Attach to the existing ticket (if `ticket_id` is set in the deployment context):
    ```bash
-   pa ticket create --project personal-assistant \
-     --title "Review: System review findings — <system-slug>" \
-     --type review-request --assignee builder --priority high --estimate M \
-     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md" \
-     --summary "WHAT: System review of <system> covering <areas>. REVIEW: N critical, M major, K minor findings. NEXT: Approve to route to builder."
+   # Attach the review report as a doc-ref on the existing ticket
+   pa ticket update <ticket_id> \
+     --doc-ref "review:agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md"
+
+   # Post a summary comment using --content-file to avoid shell-quote corruption
+   SUMMARY_FILE=$(mktemp --suffix=.md)
+   cat > "$SUMMARY_FILE" <<'EOF'
+   Review complete. Findings: N critical, M major, K minor.
+   Report: agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md
+   Next: Sinh decides whether to route findings to builder (create follow-up ticket if needed).
+   EOF
+   pa ticket comment <ticket_id> \
+     --author requirements/reviewer \
+     --content-file "$SUMMARY_FILE"
+   rm -f "$SUMMARY_FILE"
    ```
+
+   If **no** `ticket_id` is attached, stop after step 2 and print to stderr:
+   ```
+   Review complete. Report at: agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md
+   Sinh: no ticket attached — create one manually if you want to act on these findings.
+   ```
+   Do **not** call `pa ticket create`.
 
 ---
 
