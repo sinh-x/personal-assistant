@@ -101,7 +101,8 @@ pa ticket create \
   --assignee sinh \
   --priority high \
   --estimate XS \
-  --summary "FAILED: <objective>. Repo resolution failed. Checked: file path frontmatter, git context, explicit path in objective. No valid repo found. Re-launch with explicit repo path."
+  --summary "FAILED: <objective>. Repo resolution failed. Checked: file path frontmatter, git context, explicit path in objective. No valid repo found. Re-launch with explicit repo path." \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
 ```
 
 ### Phase 1: Understand Objective
@@ -179,7 +180,8 @@ pa ticket create \
   --assignee sinh \
   --priority high \
   --estimate XS \
-  --summary "Partial: Requirements doc created by deploy <deploy-id>. Approval timeout (30 min). Re-launch after approving requirements."
+  --summary "Partial: Requirements doc created by deploy <deploy-id>. Approval timeout (30 min). Re-launch after approving requirements." \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
 ```
 
 ### Phase 3: Plan Analysis
@@ -214,7 +216,8 @@ Build a **phase context map** — a structured lookup of phase number → {requi
     pa ticket create --type review-request --project personal-assistant \
       --title "Review: Plan too thin for orchestration — <objective>" \
       --assignee sinh --priority high --estimate XS \
-      --summary "Plan for '<objective>' lacks phase checklist, verification steps, or traceable acceptance criteria. Please add detail and re-launch."
+      --summary "Plan for '<objective>' lacks phase checklist, verification steps, or traceable acceptance criteria. Please add detail and re-launch." \
+      --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
     ```
   - Wait for response (30-minute timeout, same as Phase 2)
   - On timeout: exit partial
@@ -346,7 +349,8 @@ pa ticket create \
   --assignee sinh \
   --priority high \
   --estimate XS \
-  --summary "PARTIAL: Phases 1 through N-1 succeeded. Phase N failed. Builder deploy: <deploy-id>. Failure: <key error from --report>. Review and decide: retry, fix manually, or abort. Re-launch after resolving."
+  --summary "PARTIAL: Phases 1 through N-1 succeeded. Phase N failed. Builder deploy: <deploy-id>. Failure: <key error from --report>. Review and decide: retry, fix manually, or abort. Re-launch after resolving." \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
 ```
 
 After creating the failure ticket, **stop**. Do not continue to the next phase or attempt the merge.
@@ -525,6 +529,8 @@ pa ticket comment <ticket_id> --author builder/team-manager --content \
 ## Continuous Report Contract
 
 The orchestration report at `agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md` is a **living document**. The orchestrator rewrites it at four events — no exceptions, no skipping.
+
+**Standing rule — attach the report on every ticket create.** Every `pa ticket create` call in this skill (FYI tickets, review-request tickets, any ticket the orchestrator opens for Sinh on a partial/failure path) MUST include `--doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"` so the reader lands on a ticket with the live Timeline, Sub-Deploys, Cycles, and Resume Hint already attached. No exceptions — the report path is predictable from the objective topic even when the run failed during Phase 0 pre-flight. The `pa ticket update` on the primary ticket in Phase 6 also attaches this report (already covered in Phase 6 Step 2) — keep the two pointing at the same file.
 
 ### Trigger events
 
