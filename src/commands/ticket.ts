@@ -6,6 +6,7 @@ import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import { formatTicketCard } from "../lib/tickets/display.js";
 import { normalizeSandboxPath } from "../lib/agent-api/utils/sandbox.js";
+import { resolveContentInput } from "../lib/cli/read-content-input.js";
 import type {
   Estimate,
   TicketStatus,
@@ -490,20 +491,26 @@ export function createTicketCommand(): Command {
     .description("Add a comment to a ticket")
     .argument("<id>", "Ticket ID (e.g. PA-001)")
     .requiredOption("--author <name>", "Comment author")
-    .requiredOption("--content <text>", "Comment content")
-    .action((id: string, opts: { author: string; content: string }) => {
+    .option("--content <text>", "Comment content")
+    .option("--content-file <path>", "Read comment content from a file — safer than --content for multi-line content with quotes/code")
+    .action((id: string, opts: { author: string; content?: string; contentFile?: string }) => {
       try {
         validateAuthor(opts.author);
       } catch (err) {
         console.error(err instanceof Error ? err.message : String(err));
         process.exit(1);
       }
+      const content = resolveContentInput(opts.content, opts.contentFile, "content");
+      if (content === undefined) {
+        console.error("Error: one of --content or --content-file is required");
+        process.exit(1);
+      }
       const store = new TicketStore();
-      const { ticket } = store.addComment(id, opts.author, opts.content);
+      const { ticket } = store.addComment(id, opts.author, content);
       console.log(`Comment added to ${ticket.id}`);
       // F4: Hint if comment references an artifact path and no doc_refs are set
       const artifactPattern = /agent-teams\/[^\s]+\/artifacts\/[^\s]+|deployments\/[^\s]+/;
-      const match = artifactPattern.exec(opts.content);
+      const match = artifactPattern.exec(content);
       if (match && (ticket.doc_refs ?? []).length === 0) {
         process.stderr.write(
           `Hint: This comment references an artifact path. Attach it? pa ticket update ${ticket.id} --doc-ref ${match[0]}\n`
