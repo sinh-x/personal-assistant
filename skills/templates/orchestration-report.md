@@ -23,12 +23,12 @@ The report is also the **resume source**: if the orchestrator is killed by `PA_M
 ## Template
 
 ```markdown
-# Orchestration Report: <topic>
+### Orchestration Report: <topic>
 
 > Ticket: <id> | Started: <ts> | Last updated: <ts>
 > Status: in-progress | success | partial | failed
 
-## Summary
+### Summary
 
 <1-paragraph TL;DR of what the orchestrator is building. Written at Phase 1 after objective parsing. Covers: the goal, the scope (one sentence), and how completion is defined. Rewrite if scope changes.>
 
@@ -36,7 +36,7 @@ Repo: <repo_path>
 Branch: <feature_branch>
 PR: <PR URL — populated at Phase 5>
 
-## Timeline
+### Timeline
 - <HH:MM> — Phase 0 (repo resolution) Orchestrator started (d-<orch-id>)
 - <HH:MM> — Phase 4.1 (<brief scope>) launched d-abc123
 - <HH:MM> — Phase 4.1 (<brief scope>) completed d-abc123 success
@@ -46,7 +46,7 @@ PR: <PR URL — populated at Phase 5>
 - <HH:MM> — Phase 5.6-c1-fix launched d-fff111
 - <HH:MM> — Phase 6 orchestration complete — ticket advanced to review-uat
 
-## Sub-Deploys
+### Sub-Deploys
 | Phase | Deploy ID | Mode | Status | Severity |
 |-------|-----------|------|--------|----------|
 | 4.1 (<brief scope>) | d-abc123 | builder/implement | success | — |
@@ -55,12 +55,12 @@ PR: <PR URL — populated at Phase 5>
 
 > Severity: C=Critical, M=Major, Mn=Minor, I=Info
 
-## Cycles
+### Cycles
 Current: 1 / 3
 
 <!-- In-progress form: `Current: N / 3`. Terminal form (set at Phase 6): `Final: N / 3 — <reason>` (e.g., "exited cleanly after cycle 1", "cycle cap hit with Critical remaining"). -->
 
-## Remaining Findings (latest review)
+### Remaining Findings (latest review)
 - Critical (0): —
 - Major (0): —
 - Minor (1):
@@ -69,21 +69,21 @@ Current: 1 / 3
   - <one-line summary of finding>
   - <one-line summary of finding>
 
-## Sub-Deploy IDs
+### Sub-Deploy IDs
 - Implementation: d-abc123, d-def456
 - Review: d-xyz789
 - Fix: d-fff111
 
-## Resume Hint
+### Resume Hint
 Next: Phase 5.6 cycle 1 re-review (after fix d-fff111 finishes)
 
 <!-- On Phase 6 terminal state: `COMPLETE — no resume needed` (optionally with a one-line note about follow-up work that is NOT part of this orchestration). -->
 
-## Orchestrator runs
+### Orchestrator runs
 - d-<orch-id-1>: started <ts>, killed <ts>, reason: runtime cap
 - d-<orch-id-2>: started <ts>, in-progress
 
-## Session Log
+### Session Log
 sessions/YYYY/MM/agent-team/<session-log-filename>.md
 ```
 
