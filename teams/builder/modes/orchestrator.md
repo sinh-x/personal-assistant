@@ -21,6 +21,8 @@ Common repos:
 - **PA_MAX_RUNTIME.** Orchestrator deployments run with PA_MAX_RUNTIME=7200 (120 min) by default; sub-deploys are launched with explicit caps (2700 for builder/implement, 1800 for requirements/review-auto).
 - **Requirements doc gate (STRICT).** Never proceed to Phase 3/4 without a requirements doc attached to the ticket via `doc_refs`. If a ticket has no `doc_refs` with type `requirements` or marked primary, you MUST: (1) gather implementation context from the codebase, (2) add a discovery comment to the ticket, (3) push the ticket back to `requirement-review` status assigned to `requirements`, and (4) exit. Do NOT launch the requirements team inline — let the normal requirements pipeline handle it.
 - **Ticket propagation.** Always pass `--ticket <ticket_id>` to child `pa deploy` commands when your `<deployment-context>` includes a `ticket_id`. This ensures registry traceability across the deployment chain. If no `ticket_id` is set, omit the flag.
+- **Never create tickets (STRICT).** The orchestrator operates exclusively on an existing ticket passed via `ticket_id` in `<deployment-context>`. On every partial or failure path, the response is: (1) append details to the orchestration report, (2) `pa ticket comment <ticket_id>` with the failure details, (3) `pa ticket update <ticket_id> --assignee <sinh|requirements> --doc-ref "orchestration:<path>"`, (4) exit with a partial/failed status report. **Do NOT call `pa ticket create` from any phase.** Ticket creation is Sinh's decision — if a new ticket is warranted, Sinh will make it after reviewing the comment and attached report.
+- **No `ticket_id` → hard fail.** If `<deployment-context>` does not include a `ticket_id`, write a one-line error to stderr (`orchestrator requires ticket_id; none provided`) and exit non-zero immediately. Do not run Phase 0 or any later phase. The orchestrator is not a standalone tool — it is always launched in service of a specific ticket.
 - **Objective overrides (optional).** Sinh can inject directives into the orchestrator `--objective` text to adjust behavior. Supported keys (one per line, case-insensitive):
   - `Reviewer provider: anthropic` — use `review-auto-anthropic` instead of default `review-auto` (MiniMax)
   - `Max review cycles: N` — override fix-loop cap (1, 2, or 3; default 3, global)
@@ -91,18 +93,28 @@ Determine the target repository **before any other work**. This is mandatory —
 - Confirm it is a git repository (`git -C <repo_path> rev-parse --git-dir`)
 - `cd` to the repo root
 
-**If repo cannot be determined → FAIL immediately.** Create an FYI ticket for Sinh:
+**If repo cannot be determined → FAIL immediately.** Hand the existing ticket back to Sinh with the full context — do NOT create a new ticket.
 
 ```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "FYI: Builder orchestrator pre-flight failed — repo not found" \
-  --type fyi \
-  --assignee sinh \
-  --priority high \
-  --estimate XS \
-  --summary "FAILED: <objective>. Repo resolution failed. Checked: file path frontmatter, git context, explicit path in objective. No valid repo found. Re-launch with explicit repo path."
+# 1. Ensure the orchestration report exists (create-at-start trigger from Continuous Report Contract).
+#    If it does not, create a stub with the failure in the Timeline before commenting.
+
+# 2. Write the failure comment and hand back.
+cat > /tmp/orch-fail-comment.md <<'EOF'
+FAILED at Phase 0 (repo resolution). Objective: <objective>.
+
+Checked: file path frontmatter, git context, explicit path in objective. No valid repo found.
+
+Next steps (Sinh's decision): fix the objective/repo reference and re-launch, or close this ticket if the request was invalid.
+
+Orchestration report: agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md
+EOF
+pa ticket comment <ticket_id> --author builder/orchestrator --content-file /tmp/orch-fail-comment.md
+pa ticket update <ticket_id> --assignee sinh \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
 ```
+
+Then exit non-zero with a partial status report.
 
 ### Phase 1: Understand Objective
 
@@ -169,18 +181,24 @@ pa status <deploy-id> --wait
 - Sinh reviews, possibly edits, and approves via ticket status transition
 - Monitor the ticket status: `pa ticket list --assignee builder --status pending-implementation`
 - **Timeout:** 30 minutes (configurable). Check every 60 seconds.
-- **On timeout:** Create an FYI ticket noting the partial state and exit gracefully.
+- **On timeout:** Comment on the existing ticket, attach the orchestration report, and hand back to Sinh — do NOT create a new ticket.
 
 ```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "FYI: Builder orchestrator partial — awaiting Sinh approval for <objective>" \
-  --type fyi \
-  --assignee sinh \
-  --priority high \
-  --estimate XS \
-  --summary "Partial: Requirements doc created by deploy <deploy-id>. Approval timeout (30 min). Re-launch after approving requirements."
+cat > /tmp/orch-approval-timeout.md <<'EOF'
+PARTIAL at Phase 2 (awaiting Sinh approval for requirements). Timed out after 30 minutes.
+
+Requirements doc created by deploy <deploy-id> and attached to this ticket. Approval not received within the timeout window.
+
+Next steps (Sinh's decision): review and approve the requirements doc, then re-launch the orchestrator.
+
+Orchestration report: agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md
+EOF
+pa ticket comment <ticket_id> --author builder/orchestrator --content-file /tmp/orch-approval-timeout.md
+pa ticket update <ticket_id> --assignee sinh \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
 ```
+
+Then exit with a partial status report.
 
 ### Phase 3: Plan Analysis
 
@@ -209,15 +227,22 @@ Build a **phase context map** — a structured lookup of phase number → {requi
 - §4 In Scope items must be traceable to at least one phase
 - §10 Acceptance Criteria must be traceable to at least one phase
 - If the plan is too thin (no checklist, vague phases, missing verification steps, untraceable AC):
-  - Create a review-request ticket asking for more detail:
+  - Comment on the existing ticket with the specific thinness — do NOT create a new ticket — and push it back to the requirements team for more detail:
     ```bash
-    pa ticket create --type review-request --project personal-assistant \
-      --title "Review: Plan too thin for orchestration — <objective>" \
-      --assignee sinh --priority high --estimate XS \
-      --summary "Plan for '<objective>' lacks phase checklist, verification steps, or traceable acceptance criteria. Please add detail and re-launch."
+    cat > /tmp/orch-plan-thin.md <<'EOF'
+    BLOCKED at Phase 3 (plan analysis). The attached requirements doc lacks one or more of: phase checklist, verification steps, traceable acceptance criteria.
+
+    Specifically missing: <list what was missing>.
+
+    Pushing back to requirements team for more detail. After revision, re-launch the orchestrator.
+
+    Orchestration report: agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md
+    EOF
+    pa ticket comment <ticket_id> --author builder/orchestrator --content-file /tmp/orch-plan-thin.md
+    pa ticket update <ticket_id> --status requirement-review --assignee requirements \
+      --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
     ```
-  - Wait for response (30-minute timeout, same as Phase 2)
-  - On timeout: exit partial
+  - Exit with a partial status report. Do NOT wait for a response in-process — the orchestrator is not long-running for this case.
 
 **Example — Valid vs Too-Thin Phase Checklist:**
 
@@ -336,18 +361,25 @@ pa status <deploy-id> --report
 
 **On real failure:**
 
-Read the builder's report via `pa status <deploy-id> --report` and create an FYI ticket:
+Read the builder's report via `pa status <deploy-id> --report` and hand back to Sinh on the existing ticket — do NOT create a new ticket. Do NOT advance ticket status (Sinh decides the next move).
 
 ```bash
-pa ticket create \
-  --project personal-assistant \
-  --title "FYI: Builder orchestrator build failed at phase N — <objective>" \
-  --type fyi \
-  --assignee sinh \
-  --priority high \
-  --estimate XS \
-  --summary "PARTIAL: Phases 1 through N-1 succeeded. Phase N failed. Builder deploy: <deploy-id>. Failure: <key error from --report>. Review and decide: retry, fix manually, or abort. Re-launch after resolving."
+cat > /tmp/orch-build-fail.md <<'EOF'
+PARTIAL at Phase 4 (build loop). Phases 1 through N-1 succeeded. Phase N failed.
+
+Builder deploy: <deploy-id>
+Key error: <first-line error from pa status <deploy-id> --report>
+
+Next steps (Sinh's decision): retry Phase N, fix manually, or abort the run. Full failure context is in the orchestration report below; full builder report is available via `pa status <deploy-id> --report`.
+
+Orchestration report: agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md
+EOF
+pa ticket comment <ticket_id> --author builder/orchestrator --content-file /tmp/orch-build-fail.md
+pa ticket update <ticket_id> --assignee sinh \
+  --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md"
 ```
+
+Then exit with a partial status report.
 
 After creating the failure ticket, **stop**. Do not continue to the next phase or attempt the merge.
 
@@ -631,12 +663,12 @@ When working with builder tickets:
 
 ## Communication with Sinh
 
-All communication with Sinh goes through the ticket system:
-- **Orchestration report (primary handoff)** → `pa ticket update <id> --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md" --doc-ref-primary` (written in Phase 6 alongside the `review-uat → sinh` advance)
-- **Completion (working ticket)** → `pa ticket comment <ticket-id>` with summary and session log reference
-- **Completion (no ticket)** → `pa ticket create --type fyi --assignee sinh`
-- **Review requests** → `pa ticket create --type review-request --assignee sinh`
-- **Failure reports** → `pa ticket create --type fyi --assignee sinh --priority high`
+All communication with Sinh goes through the **existing ticket** (`ticket_id` from `<deployment-context>`). The orchestrator never creates tickets — see the "Never create tickets" rule in Critical Rules.
+
+- **Orchestration report (primary handoff)** → `pa ticket update <ticket_id> --doc-ref "orchestration:agent-teams/builder/artifacts/YYYY-MM-DD-<topic>-orchestration-report.md" --doc-ref-primary` (written in Phase 6 alongside the `review-uat → sinh` advance)
+- **Completion** → `pa ticket comment <ticket_id> --author builder/orchestrator --content-file <tmp>` with summary and session log reference, then Phase 6's `pa ticket update` advances the ticket.
+- **Review requests / questions** → `pa ticket comment <ticket_id>` with the question, then `pa ticket update <ticket_id> --assignee sinh --doc-ref "orchestration:<path>"`. Exit partial. Sinh reads the comment + report and decides the next move.
+- **Failure reports** → `pa ticket comment <ticket_id>` with the failure details, then `pa ticket update <ticket_id> --assignee sinh --doc-ref "orchestration:<path>"`. Do NOT advance status — Sinh decides retry vs. abort.
 
 ## Environment Variables
 
