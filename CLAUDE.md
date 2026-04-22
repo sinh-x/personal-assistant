@@ -24,7 +24,22 @@ Or directly:
 bash scripts/dev/version_bump.sh [patch|minor|major]
 ```
 
-The script: reads current version from `package.json`, computes new version, updates `package.json`, runs `pnpm build`, commits, and pushes to main.
+The script: reads current version from `package.json`, computes new version, updates `package.json`, runs `pnpm build`, auto-refreshes `pnpmDeps.hash` in `flake.nix` if `pnpm-lock.yaml` changed, commits, and pushes to main.
+
+### NixOS Build Troubleshooting
+
+The `personal-assistant` NixOS flake uses `fetchPnpmDeps` with a content-addressed `pnpmDeps.hash` tied to the exact contents of `pnpm-lock.yaml`. If the hash is stale, `nix build` fails with `ERR_PNPM_NO_OFFLINE_TARBALL` or a hash mismatch error.
+
+**Auto-refresh:** `scripts/dev/version_bump.sh` automatically detects lockfile changes and refreshes `pnpmDeps.hash` before committing. This is handled transparently during normal version bumps.
+
+**Manual refresh:**
+```bash
+bash scripts/dev/version_bump.sh --refresh-hash
+# or via pnpm:
+pnpm run bump:refresh-hash
+```
+
+**If CI fails on the `nix-build` job:** Run the refresh command above, commit `flake.nix`, and re-push. The CI job error message will guide you.
 
 ## Team Name Convention
 
