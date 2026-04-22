@@ -101,6 +101,8 @@ export interface DocRef {
   addedAt: string;
   /** Agent or user who added this ref */
   addedBy: string;
+  /** Derived human-readable title — sourced from H1, frontmatter title:, or filename (Phase 4.5, PA-1210) */
+  title?: string;
 }
 
 /** One entry in the JSONL audit log — records every mutation */
@@ -205,3 +207,63 @@ export type UpdateTicketInput = Partial<
 
 /** counter.json structure — one entry per project prefix */
 export type CounterStore = Record<string, number>;
+
+// ─── Doc-ref type taxonomy (Phase 4.1, PA-1210) ─────────────────────────────────
+
+/**
+ * Canonical ordering for doc-ref type display badges.
+ * Used by `formatDocRefBadge` in list view to render badges in canonical order.
+ */
+export const DOC_REF_BADGE_ORDER: readonly string[] = [
+  "req",
+  "plan",
+  "spike",
+  "impl",
+  "uat",
+  "orch",
+  "session",
+  "log",
+  "url",
+  "attachment",
+] as const;
+
+/**
+ * Canonical lowercase doc-ref type codes.
+ * Use `DOC_REF_TYPE_DISPLAY` to get the uppercase display string.
+ */
+export const STANDARD_DOC_REF_TYPES: readonly string[] = [
+  "req",
+  "uat",
+  "impl",
+  "orch",
+  "plan",
+  "spike",
+  "session",
+  "log",
+  "url",
+  "attachment",
+] as const;
+
+/**
+ * Map from any doc-ref type (short code or long-form alias) to its canonical
+ * uppercase display form.
+ * Covers all `STANDARD_DOC_REF_TYPES` plus long-form aliases.
+ */
+export const DOC_REF_TYPE_DISPLAY: Readonly<Record<string, string>> = {
+  // Short codes → uppercase display
+  req: "REQ",
+  uat: "UAT",
+  impl: "IMPL",
+  orch: "ORCH",
+  plan: "PLAN",
+  spike: "SPIKE",
+  session: "SESSION",
+  log: "LOG",
+  url: "URL",
+  attachment: "ATTACHMENT",
+  // Long-form aliases → uppercase display
+  requirements: "REQ",
+  implementation: "IMPL",
+  review: "REVIEW",
+  "review-report": "REVIEW",
+} as const;

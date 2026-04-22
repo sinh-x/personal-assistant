@@ -113,3 +113,22 @@ Items explicitly deferred from this scope.
 - **Repo path and branch** in §0/Context for pre-flight checks
 - **Phase checklist** in §12 so orchestrator can delegate one phase at a time
 - **Verification steps** in §12 for each phase so builder can confirm success
+
+## Doc-ref Types
+
+When attaching documents to tickets via `--doc-ref`, use the standardized type prefix:
+
+| Type | Use for | Example |
+|------|---------|---------|
+| `req` | Requirements documents | `--doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-topic.md"` |
+| `uat` | UAT test plans | `--doc-ref "uat:agent-teams/requirements/artifacts/YYYY-MM-DD-topic-uat.md"` |
+| `impl` | Implementation artifacts | `--doc-ref "impl:agent-teams/builder/artifacts/YYYY-MM-DD-topic.md"` |
+| `orch` | Orchestration reports | `--doc-ref "orch:agent-teams/orchestrator/artifacts/YYYY-MM-DD-report.md"` |
+| `plan` | Planning documents | `--doc-ref "plan:path/to/plan.md"` |
+| `spike` | Spike reports | `--doc-ref "spike:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-topic.md"` |
+| `session` | Session logs | `--doc-ref "session:sessions/YYYY/MM/session-id.md"` |
+| `log` | Diagnostic/export logs | `--doc-ref "log:deployments/d-abc123/session-log.md"` |
+| `url` | External URLs | `--doc-ref "url:https://..."` |
+| `attachment` | Generic attachments | `--doc-ref "attachment:path/to/file.pdf"` |
+
+Use `--doc-ref-primary` to mark the primary doc_ref (typically the requirements doc).

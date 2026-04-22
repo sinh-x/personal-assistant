@@ -12,7 +12,7 @@ When starting a requirements session from an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee requirements --status requirement-review`
 2. Claim the ticket: `pa ticket update <id> --assignee requirements/team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"`
+4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-<topic>.md"`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ### Repo Context (mandatory startup)

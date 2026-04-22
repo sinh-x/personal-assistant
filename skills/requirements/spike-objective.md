@@ -129,7 +129,7 @@ Follow each phase in order. Log gate status after each phase before proceeding.
 - [ ] Add doc_ref on ticket: `pa ticket update <ticket-id> --doc-ref "spike:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"`
 
 **If working on existing ticket:**
-- [ ] Advance: `pa ticket update <ticket-id> --status pending-approval --assignee sinh --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"`
+- [ ] Advance: `pa ticket update <ticket-id> --status pending-approval --assignee sinh --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"`
 
 **If standalone (no ticket):**
 - [ ] Create review-request ticket per spike.md instructions

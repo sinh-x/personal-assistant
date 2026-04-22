@@ -10,7 +10,7 @@ When starting from an assigned ticket:
 1. List assigned tickets: `pa ticket list --assignee requirements --status requirement-review`
 2. Claim the ticket: `pa ticket update <id> --assignee requirements/team-manager` (keep status as `requirement-review`)
 3. Work on it
-4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"`
+4. On completion: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"`
 5. On failure/abort: add `--tags failed` + comment + create an FYI ticket
 
 ---
@@ -353,9 +353,9 @@ Do this **before** advancing ticket status. If you advance without a `doc_refs` 
 Advance the existing ticket instead of creating a new one:
 ```bash
 pa ticket update <ticket_id> --status pending-approval --assignee sinh \
-  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
+  --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
 pa ticket comment <ticket_id> --author researcher \
-  --content "Spike research complete. Produced <light spike | full requirements doc>. Doc: agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md. Review and approve to route to builder."
+  --content "Spike research complete. Produced <light spike | full requirements doc>. Doc: req:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md. Review and approve to route to builder."
 ```
 
 ### If NO existing ticket (standalone spike):
@@ -365,7 +365,7 @@ pa ticket create --type review-request --project personal-assistant \
   --title "Spike Review: <topic>" \
   --summary "Autonomous spike on <topic>. Produced <light spike | full requirements doc>. Review and decide: approve, request interactive session, or defer." \
   --assignee builder --priority medium --estimate S \
-  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
+  --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-spike-<topic-slug>.md"
 ```
 
 Template for the inline review-request summary (include as `--description` or as a comment):

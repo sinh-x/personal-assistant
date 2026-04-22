@@ -4,7 +4,9 @@ import { resolve } from "node:path";
 import { getTicketsDir } from "../lib/paths.js";
 import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
-import { formatTicketCard } from "../lib/tickets/display.js";
+import { formatTicketCard, formatDocRefsTable } from "../lib/tickets/display.js";
+import { normalizeDocRefType, formatDocRefBadge } from "../lib/tickets/doc-ref.js";
+import { DOC_REF_BADGE_ORDER, STANDARD_DOC_REF_TYPES } from "../lib/tickets/types.js";
 import { normalizeSandboxPath } from "../lib/agent-api/utils/sandbox.js";
 import { resolveContentInput } from "../lib/cli/read-content-input.js";
 import type {
@@ -84,13 +86,29 @@ function validateStatus(value: string): TicketStatus {
  * Parse --doc-ref value: "[type:]path"
  * - With colon: type is before colon, path is after
  * - Without colon: type defaults to 'attachment' (backward compat — F15)
+ * - Normalizes type via normalizeDocRefType (short + long aliases → canonical)
+ * - Warns to stderr if normalized type is not in STANDARD_DOC_REF_TYPES (soft enforcement —
+ *   does NOT exit; intent is per PA-1210 F4/AC4 to allow future/unofficial types without
+ *   breaking existing workflows)
  */
 function parseDocRef(raw: string, primary: boolean): AddDocRefInput {
   const colonIdx = raw.indexOf(":");
+  let type: string;
+  let path: string;
   if (colonIdx > 0) {
-    return { type: raw.slice(0, colonIdx), path: raw.slice(colonIdx + 1), primary };
+    type = raw.slice(0, colonIdx);
+    path = raw.slice(colonIdx + 1);
+  } else {
+    type = "attachment";
+    path = raw;
   }
-  return { type: "attachment", path: raw, primary };
+  const normalized = normalizeDocRefType(type);
+  if (!STANDARD_DOC_REF_TYPES.includes(normalized)) {
+    process.stderr.write(
+      `Warning: Unknown doc-ref type '${type}'. Standard types: ${STANDARD_DOC_REF_TYPES.join(", ")}\n`
+    );
+  }
+  return { type: normalized, path, primary };
 }
 
 /**
@@ -134,27 +152,63 @@ function parseLinkedCommit(raw: string): AddLinkedCommitInput {
   return { repo, sha, message, author, timestamp };
 }
 
-/** Format a doc_refs table for show command */
-function formatDocRefsTable(docRefs: DocRef[]): string {
-  if (docRefs.length === 0) return "  (none)";
-  const header = "  TYPE".padEnd(22) + "PATH".padEnd(60) + "PRIMARY";
-  const sep = "  " + "-".repeat(80);
-  const rows = docRefs.map((r) => {
-    const isUrl = r.path.startsWith("http://") || r.path.startsWith("https://");
-    const displayPath = isUrl ? `[url] ${r.path}` : r.path;
-    return "  " + r.type.padEnd(20) + displayPath.padEnd(60) + (r.primary ? "✓" : "");
-  });
-  return [header, sep, ...rows].join("\n");
+/** Build the inline doc-ref badge prefix for list view, e.g. "[★REQ][UAT][IMPL]".
+ *  De-duplicates by type; orders by DOC_REF_BADGE_ORDER; marks primary with ★.
+ *  Returns empty string if docRefs is empty.
+ *  F8: collapses to "[★TYPE][+N]" when 4+ distinct types and row would exceed 120 cols. */
+function buildBadgePrefix(docRefs: DocRef[], titleLength: number): string {
+  if (!docRefs || docRefs.length === 0) return "";
+
+  // Group by normalized type, keeping primary ref per type
+  const byType = new Map<string, DocRef>();
+  for (const ref of docRefs) {
+    const key = normalizeDocRefType(ref.type);
+    if (!byType.has(key) || ref.primary) {
+      byType.set(key, ref);
+    }
+  }
+
+  // Order by canonical badge order
+  const ordered: DocRef[] = [];
+  for (const typeKey of DOC_REF_BADGE_ORDER) {
+    const ref = byType.get(typeKey);
+    if (ref) ordered.push(ref);
+  }
+  // Append any types not in the canonical order
+  for (const [, ref] of byType) {
+    if (!ordered.includes(ref)) ordered.push(ref);
+  }
+
+  const distinctCount = ordered.length;
+  const badgeLine = ordered.map((ref) => formatDocRefBadge(ref)).join("");
+
+  // F8 collapse: 4+ distinct types and row would exceed 120 cols
+  // Fixed columns: ID(9) + STATUS(25) + PRIORITY(11) + EST(6) + ASSIGNEE(28) + space = 80
+  const ROW_FIXED = 80;
+  if (distinctCount >= 4 && ROW_FIXED + badgeLine.length + 1 + titleLength > 120) {
+    const primary = ordered.find((r) => r.primary) ?? ordered[0];
+    const second = ordered.find((r) => r !== primary);
+    const remaining = distinctCount - 2;
+    const first = formatDocRefBadge(primary);
+    const secondStr = second ? formatDocRefBadge(second) : "";
+    const collapse = remaining > 0 ? `[+${remaining}]` : "";
+    return first + secondStr + collapse;
+  }
+
+  return badgeLine;
 }
 
 /** Format a ticket row for the list view — defensive null checks for all fields */
-function formatRow(id: string, status: string, priority: string, estimate: string, assignee: string, title: string): string {
+function formatRow(id: string, status: string, priority: string, estimate: string, assignee: string, title: string, docRefs?: DocRef[]): string {
+  const badgePrefix = buildBadgePrefix(docRefs ?? [], (title ?? "").length);
+  const paddedBadge = badgePrefix ? badgePrefix + " " : "";
   return (
     (id ?? "").padEnd(9) +
     (status ?? "").padEnd(25) +
     (priority ?? "").padEnd(11) +
     (estimate ?? "").padEnd(6) +
     (assignee ?? "").padEnd(28) +
+    paddedBadge +
     (title ?? "")
   );
 }
@@ -278,7 +332,7 @@ export function createTicketCommand(): Command {
     .option("--tags <tags>", "Comma-separated tags (replaces existing)")
     .option("--blocked-by <ids>", "Comma-separated ticket IDs that block this ticket (replaces existing; empty string to clear)")
     .option("--estimate <size>", "New effort estimate (XS|S|M|L|XL)")
-    .option("--doc-ref <value>", "Add document reference: [type:]path (ADDS to array, does not replace). Type defaults to 'attachment'.")
+    .option("--doc-ref <value>", "Add document reference: [type:]path. Standard types: req, uat, impl, orch, plan, spike, session, log, url, attachment. Type defaults to 'attachment'.")
     .option("--doc-ref-primary", "Mark the added doc-ref as primary (demotes any existing primary)")
     .option("--remove-doc-ref <path>", "Remove a doc-ref by exact path match")
     .option("--linked-branch <value>", "Link a branch: repo|branch[:sha] (ADDS to array)")
@@ -421,7 +475,7 @@ export function createTicketCommand(): Command {
         console.log(formatRow("ID", "STATUS", "PRIORITY", "EST", "ASSIGNEE", "TITLE"));
         console.log("-".repeat(80));
         for (const t of tickets) {
-          console.log(formatRow(t.id, t.status, t.priority, t.estimate, t.assignee, t.title));
+          console.log(formatRow(t.id, t.status, t.priority, t.estimate, t.assignee, t.title, t.doc_refs));
         }
         console.log(`\n${tickets.length} ticket(s)`);
       }

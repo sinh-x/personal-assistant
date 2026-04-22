@@ -170,7 +170,7 @@ Save the review report to:
 When you pick up a ticket for work:
 1. Claim it: `pa ticket update <id> --assignee requirements/team-manager` (keep status as `requirement-review`)
 2. Work through phases 1-6
-3. Mark complete: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md"`
+3. Mark complete: `pa ticket update <id> --status pending-approval --assignee sinh --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md"`
 
 ---
 
