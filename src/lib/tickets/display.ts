@@ -1,6 +1,7 @@
 import { marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 import type { Ticket, Comment, DocRef, SubTicket, LinkedBranch, LinkedCommit } from "./types.js";
+import { formatDocRefBadge, deriveDocRefTitle } from "./doc-ref.js";
 
 // Configure marked with terminal renderer
 const terminalRenderer = markedTerminal({
@@ -38,28 +39,22 @@ function formatTimestamp(iso: string): string {
 }
 
 /**
- * Format a doc_refs table — reused from ticket.ts show command.
+ * Format a doc_refs table — two-line layout per ref.
+ * Line 1: badge + title (★ marks primary, aligned to first column)
+ * Line 2: indented dim path
  */
-function formatDocRefsTable(docRefs: DocRef[]): string {
+export function formatDocRefsTable(docRefs: DocRef[]): string {
   if (docRefs.length === 0) return "  (none)";
-  const width = process.stdout.isTTY ? Math.min(process.stdout.columns, 120) : 100;
-  const typeWidth = 20;
-  const pathWidth = width - typeWidth - 12;
-  const header = "  TYPE".padEnd(typeWidth) + "PATH".padEnd(pathWidth) + "PRIMARY";
-  const sep = "  " + "-".repeat(width);
-  const rows = docRefs.map((r) => {
-    const isUrl = r.path.startsWith("http://") || r.path.startsWith("https://");
-    const displayPath = isUrl ? `[url] ${r.path}` : r.path;
-    return (
-      "  " +
-      r.type.padEnd(typeWidth - 2) +
-      (displayPath.length > pathWidth - 3
-        ? displayPath.slice(0, pathWidth - 6) + "..."
-        : displayPath).padEnd(pathWidth - 2) +
-      (r.primary ? "✓" : "")
+  const COLORS = { dim: "\x1b[2m", reset: "\x1b[0m" };
+  const rows: string[] = [];
+  for (const ref of docRefs) {
+    const badge = formatDocRefBadge(ref);
+    const title = deriveDocRefTitle(ref);
+    rows.push(
+      `  ${badge} ${title}\n  ${COLORS.dim}${ref.path}${COLORS.reset}`
     );
-  });
-  return [header, sep, ...rows].join("\n");
+  }
+  return rows.join("\n");
 }
 
 /**

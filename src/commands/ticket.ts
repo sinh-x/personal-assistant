@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { getTicketsDir } from "../lib/paths.js";
 import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
-import { formatTicketCard } from "../lib/tickets/display.js";
+import { formatTicketCard, formatDocRefsTable } from "../lib/tickets/display.js";
 import { normalizeSandboxPath } from "../lib/agent-api/utils/sandbox.js";
 import { resolveContentInput } from "../lib/cli/read-content-input.js";
 import type {
@@ -132,19 +132,6 @@ function parseLinkedCommit(raw: string): AddLinkedCommitInput {
   const author = parts.length >= 4 ? parts[3] : undefined;
   const timestamp = parts.length >= 5 ? parts[4] : undefined;
   return { repo, sha, message, author, timestamp };
-}
-
-/** Format a doc_refs table for show command */
-function formatDocRefsTable(docRefs: DocRef[]): string {
-  if (docRefs.length === 0) return "  (none)";
-  const header = "  TYPE".padEnd(22) + "PATH".padEnd(60) + "PRIMARY";
-  const sep = "  " + "-".repeat(80);
-  const rows = docRefs.map((r) => {
-    const isUrl = r.path.startsWith("http://") || r.path.startsWith("https://");
-    const displayPath = isUrl ? `[url] ${r.path}` : r.path;
-    return "  " + r.type.padEnd(20) + displayPath.padEnd(60) + (r.primary ? "✓" : "");
-  });
-  return [header, sep, ...rows].join("\n");
 }
 
 /** Format a ticket row for the list view — defensive null checks for all fields */
