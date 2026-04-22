@@ -87,7 +87,9 @@ function validateStatus(value: string): TicketStatus {
  * - With colon: type is before colon, path is after
  * - Without colon: type defaults to 'attachment' (backward compat — F15)
  * - Normalizes type via normalizeDocRefType (short + long aliases → canonical)
- * - Warns to stderr if normalized type is not in STANDARD_DOC_REF_TYPES
+ * - Warns to stderr if normalized type is not in STANDARD_DOC_REF_TYPES (soft enforcement —
+ *   does NOT exit; intent is per PA-1210 F4/AC4 to allow future/unofficial types without
+ *   breaking existing workflows)
  */
 function parseDocRef(raw: string, primary: boolean): AddDocRefInput {
   const colonIdx = raw.indexOf(":");

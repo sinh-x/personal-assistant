@@ -47,6 +47,8 @@ export function formatDocRefsTable(docRefs: DocRef[]): string {
   if (docRefs.length === 0) return "  (none)";
   const COLORS = { dim: "\x1b[2m", reset: "\x1b[0m" };
   const rows: string[] = [];
+  rows.push(`  DOC REFS`);
+  rows.push(`  ${"-".repeat(74)}`);
   for (const ref of docRefs) {
     const badge = formatDocRefBadge(ref);
     const title = deriveDocRefTitle(ref);
