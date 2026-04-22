@@ -127,7 +127,7 @@ Triaged N ideas into M groups. N new ideas processed.
      --title "Ideas Triage: YYYY-MM-DD" \
      --summary "Triaged N ideas into M groups. Review groupings and priorities." \
      --assignee requirements --priority medium --estimate S \
-     --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-ideas-triage-proposal.md"
+     --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-ideas-triage-proposal.md"
    ```
 
 2. **Save tracking copy to requirements artifacts:**

@@ -196,7 +196,7 @@ pa ticket create \
   --assignee builder \
   --priority high \
   --estimate M \
-  --doc-ref "agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md" \
+  --doc-ref "req:agent-teams/requirements/artifacts/YYYY-MM-DD-review-<system-slug>.md" \
   --summary "WHAT: System review of <system name> covering <selected areas>. REVIEW: N critical, M major, K minor findings. NEXT: Approve to route prioritized fixes to builder for implementation."
 ```
 
