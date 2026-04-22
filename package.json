@@ -1,6 +1,6 @@
 {
   "name": "personal-assistant",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "type": "module",
   "description": "CLI agent team orchestrator for NixOS",
   "main": "dist/cli.mjs",
