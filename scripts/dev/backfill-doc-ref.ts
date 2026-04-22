@@ -15,8 +15,8 @@
  *   --dry-run  Show what would change without modifying any files
  */
 
-import { TicketStore } from "../src/lib/tickets/store.js";
-import { ACTIVE_STATUSES } from "../src/lib/tickets/types.js";
+import { TicketStore } from "../../src/lib/tickets/store.js";
+import { ACTIVE_STATUSES } from "../../src/lib/tickets/types.js";
 
 const DRY_RUN = process.argv.includes("--dry-run");
 
