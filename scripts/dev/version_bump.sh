@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # version_bump.sh — bump package version, generate changelog, tag, and push
-# Usage: ./scripts/version_bump.sh [patch|minor|major] [--no-edit] [--force]
+# Usage: ./scripts/dev/version_bump.sh [patch|minor|major] [--no-edit] [--force] [--refresh-hash]
 set -euo pipefail
 
 BUMP="patch"
 NO_EDIT=false
 FORCE=false
+REFRESH_HASH=false
 
 # Parse arguments
 for arg in "$@"; do
@@ -13,9 +14,58 @@ for arg in "$@"; do
     patch|minor|major) BUMP="$arg" ;;
     --no-edit) NO_EDIT=true ;;
     --force) FORCE=true ;;
-    *) echo "Usage: $0 [patch|minor|major] [--no-edit] [--force]"; exit 1 ;;
+    --refresh-hash) REFRESH_HASH=true ;;
+    *) echo "Usage: $0 [patch|minor|major] [--no-edit] [--force] [--refresh-hash]"; exit 1 ;;
   esac
 done
+
+refresh_pnpm_deps_hash() {
+  # Skip unless pnpm-lock.yaml changed since last tag (or is newly dirty)
+  local last_tag; last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+  local lock_changed=false
+  if [[ -n "$last_tag" ]] && git diff --quiet "$last_tag" -- pnpm-lock.yaml; then
+    :
+  else
+    lock_changed=true
+  fi
+  git diff --quiet -- pnpm-lock.yaml || lock_changed=true
+  [[ "$lock_changed" == false ]] && echo "pnpm-lock.yaml unchanged — skipping hash refresh" && return 0
+
+  command -v nix >/dev/null || { echo "ERROR: nix not available, cannot refresh pnpmDeps.hash"; return 1; }
+
+  echo "pnpm-lock.yaml changed — refreshing flake.nix pnpmDeps.hash"
+
+  # 1. First attempt — if it already builds, we're done
+  if nix build .#personal-assistant --no-link 2>/dev/null; then
+    echo "Hash already correct — no refresh needed"
+    return 0
+  fi
+
+  # 2. Invalidate and re-run to collect the expected hash
+  local tmpfile; tmpfile=$(mktemp)
+  sed -i.bak 's|hash = "sha256-[^"]*"|hash = ""|' flake.nix
+  nix build .#personal-assistant --no-link 2>&1 | tee "$tmpfile" || true
+  local got; got=$(grep -oP 'got:\s+\Ksha256-\S+' "$tmpfile" | head -1)
+  if [[ -z "$got" ]]; then
+    # Restore and fail
+    mv flake.nix.bak flake.nix
+    rm -f "$tmpfile"
+    echo "ERROR: could not extract expected hash from nix build output"
+    return 1
+  fi
+  sed -i "s|hash = \"\"|hash = \"$got\"|" flake.nix
+  rm -f flake.nix.bak "$tmpfile"
+
+  # 3. Verify the new hash
+  nix build .#personal-assistant --no-link || { echo "ERROR: build still fails after hash refresh"; return 1; }
+  echo "pnpmDeps.hash refreshed to $got"
+}
+
+# Early exit for standalone hash refresh
+if [[ "$REFRESH_HASH" == true ]]; then
+  refresh_pnpm_deps_hash
+  exit $?
+fi
 
 # Read current version from package.json
 CURRENT=$(node -e "process.stdout.write(require('./package.json').version)")
@@ -38,12 +88,12 @@ if [[ "$FORCE" == false ]]; then
   if [[ "$BUMP" == "patch" ]]; then
     FEAT_COMMITS=$(git log ${RANGE:-HEAD} --oneline --grep='^feat(' 2>/dev/null | wc -l | tr -d ' ')
     if [[ "$FEAT_COMMITS" -gt 0 ]]; then
-      echo "⚠️  WARNING: $FEAT_COMMITS feat() commit(s) found since last tag. Consider bumping minor instead."
+      echo "WARNING: $FEAT_COMMITS feat() commit(s) found since last tag. Consider bumping minor instead."
     fi
   elif [[ "$BUMP" == "minor" ]]; then
     BREAKING_COMMITS=$(git log ${RANGE:-HEAD} --oneline --grep='BREAKING CHANGE' 2>/dev/null | wc -l | tr -d ' ')
     if [[ "$BREAKING_COMMITS" -gt 0 ]]; then
-      echo "⚠️  WARNING: $BREAKING_COMMITS BREAKING CHANGE commit(s) found since last tag. Consider bumping major instead."
+      echo "WARNING: $BREAKING_COMMITS BREAKING CHANGE commit(s) found since last tag. Consider bumping major instead."
     fi
   fi
 fi
@@ -58,12 +108,15 @@ fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
 
 pnpm build
 
+# Auto-refresh pnpmDeps.hash if lockfile changed
+refresh_pnpm_deps_hash || { echo "Aborting bump due to hash-refresh failure"; exit 1; }
+
 # Generate changelog with git-cliff (installed via nix devshell)
 if command -v git-cliff &>/dev/null; then
   git-cliff --config cliff.toml --unreleased --tag "v$NEW" --prepend CHANGELOG.md
   echo "Changelog updated."
 else
-  echo "⚠️  git-cliff not found — skipping changelog generation (run inside nix devshell to enable)"
+  echo "WARNING: git-cliff not found — skipping changelog generation (run inside nix devshell to enable)"
 fi
 
 # Review pause (unless --no-edit)
@@ -72,7 +125,7 @@ if [[ "$NO_EDIT" == false ]]; then
   read -r -p "Press Enter to continue (Ctrl+C to abort)..."
 fi
 
-git add package.json CHANGELOG.md
+git add package.json CHANGELOG.md flake.nix
 git commit -m "chore: bump version to $NEW"
 
 # Create annotated tag pointing at the bump commit

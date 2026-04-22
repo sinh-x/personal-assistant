@@ -16,7 +16,8 @@
     "dev": "tsup --watch",
     "bump:patch": "bash scripts/dev/version_bump.sh patch",
     "bump:minor": "bash scripts/dev/version_bump.sh minor",
-    "bump:major": "bash scripts/dev/version_bump.sh major"
+    "bump:major": "bash scripts/dev/version_bump.sh major",
+    "bump:refresh-hash": "bash scripts/dev/version_bump.sh --refresh-hash"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
