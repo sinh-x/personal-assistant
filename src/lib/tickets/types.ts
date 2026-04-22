@@ -101,6 +101,8 @@ export interface DocRef {
   addedAt: string;
   /** Agent or user who added this ref */
   addedBy: string;
+  /** Derived human-readable title — sourced from H1, frontmatter title:, or filename (Phase 4.5, PA-1210) */
+  title?: string;
 }
 
 /** One entry in the JSONL audit log — records every mutation */

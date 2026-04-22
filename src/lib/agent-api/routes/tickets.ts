@@ -28,9 +28,10 @@ import { existsSync } from "node:fs";
 import { join, extname } from "node:path";
 import { homedir } from "node:os";
 import { TicketStore } from "../../tickets/index.js";
+import { deriveDocRefTitle } from "../../tickets/doc-ref.js";
 import { validateAuthor, validateAssignee } from "../../tickets/validate.js";
 import { buildBoardView } from "../../tickets/board.js";
-import type { CreateTicketInput, UpdateTicketInput, Comment } from "../../tickets/types.js";
+import type { CreateTicketInput, UpdateTicketInput, Comment, DocRef } from "../../tickets/types.js";
 import { listRepos } from "../../repos.js";
 import { validateSandboxPath } from "../utils/sandbox.js";
 import { getDeploymentsByTicketId } from "../../registry.js";
@@ -72,6 +73,15 @@ export function ticketRoutes(): Hono {
 
     try {
       const tickets = store.list(filters);
+      // F9: Add derived title to each doc_ref
+      for (const ticket of tickets) {
+        if (ticket.doc_refs?.length) {
+          ticket.doc_refs = ticket.doc_refs.map((r) => ({
+            ...r,
+            title: deriveDocRefTitle(r),
+          }));
+        }
+      }
       return c.json({ tickets, count: tickets.length });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -138,6 +148,7 @@ export function ticketRoutes(): Hono {
     const doc_refs = (ticket.doc_refs ?? []).map((r) => ({
       ...r,
       url: `/api/documents?path=${encodeURIComponent(r.path)}`,
+      title: deriveDocRefTitle(r),
     }));
     return c.json({ ticket, doc_refs });
   });
@@ -153,6 +164,13 @@ export function ticketRoutes(): Hono {
     }
     // F5: Include deployments array for this ticket
     const deployments = getDeploymentsByTicketId(id);
+    // F9: Add derived title to each doc_ref
+    if (ticket.doc_refs?.length) {
+      ticket.doc_refs = ticket.doc_refs.map((r) => ({
+        ...r,
+        title: deriveDocRefTitle(r),
+      }));
+    }
     if (renderHtml) {
       // Render content fields to HTML using marked
       const renderToHtml = (content: string): string => {
@@ -531,6 +549,17 @@ export function ticketRoutes(): Hono {
 
     try {
       const board = buildBoardView(project, filters);
+      // F9: Add derived title to each doc_ref in board tickets
+      for (const column of board.columns) {
+        for (const ticket of column.tickets) {
+          if (ticket.doc_refs?.length) {
+            ticket.doc_refs = (ticket.doc_refs as Array<{ type: string; path: string }>).map((r) => ({
+              ...r,
+              title: deriveDocRefTitle(r),
+            })) as DocRef[];
+          }
+        }
+      }
       return c.json({ board });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
