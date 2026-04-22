@@ -205,3 +205,46 @@ export type UpdateTicketInput = Partial<
 
 /** counter.json structure — one entry per project prefix */
 export type CounterStore = Record<string, number>;
+
+// ─── Doc-ref type taxonomy (Phase 4.1, PA-1210) ─────────────────────────────────
+
+/**
+ * Canonical lowercase doc-ref type codes.
+ * Use `DOC_REF_TYPE_DISPLAY` to get the uppercase display string.
+ */
+export const STANDARD_DOC_REF_TYPES: readonly string[] = [
+  "req",
+  "uat",
+  "impl",
+  "orch",
+  "plan",
+  "spike",
+  "session",
+  "log",
+  "url",
+  "attachment",
+] as const;
+
+/**
+ * Map from any doc-ref type (short code or long-form alias) to its canonical
+ * uppercase display form.
+ * Covers all `STANDARD_DOC_REF_TYPES` plus long-form aliases.
+ */
+export const DOC_REF_TYPE_DISPLAY: Readonly<Record<string, string>> = {
+  // Short codes → uppercase display
+  req: "REQ",
+  uat: "UAT",
+  impl: "IMPL",
+  orch: "ORCH",
+  plan: "PLAN",
+  spike: "SPIKE",
+  session: "SESSION",
+  log: "LOG",
+  url: "URL",
+  attachment: "ATTACHMENT",
+  // Long-form aliases → uppercase display
+  requirements: "REQ",
+  implementation: "IMPL",
+  review: "REVIEW",
+  "review-report": "REVIEW",
+} as const;
