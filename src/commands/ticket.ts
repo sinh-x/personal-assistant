@@ -6,7 +6,7 @@ import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import { formatTicketCard, formatDocRefsTable } from "../lib/tickets/display.js";
 import { normalizeDocRefType, formatDocRefBadge } from "../lib/tickets/doc-ref.js";
-import { DOC_REF_BADGE_ORDER } from "../lib/tickets/types.js";
+import { DOC_REF_BADGE_ORDER, STANDARD_DOC_REF_TYPES } from "../lib/tickets/types.js";
 import { normalizeSandboxPath } from "../lib/agent-api/utils/sandbox.js";
 import { resolveContentInput } from "../lib/cli/read-content-input.js";
 import type {
@@ -86,13 +86,27 @@ function validateStatus(value: string): TicketStatus {
  * Parse --doc-ref value: "[type:]path"
  * - With colon: type is before colon, path is after
  * - Without colon: type defaults to 'attachment' (backward compat — F15)
+ * - Normalizes type via normalizeDocRefType (short + long aliases → canonical)
+ * - Warns to stderr if normalized type is not in STANDARD_DOC_REF_TYPES
  */
 function parseDocRef(raw: string, primary: boolean): AddDocRefInput {
   const colonIdx = raw.indexOf(":");
+  let type: string;
+  let path: string;
   if (colonIdx > 0) {
-    return { type: raw.slice(0, colonIdx), path: raw.slice(colonIdx + 1), primary };
+    type = raw.slice(0, colonIdx);
+    path = raw.slice(colonIdx + 1);
+  } else {
+    type = "attachment";
+    path = raw;
   }
-  return { type: "attachment", path: raw, primary };
+  const normalized = normalizeDocRefType(type);
+  if (!STANDARD_DOC_REF_TYPES.includes(normalized)) {
+    process.stderr.write(
+      `Warning: Unknown doc-ref type '${type}'. Standard types: ${STANDARD_DOC_REF_TYPES.join(", ")}\n`
+    );
+  }
+  return { type: normalized, path, primary };
 }
 
 /**
@@ -316,7 +330,7 @@ export function createTicketCommand(): Command {
     .option("--tags <tags>", "Comma-separated tags (replaces existing)")
     .option("--blocked-by <ids>", "Comma-separated ticket IDs that block this ticket (replaces existing; empty string to clear)")
     .option("--estimate <size>", "New effort estimate (XS|S|M|L|XL)")
-    .option("--doc-ref <value>", "Add document reference: [type:]path (ADDS to array, does not replace). Type defaults to 'attachment'.")
+    .option("--doc-ref <value>", "Add document reference: [type:]path. Standard types: req, uat, impl, orch, plan, spike, session, log, url, attachment. Type defaults to 'attachment'.")
     .option("--doc-ref-primary", "Mark the added doc-ref as primary (demotes any existing primary)")
     .option("--remove-doc-ref <path>", "Remove a doc-ref by exact path match")
     .option("--linked-branch <value>", "Link a branch: repo|branch[:sha] (ADDS to array)")
