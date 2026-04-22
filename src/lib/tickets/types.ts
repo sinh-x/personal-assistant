@@ -209,6 +209,23 @@ export type CounterStore = Record<string, number>;
 // ─── Doc-ref type taxonomy (Phase 4.1, PA-1210) ─────────────────────────────────
 
 /**
+ * Canonical ordering for doc-ref type display badges.
+ * Used by `formatDocRefBadge` in list view to render badges in canonical order.
+ */
+export const DOC_REF_BADGE_ORDER: readonly string[] = [
+  "req",
+  "plan",
+  "spike",
+  "impl",
+  "uat",
+  "orch",
+  "session",
+  "log",
+  "url",
+  "attachment",
+] as const;
+
+/**
  * Canonical lowercase doc-ref type codes.
  * Use `DOC_REF_TYPE_DISPLAY` to get the uppercase display string.
  */

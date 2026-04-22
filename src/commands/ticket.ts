@@ -5,6 +5,8 @@ import { getTicketsDir } from "../lib/paths.js";
 import { TicketStore } from "../lib/tickets/index.js";
 import { validateAuthor, validateAssignee } from "../lib/tickets/validate.js";
 import { formatTicketCard, formatDocRefsTable } from "../lib/tickets/display.js";
+import { normalizeDocRefType, formatDocRefBadge } from "../lib/tickets/doc-ref.js";
+import { DOC_REF_BADGE_ORDER } from "../lib/tickets/types.js";
 import { normalizeSandboxPath } from "../lib/agent-api/utils/sandbox.js";
 import { resolveContentInput } from "../lib/cli/read-content-input.js";
 import type {
@@ -134,14 +136,63 @@ function parseLinkedCommit(raw: string): AddLinkedCommitInput {
   return { repo, sha, message, author, timestamp };
 }
 
+/** Build the inline doc-ref badge prefix for list view, e.g. "[★REQ][UAT][IMPL]".
+ *  De-duplicates by type; orders by DOC_REF_BADGE_ORDER; marks primary with ★.
+ *  Returns empty string if docRefs is empty.
+ *  F8: collapses to "[★TYPE][+N]" when 4+ distinct types and row would exceed 120 cols. */
+function buildBadgePrefix(docRefs: DocRef[], titleLength: number): string {
+  if (!docRefs || docRefs.length === 0) return "";
+
+  // Group by normalized type, keeping primary ref per type
+  const byType = new Map<string, DocRef>();
+  for (const ref of docRefs) {
+    const key = normalizeDocRefType(ref.type);
+    if (!byType.has(key) || ref.primary) {
+      byType.set(key, ref);
+    }
+  }
+
+  // Order by canonical badge order
+  const ordered: DocRef[] = [];
+  for (const typeKey of DOC_REF_BADGE_ORDER) {
+    const ref = byType.get(typeKey);
+    if (ref) ordered.push(ref);
+  }
+  // Append any types not in the canonical order
+  for (const [, ref] of byType) {
+    if (!ordered.includes(ref)) ordered.push(ref);
+  }
+
+  const distinctCount = ordered.length;
+  const badgeLine = ordered.map((ref) => formatDocRefBadge(ref)).join("");
+
+  // F8 collapse: 4+ distinct types and row would exceed 120 cols
+  // Fixed columns: ID(9) + STATUS(25) + PRIORITY(11) + EST(6) + ASSIGNEE(28) + space = 80
+  const ROW_FIXED = 80;
+  if (distinctCount >= 4 && ROW_FIXED + badgeLine.length + 1 + titleLength > 120) {
+    const primary = ordered.find((r) => r.primary) ?? ordered[0];
+    const second = ordered.find((r) => r !== primary);
+    const remaining = distinctCount - 2;
+    const first = formatDocRefBadge(primary);
+    const secondStr = second ? formatDocRefBadge(second) : "";
+    const collapse = remaining > 0 ? `[+${remaining}]` : "";
+    return first + secondStr + collapse;
+  }
+
+  return badgeLine;
+}
+
 /** Format a ticket row for the list view — defensive null checks for all fields */
-function formatRow(id: string, status: string, priority: string, estimate: string, assignee: string, title: string): string {
+function formatRow(id: string, status: string, priority: string, estimate: string, assignee: string, title: string, docRefs?: DocRef[]): string {
+  const badgePrefix = buildBadgePrefix(docRefs ?? [], (title ?? "").length);
+  const paddedBadge = badgePrefix ? badgePrefix + " " : "";
   return (
     (id ?? "").padEnd(9) +
     (status ?? "").padEnd(25) +
     (priority ?? "").padEnd(11) +
     (estimate ?? "").padEnd(6) +
     (assignee ?? "").padEnd(28) +
+    paddedBadge +
     (title ?? "")
   );
 }
@@ -408,7 +459,7 @@ export function createTicketCommand(): Command {
         console.log(formatRow("ID", "STATUS", "PRIORITY", "EST", "ASSIGNEE", "TITLE"));
         console.log("-".repeat(80));
         for (const t of tickets) {
-          console.log(formatRow(t.id, t.status, t.priority, t.estimate, t.assignee, t.title));
+          console.log(formatRow(t.id, t.status, t.priority, t.estimate, t.assignee, t.title, t.doc_refs));
         }
         console.log(`\n${tickets.length} ticket(s)`);
       }
