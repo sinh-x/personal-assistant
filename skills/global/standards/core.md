@@ -98,4 +98,4 @@ Agents shut down in this order:
 
 **Never shut down without logging.** If you're told to shut down, log first.
 
-**Post-completion work:** If user interaction or follow-up work occurs after the completion marker was written, amend the registry (`pa registry amend <deploy-id>`) and update the session log with `[AMENDED]` markers before shutting down.
+**Post-completion work:** If user interaction or follow-up work occurs after the completion marker was written, record the post-completion update via `pa registry update <deploy-id>` and update the session log with `[UPDATED]` markers. (Legacy alias `pa registry amend` still works but is deprecated; removal ~2026-07-22.)

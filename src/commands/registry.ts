@@ -549,7 +549,7 @@ export function createRegistryCommand(): Command {
   // pa registry amend <deploy-id>
   cmd
     .command("amend <deploy-id>")
-    .description("Append an amendment note to a completed deployment")
+    .description("[DEPRECATED] Use 'pa registry update' instead. Alias for updating a completed deployment")
     .requiredOption("--summary <text>", "Amendment summary to append")
     .option("--log-file <path>", "Session log file path (optional)")
     .action(
@@ -560,7 +560,7 @@ export function createRegistryCommand(): Command {
           logFile?: string;
         }
       ) => {
-        // Validate deployment exists and has a completed event
+        // Validate deployment exists (started event required)
         const events = getDeploymentEvents(deployId);
         const started = events.find((e) => e.event === "started");
         if (!started) {
@@ -570,18 +570,14 @@ export function createRegistryCommand(): Command {
           process.exit(1);
         }
 
-        const completed = events.find((e) => e.event === "completed");
-        if (!completed) {
-          console.error(
-            `Error: Deployment "${deployId}" has not been completed. Use "pa registry complete" first.`
-          );
-          process.exit(1);
-        }
+        console.error(
+          "Warning: `pa registry amend` is deprecated. Use `pa registry update` instead. This alias will be removed ~2026-07-22."
+        );
 
         const event: RegistryEvent = {
           deployment_id: deployId,
           team: started.team,
-          event: "amended",
+          event: "updated",
           timestamp: localISOTimestamp(),
           summary: opts.summary,
           ...(opts.logFile ? { log_file: opts.logFile } : {}),
@@ -590,6 +586,146 @@ export function createRegistryCommand(): Command {
         appendRegistryEvent(event);
         console.log(
           `Amended: ${deployId} — ${opts.summary}`
+        );
+      }
+    );
+
+  // pa registry update <deploy-id>
+  cmd
+    .command("update <deploy-id>")
+    .description("Record an update to an existing deployment (post-completion correction)")
+    .option("--summary <text>", "Update summary")
+    .option("--status <status>", "Updated status (success|partial|failed)")
+    .option("--log-file <path>", "Session log file path")
+    .option("--rating-source <source>", "Rating source (agent|system|user)")
+    .option("--rating-overall <number>", "Overall rating (0-5)", parseFloat)
+    .option("--rating-productivity <number>", "Productivity rating (0-5)", parseFloat)
+    .option("--rating-quality <number>", "Quality rating (0-5)", parseFloat)
+    .option("--rating-efficiency <number>", "Efficiency rating (0-5)", parseFloat)
+    .option("--rating-insight <number>", "Insight rating (0-5)", parseFloat)
+    .option("--note <text>", "Free-text annotation for the update")
+    .action(
+      (
+        deployId: string,
+        opts: {
+          summary?: string;
+          status?: string;
+          logFile?: string;
+          ratingSource?: string;
+          ratingOverall?: number;
+          ratingProductivity?: number;
+          ratingQuality?: number;
+          ratingEfficiency?: number;
+          ratingInsight?: number;
+          note?: string;
+        }
+      ) => {
+        // Validate: at least one field must be provided
+        const hasAnyField =
+          opts.summary !== undefined ||
+          opts.status !== undefined ||
+          opts.logFile !== undefined ||
+          opts.ratingSource !== undefined ||
+          opts.ratingOverall !== undefined ||
+          opts.ratingProductivity !== undefined ||
+          opts.ratingQuality !== undefined ||
+          opts.ratingEfficiency !== undefined ||
+          opts.ratingInsight !== undefined ||
+          opts.note !== undefined;
+
+        if (!hasAnyField) {
+          console.error(
+            "Error: At least one field is required. Use --summary, --status, --log-file, --rating-*, or --note."
+          );
+          process.exit(1);
+        }
+
+        // Validate status if provided
+        if (
+          opts.status &&
+          !VALID_STATUSES.includes(opts.status as CompletionStatus)
+        ) {
+          console.error(
+            `Error: Invalid status "${opts.status}". Must be one of: success, partial, failed`
+          );
+          process.exit(1);
+        }
+
+        // Validate rating source if provided
+        if (
+          opts.ratingSource &&
+          !VALID_RATING_SOURCES.includes(opts.ratingSource as RatingSource)
+        ) {
+          console.error(
+            `Error: Invalid rating source "${opts.ratingSource}". Must be one of: agent, system, user`
+          );
+          process.exit(1);
+        }
+
+        // Validate rating values are in range
+        const ratingValues = [
+          opts.ratingOverall,
+          opts.ratingProductivity,
+          opts.ratingQuality,
+          opts.ratingEfficiency,
+          opts.ratingInsight,
+        ];
+        for (const val of ratingValues) {
+          if (val !== undefined && (val < 0 || val > 5)) {
+            console.error(
+              `Error: Rating values must be between 0 and 5. Got: ${val}`
+            );
+            process.exit(1);
+          }
+        }
+
+        // Validate deployment exists (has a started event)
+        const events = getDeploymentEvents(deployId);
+        const started = events.find((e) => e.event === "started");
+        if (!started) {
+          console.error(
+            `Error: Deployment "${deployId}" not found in registry (no started event).`
+          );
+          process.exit(1);
+        }
+
+        // Build rating object if any rating options are provided
+        let rating: Rating | undefined;
+        if (opts.ratingSource || opts.ratingOverall !== undefined) {
+          rating = {
+            source: (opts.ratingSource as RatingSource) ?? "agent",
+            overall: opts.ratingOverall ?? 0,
+            ...(opts.ratingProductivity !== undefined && {
+              productivity: opts.ratingProductivity,
+            }),
+            ...(opts.ratingQuality !== undefined && {
+              quality: opts.ratingQuality,
+            }),
+            ...(opts.ratingEfficiency !== undefined && {
+              efficiency: opts.ratingEfficiency,
+            }),
+            ...(opts.ratingInsight !== undefined && {
+              insight: opts.ratingInsight,
+            }),
+          };
+        }
+
+        const event: RegistryEvent = {
+          deployment_id: deployId,
+          team: started.team,
+          event: "updated",
+          timestamp: localISOTimestamp(),
+          ...(opts.status && { status: opts.status as CompletionStatus }),
+          ...(opts.summary && { summary: opts.summary }),
+          ...(opts.logFile && { log_file: opts.logFile }),
+          ...(rating && { rating }),
+          ...(opts.note && { note: opts.note }),
+        };
+
+        appendRegistryEvent(event);
+        const summaryText = opts.summary ?? "update recorded";
+        console.log(
+          `Updated: ${deployId} — ${summaryText}`
         );
       }
     );
