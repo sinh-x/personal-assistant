@@ -114,7 +114,8 @@ export interface Rating {
 export interface RegistryEvent {
   deployment_id: string;
   team: string;
-  event: "started" | "pid" | "completed" | "crashed" | "amended";
+  event: "started" | "pid" | "completed" | "crashed" | "amended" | "updated";
+  note?: string;
   timestamp: string;
   pid?: number;
   status?: "success" | "partial" | "failed";

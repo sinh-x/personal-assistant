@@ -54,6 +54,7 @@ export function readRegistry(): RegistryEvent[] {
       repo: row.repo as string | undefined,
       fallback: !!row.fallback,
       resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
+      note: row.note as string | undefined,
     };
   });
 }
@@ -77,11 +78,13 @@ export function appendRegistryEvent(event: RegistryEvent): void {
     INSERT INTO registry_events (
       deployment_id, team, event, timestamp, pid, status, summary,
       log_file, primer, agents, models, error, exit_code,
-      ticket_id, provider, rating, objective, repo, fallback, resumed_from_deployment_id
+      ticket_id, provider, rating, objective, repo, fallback, resumed_from_deployment_id,
+      note
     ) VALUES (
       @deployment_id, @team, @event, @timestamp, @pid, @status, @summary,
       @log_file, @primer, @agents, @models, @error, @exit_code,
-      @ticket_id, @provider, @rating, @objective, @repo, @fallback, @resumed_from_deployment_id
+      @ticket_id, @provider, @rating, @objective, @repo, @fallback, @resumed_from_deployment_id,
+      @note
     )
   `).run({
     deployment_id: event.deployment_id,
@@ -104,6 +107,7 @@ export function appendRegistryEvent(event: RegistryEvent): void {
     repo: event.repo ?? null,
     fallback: event.fallback ? 1 : 0,
     resumed_from_deployment_id: event.resumed_from_deployment_id ?? null,
+    note: event.note ?? null,
   });
 
   // UPSERT INTO deployments materialized view
@@ -214,6 +218,12 @@ function upsertDeployment(db: ReturnType<typeof getDb>, event: RegistryEvent): v
         summary: event.summary ?? "",
       });
       break;
+
+    case "updated":
+      // NO-OP: updated events are append-only to registry_events only.
+      // The deployments materialized view preserves the original completion state.
+      // This maintains the append-only invariant confirmed by the user.
+      break;
   }
 }
 
@@ -250,6 +260,7 @@ export function getDeploymentEvents(deployId: string): RegistryEvent[] {
       repo: row.repo as string | undefined,
       fallback: !!row.fallback,
       resumed_from_deployment_id: row.resumed_from_deployment_id as string | undefined,
+      note: row.note as string | undefined,
     };
   });
 }
