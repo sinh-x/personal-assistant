@@ -161,6 +161,59 @@ validate_command() {
   compare_flags "$cmd" "$subcmd" "$cli_flags" "$fish_flags"
 }
 
+# --- Validate status completion deploy IDs ---
+validate_status_deploy_ids() {
+  # Verify __pa_deployments_with_team emits valid bare deploy IDs (not team/id).
+  log_info "Validating status completion deploy IDs..."
+
+  local tmpfile
+  tmpfile=$(mktemp)
+
+  # Shell out to fish to evaluate the completion helper
+  fish -c "source completions/pa.fish; __pa_deployments_with_team" 2>/dev/null > "$tmpfile" || true
+
+  if [[ ! -s "$tmpfile" ]]; then
+    log_warn "No deployment IDs returned from helper (registry may be empty)"
+    rm -f "$tmpfile"
+    return 0
+  fi
+
+  local validation_errors=0
+  while IFS=$'\t' read -r deploy_id description; do
+    # Validate: column 1 must be bare deploy ID (d-xxxxxx)
+    if [[ ! "$deploy_id" =~ ^d-[0-9a-f]+$ ]]; then
+      log_error "Invalid deploy ID format: '$deploy_id' (expected ^d-[0-9a-f]+$)"
+      validation_errors=$((validation_errors + 1))
+    fi
+  done < "$tmpfile"
+
+  # Sample test: run pa status on first 3 IDs to ensure "Deployment not found" doesn't appear
+  local sample_count=0
+  while IFS=$'\t' read -r deploy_id description; do
+    if [[ $sample_count -ge 3 ]]; then
+      break
+    fi
+    if [[ "$deploy_id" =~ ^d-[0-9a-f]+$ ]]; then
+      local status_output
+      status_output=$(pa status "$deploy_id" 2>&1)
+      if echo "$status_output" | grep -q "Deployment not found"; then
+        log_error "Completion value '$deploy_id' not accepted by pa status: 'Deployment not found'"
+        validation_errors=$((validation_errors + 1))
+      fi
+      sample_count=$((sample_count + 1))
+    fi
+  done < "$tmpfile"
+
+  rm -f "$tmpfile"
+
+  if [[ $validation_errors -gt 0 ]]; then
+    log_error "Status completion validation failed: $validation_errors error(s)"
+    ERRORS=$((ERRORS + validation_errors))
+  else
+    log_info "Status completion validation passed."
+  fi
+}
+
 # --- Main validation ---
 
 log_info "Starting completion validation..."
@@ -208,6 +261,9 @@ for cmd in "${!NESTED_SUBCOMMANDS[@]}"; do
     validate_command "$cmd" "$subcmd"
   done
 done
+
+# Validate status completion deploy IDs
+validate_status_deploy_ids
 
 # --- Report results ---
 echo ""

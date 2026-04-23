@@ -95,18 +95,27 @@ function __pa_deploy_ids
 end
 
 function __pa_deployments_with_team
-    # List deployments as "team/deployment_id" with summary as description.
-    # Format: "team/id\tsummary" for fish's -d flag display.
-    # Queries SQLite registry.
+    # List deployments as bare deploy_id with "team — summary" as description.
+    # Format: "d-xxxxxx\team — summary" for fish's -d flag display.
+    # Value column is bare deploy ID (accepted by pa status).
+    # Ordered by most-recent first (MAX timestamp).
     set -l registry_db ~/Documents/ai-usage/deployments/registry.db
     if test -f "$registry_db"
         sqlite3 "$registry_db" "
-            SELECT e.team || '/' || e.deployment_id, COALESCE(
-                (SELECT summary FROM registry_events WHERE deployment_id = e.deployment_id AND summary IS NOT NULL AND summary != '' LIMIT 1),
+            SELECT
+              e.deployment_id,
+              e.team || ' — ' || COALESCE(
+                (SELECT summary FROM registry_events
+                  WHERE deployment_id = e.deployment_id AND summary IS NOT NULL AND summary != ''
+                  LIMIT 1),
                 '(no summary)'
-            )
-            FROM (SELECT DISTINCT deployment_id, team FROM registry_events) e
-            ORDER BY e.deployment_id DESC
+              )
+            FROM (
+              SELECT deployment_id, team, MAX(timestamp) AS last_ts
+              FROM registry_events
+              GROUP BY deployment_id
+            ) e
+            ORDER BY e.last_ts DESC
             LIMIT 100;
         " -separator \t 2>/dev/null
     end
@@ -204,7 +213,7 @@ complete -c pa -n '__fish_seen_subcommand_from daily' -l interactive -d 'Run in 
 complete -c pa -n '__fish_seen_subcommand_from daily' -l review      -d 'Interactive review mode (end=review+synthesize, plan=finalize draft)'
 
 # --- status: [deploy-id] + flags ---
-complete -c pa -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from (__pa_deployments_with_team)' -a '(__pa_deployments_with_team)' -d 'Deployment (team/id — summary)'
+complete -c pa -n '__fish_seen_subcommand_from status; and not __fish_seen_subcommand_from (__pa_deployments_with_team)' -a '(__pa_deployments_with_team)' -d 'Deployment (team — summary)'
 complete -c pa -n '__fish_seen_subcommand_from status' -l running   -d 'Show only running deployments'
 complete -c pa -n '__fish_seen_subcommand_from status' -l team      -d 'Filter by team name' -r -a '(__pa_teams)'
 complete -c pa -n '__fish_seen_subcommand_from status' -l wait      -d 'Block until deployment reaches a terminal state'
