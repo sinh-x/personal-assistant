@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { execSync } from "node:child_process";
-import { readRegistry } from "../lib/registry.js";
+import { readRegistry, queryDeploymentStatus } from "../lib/registry.js";
 import { getDataDir, getRegistryDbPath } from "../lib/paths.js";
 import { isProcessAlive } from "../utils/process.js";
 import type { RegistryEvent } from "../lib/types.js";
@@ -300,13 +300,37 @@ function waitForDeployment(did: string): void {
 function showReport(did: string): void {
   const base = resolve(homedir(), "Documents/ai-usage");
 
-  // Collect all agent-team done/ and ongoing/ dirs dynamically
+  // ── Step 1: Registry-first lookup ──────────────────────────────────────
+  // Try to extract artifact path from the deployment's summary field.
+  // The artifact path is embedded in the summary text, e.g.:
+  //   "Artifact: agent-teams/builder/artifacts/2026-04-23-FIT-049-transform-reader-migration.md"
+  const depStatus = queryDeploymentStatus(did);
+  if (depStatus?.summary) {
+    const artifactMatch = depStatus.summary.match(/Artifact:\s*(\S+\.md)/);
+    if (artifactMatch) {
+      const artifactPath = resolve(base, artifactMatch[1]);
+      if (existsSync(artifactPath)) {
+        console.log(readFileSync(artifactPath, "utf-8"));
+        return;
+      }
+    }
+  }
+
+  // ── Step 2: Filesystem fallback scan ────────────────────────────────────
+  // Collect all agent-team done/, ongoing/, artifacts/, work-reports/,
+  // completed-deployments/ dirs dynamically
   const agentTeamDirs: string[] = [];
   const agentTeamsBase = resolve(base, "agent-teams");
   if (existsSync(agentTeamsBase)) {
     for (const team of readdirSync(agentTeamsBase, { withFileTypes: true })) {
       if (!team.isDirectory()) continue;
-      for (const sub of ["done", "ongoing"]) {
+      for (const sub of [
+        "done",
+        "ongoing",
+        "artifacts",
+        "work-reports",
+        "completed-deployments",
+      ]) {
         agentTeamDirs.push(resolve(agentTeamsBase, team.name, sub));
       }
     }
@@ -319,8 +343,12 @@ function showReport(did: string): void {
     ...agentTeamDirs,
   ];
 
+  // Track which dirs were actually searched for the not-found message
+  const searchedDirs: string[] = [];
+
   for (const dir of searchDirs) {
     if (!existsSync(dir)) continue;
+    searchedDirs.push(dir);
     const entries = readdirSync(dir).filter((f) => f.endsWith(".md"));
 
     // Fast path: deploy ID in filename
@@ -341,7 +369,12 @@ function showReport(did: string): void {
     }
   }
 
-  console.log(`No work report found for deployment: ${did}`);
+  // ── Step 3: Not found ───────────────────────────────────────────────────
+  const registryArtifact =
+    depStatus?.summary?.match(/Artifact:\s*(\S+\.md)/)?.[1] ?? "not set";
+  console.log(
+    `No work report found for deployment: ${did}.\nSearched: ${searchedDirs.join(", ")}.\nRegistry artifact: ${registryArtifact}.`
+  );
 }
 
 /**

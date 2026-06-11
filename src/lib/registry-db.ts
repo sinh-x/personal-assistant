@@ -98,7 +98,18 @@ function migrateToV6(db: Database.Database): void {
 
   // Copy data from old table to new table (note column will be NULL for existing rows)
   db.exec(`
-    INSERT INTO registry_events_v6 SELECT * FROM registry_events;
+    INSERT INTO registry_events_v6 (
+      id, deployment_id, team, event, timestamp, pid, status, summary,
+      log_file, primer, agents, models, error, exit_code,
+      ticket_id, provider, rating, objective, repo, fallback,
+      resumed_from_deployment_id, note
+    )
+    SELECT
+      id, deployment_id, team, event, timestamp, pid, status, summary,
+      log_file, primer, agents, models, error, exit_code,
+      ticket_id, provider, rating, objective, repo, fallback,
+      resumed_from_deployment_id, NULL as note
+    FROM registry_events
   `);
 
   // Drop old table and rename new table
