@@ -346,7 +346,7 @@ export function repoGitExtRoutes(): Hono {
   // Validation regexes (reused from repo-commits.ts)
   const branchNameRegex = /^[a-zA-Z0-9._\-/]+$/;
   const repoKeyRegex = /^[a-zA-Z0-9-]+$/;
-  const shaRegex = /^[a-f0-9]{40}$/i;
+  const shaRegex = /^[a-f0-9]{7,40}$/i;
 
   // ---------------------------------------------------------------------------
   // GET /api/repos/:key/diff?commit=<sha> — full commit diff
@@ -368,7 +368,7 @@ export function repoGitExtRoutes(): Hono {
       return c.json({ error: "commit query param is required", code: "BAD_REQUEST" }, 400);
     }
     if (!shaRegex.test(sha)) {
-      return c.json({ error: "Invalid SHA format. Must be 40-character hex string", code: "BAD_REQUEST" }, 400);
+      return c.json({ error: "Invalid SHA format. Must be 7-40 character hex string", code: "BAD_REQUEST" }, 400);
     }
 
     // Load repo

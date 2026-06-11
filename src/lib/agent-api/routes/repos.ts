@@ -25,6 +25,7 @@ interface BranchInfo {
 interface FeatureBranch {
   name: string;
   latestCommit: {
+    hash: string;
     hash_short: string;
     message: string;
     date: string;
@@ -147,25 +148,26 @@ function getUnmergedBranches(developBranch: string, cwd: string): FeatureBranch[
     const logOutput = gitRun([
       "log",
       "-1",
-      "--format=%h%n%s%n%ci",
+      "--format=%H%n%h%n%s%n%ci",
       name,
     ], cwd);
 
     if (logOutput) {
       const lines = logOutput.split("\n");
-      if (lines.length >= 3) {
+      if (lines.length >= 4) {
         features.push({
           name,
           latestCommit: {
-            hash_short: lines[0],
-            message: lines[1],
-            date: lines[2],
+            hash: lines[0],
+            hash_short: lines[1],
+            message: lines[2],
+            date: lines[3],
           },
         });
       } else {
         features.push({
           name,
-          latestCommit: { hash_short: "?", message: "?", date: "?" },
+          latestCommit: { hash: "?", hash_short: "?", message: "?", date: "?" },
         });
       }
     }
